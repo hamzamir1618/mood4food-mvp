@@ -1,13 +1,14 @@
 {
     "source_intent": {
-        "budget_max_pkr": 800,
+        "budget_max_pkr": 1000,
         "allergens_pruned": [
+            "dairy",
             "meat"
         ]
     },
     "soft_constraints": {
         "protein_priority": "normal",
-        "mood_vector_seed": "spicy"
+        "mood_vector_seed": "neutral"
     },
     "safe_candidates": [
         {
@@ -25,13 +26,6 @@
             "calories": 350
         },
         {
-            "dish_id": "D003",
-            "name": "Palak Paneer",
-            "price_pkr": 350,
-            "protein_g": 18.0,
-            "calories": 400
-        },
-        {
             "dish_id": "D004",
             "name": "Aloo Gobi",
             "price_pkr": 200,
@@ -44,20 +38,6 @@
             "price_pkr": 220,
             "protein_g": 5.0,
             "calories": 260
-        },
-        {
-            "dish_id": "D006",
-            "name": "Vegetable Biryani",
-            "price_pkr": 300,
-            "protein_g": 10.0,
-            "calories": 450
-        },
-        {
-            "dish_id": "D007",
-            "name": "Dahi Bhalle",
-            "price_pkr": 180,
-            "protein_g": 8.0,
-            "calories": 300
         },
         {
             "dish_id": "D015",
@@ -74,13 +54,6 @@
             "calories": 280
         },
         {
-            "dish_id": "D017",
-            "name": "Plain Naan",
-            "price_pkr": 50,
-            "protein_g": 3.0,
-            "calories": 260
-        },
-        {
             "dish_id": "D018",
             "name": "Spicy Tofu Stir-Fry",
             "price_pkr": 320,
@@ -93,7 +66,133 @@
             "price_pkr": 150,
             "protein_g": 10.0,
             "calories": 350
+        },
+        {
+            "dish_id": "D021",
+            "name": "Rajma Chawal",
+            "price_pkr": 200,
+            "protein_g": 13.0,
+            "calories": 380
+        },
+        {
+            "dish_id": "D022",
+            "name": "Bhindi Masala",
+            "price_pkr": 180,
+            "protein_g": 4.0,
+            "calories": 220
+        },
+        {
+            "dish_id": "D023",
+            "name": "Mushroom Matar",
+            "price_pkr": 260,
+            "protein_g": 9.0,
+            "calories": 240
+        },
+        {
+            "dish_id": "D024",
+            "name": "Mixed Veg Curry",
+            "price_pkr": 220,
+            "protein_g": 7.0,
+            "calories": 270
+        },
+        {
+            "dish_id": "D025",
+            "name": "Coconut Chickpea Curry",
+            "price_pkr": 300,
+            "protein_g": 15.0,
+            "calories": 370
+        },
+        {
+            "dish_id": "D030",
+            "name": "Prawn Karahi",
+            "price_pkr": 800,
+            "protein_g": 28.0,
+            "calories": 380
+        },
+        {
+            "dish_id": "D032",
+            "name": "Shrimp Rice Bowl",
+            "price_pkr": 650,
+            "protein_g": 26.0,
+            "calories": 450
+        },
+        {
+            "dish_id": "D033",
+            "name": "Coconut Fish Curry",
+            "price_pkr": 600,
+            "protein_g": 27.0,
+            "calories": 390
+        },
+        {
+            "dish_id": "D034",
+            "name": "Egg Fried Rice",
+            "price_pkr": 200,
+            "protein_g": 12.0,
+            "calories": 400
+        },
+        {
+            "dish_id": "D035",
+            "name": "Omelette Paratha",
+            "price_pkr": 120,
+            "protein_g": 15.0,
+            "calories": 420
+        },
+        {
+            "dish_id": "D037",
+            "name": "Missi Roti",
+            "price_pkr": 40,
+            "protein_g": 6.0,
+            "calories": 200
+        },
+        {
+            "dish_id": "D038",
+            "name": "Tofu Rice Bowl",
+            "price_pkr": 280,
+            "protein_g": 18.0,
+            "calories": 380
+        },
+        {
+            "dish_id": "D042",
+            "name": "Suji Halwa",
+            "price_pkr": 100,
+            "protein_g": 3.0,
+            "calories": 300
+        },
+        {
+            "dish_id": "D044",
+            "name": "Samosa (2 pcs)",
+            "price_pkr": 60,
+            "protein_g": 4.0,
+            "calories": 320
+        },
+        {
+            "dish_id": "D045",
+            "name": "Pakora Plate",
+            "price_pkr": 80,
+            "protein_g": 5.0,
+            "calories": 350
+        },
+        {
+            "dish_id": "D046",
+            "name": "Gol Gappay (6 pcs)",
+            "price_pkr": 50,
+            "protein_g": 2.0,
+            "calories": 180
+        },
+        {
+            "dish_id": "D049",
+            "name": "Peanut Chaat Salad",
+            "price_pkr": 120,
+            "protein_g": 10.0,
+            "calories": 250
+        },
+        {
+            "dish_id": "D051",
+            "name": "Pomegranate Salad",
+            "price_pkr": 150,
+            "protein_g": 3.0,
+            "calories": 160
         }
     ],
-    "candidate_count": 12
+    "candidate_count": 26
 }

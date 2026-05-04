@@ -13,8 +13,8 @@ Mood4Food is a local-first, offline-capable decision-support system that recomme
 ┌────────────────────────────────────────────────────────────────────┐
 │                    TIER 3 — WEB UI (HTML/CSS/JS)                   │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐    │
-│   │ Winner Card   │  │ Score Bars   │  │ Budget Slider        │    │
-│   │ (Best Pick)   │  │ H / B / T    │  │ POST /recalculate    │    │
+│   │ Query Bar     │  │ Winner Card  │  │ Budget Slider        │    │
+│   │ POST /submit  │  │ Score Bars   │  │ POST /recalculate    │    │
 │   └──────┬───────┘  └──────────────┘  └──────────┬───────────┘    │
 │          │          GET /decision_blueprint       │                │
 └──────────┼───────────────────────────────────────┼────────────────┘
@@ -22,6 +22,7 @@ Mood4Food is a local-first, offline-capable decision-support system that recomme
            ▼                                       ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │                    FASTAPI ORCHESTRATOR (:8000)                    │
+│         POST /submit → Tier 1a → Tier 1b → Tier 2 → respond      │
 └──────────┬────────────────────────────────────────────────────────┘
            │
      ┌─────┴──────────────────────────────────┐
@@ -51,7 +52,7 @@ JSON Contract Flow:
 ```
 MVP/
 ├── orchestrator.py              # FastAPI server — serves UI + API
-├── seed_neo4j.py                # Seeds Neo4j with 20 dishes & 41 ingredients
+├── seed_neo4j.py                # Seeds Neo4j with 55 dishes & 74 ingredients
 ├── requirements.txt             # Python dependencies
 │
 ├── web_ui/                      # Web frontend (served at http://localhost:8000/)
@@ -135,9 +136,9 @@ Expected output:
 
 ```
 [OK]  Connected to Neo4j at bolt://localhost:7687
-[OK]  Seeded 20 Dish nodes
-[OK]  Seeded 41 Ingredient nodes
-[OK]  Created 228 CONTAINS relationships
+[OK]  Seeded 55 Dish nodes
+[OK]  Seeded 74 Ingredient nodes
+[OK]  Created 626 CONTAINS relationships
 [OK]  Neo4j seed complete — ready for symbolic_anchoring.py
 ```
 
@@ -172,16 +173,18 @@ Open **http://localhost:8000/** in your browser. Done.
 |--------|----------|-------------|
 | `GET` | `/` | Serves the Mood4Food web UI |
 | `GET` | `/decision_blueprint` | Returns the current decision blueprint JSON |
+| `POST` | `/submit` | Accepts `{"query": "..."}`, runs the full 3-stage pipeline, returns blueprint |
 | `POST` | `/recalculate` | Accepts `{"w_budget": float}`, returns recalculated blueprint |
 
 ---
 
 ## Usage
 
-1. **View the recommendation** — The app loads and shows the best dish based on current constraints.
-2. **Adjust budget priority** — Use the slider to control how much weight is given to price. Dragging right favours the cheapest option; dragging left favours health and taste.
-3. **View all options** — Scroll down to see every candidate dish ranked by score.
-4. **Understand the reasoning** — Click "How It Works" to see the full AI reasoning trace.
+1. **Search for food** — Type a natural language query in the search bar, e.g. `"food under 300 rupees, no meat no dairy"`. The full pipeline runs and returns fresh results.
+2. **View the recommendation** — The app shows the best dish based on your constraints.
+3. **Adjust budget priority** — Use the slider to control how much weight is given to price. Dragging right favours the cheapest option; dragging left favours health and taste.
+4. **View all options** — Scroll down to see every candidate dish ranked by score.
+5. **Understand the reasoning** — Click "How It Works" to see the full AI reasoning trace.
 
 ---
 
