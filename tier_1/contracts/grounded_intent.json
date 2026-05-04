@@ -1,0 +1,12 @@
+{
+    "hard_constraints": {
+        "budget_max_pkr": 800,
+        "allergens_pruned": [
+            "meat"
+        ]
+    },
+    "soft_constraints": {
+        "protein_priority": "normal",
+        "mood_vector_seed": "spicy"
+    }
+}

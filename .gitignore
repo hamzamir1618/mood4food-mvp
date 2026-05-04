@@ -1,0 +1,45 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Flutter ─────────────────────────────────────────────────────────────────
+fipe_flutter/.dart_tool/
+fipe_flutter/build/
+fipe_flutter/.flutter-plugins
+fipe_flutter/.flutter-plugins-dependencies
+fipe_flutter/.packages
+fipe_flutter/pubspec.lock
+
+# ── Vector Store (local runtime data) ───────────────────────────────────────
+tier_2/vector_store.json
+tier_2/chroma_store/
+
+# ── IDE / Editor ────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log
+
+# ── Environment / Secrets ───────────────────────────────────────────────────
+.env
+.env.local
