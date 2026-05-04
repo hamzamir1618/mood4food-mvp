@@ -1,6 +1,6 @@
 """
-FastAPI Orchestrator — serves decision_blueprint.json and handles
-weight recalculation requests from the web UI frontend.
+FastAPI Orchestrator — serves the web UI, runs the full ingestion-to-debate
+pipeline from user queries, and handles weight recalculation.
 
 Run:  uvicorn orchestrator:app --host 0.0.0.0 --port 8000 --reload
 Open: http://localhost:8000/
@@ -51,7 +51,61 @@ class WeightUpdate(BaseModel):
     w_budget: float
 
 
+class QueryInput(BaseModel):
+    query: str
+
+
 # ── Routes ──────────────────────────────────────────────────────────────────
+
+
+@app.post("/submit")
+def submit_query(payload: QueryInput):
+    """
+    Accepts a natural language food query from the user, runs the full
+    3-stage pipeline (intent parsing → Neo4j pruning → debate), and
+    returns the resulting decision_blueprint.
+    """
+    from tier_1.multi_modal_ingestion import run_ingestion_pipeline
+    from tier_1.symbolic_anchoring import run_anchoring_pipeline
+    from tier_2.consensus_manager import run_debate_pipeline
+
+    query = payload.query.strip()
+    if not query:
+        raise HTTPException(400, "Query cannot be empty.")
+
+    log.info("─── /submit received: %s ───", query)
+
+    # Stage 1: Intent Parsing
+    try:
+        intent = run_ingestion_pipeline(query)
+    except Exception as exc:
+        log.error("Tier 1a failed: %s", exc)
+        raise HTTPException(500, f"Intent parsing failed: {exc}")
+
+    # Stage 2: Neo4j Allergen Pruning
+    try:
+        run_anchoring_pipeline()
+    except Exception as exc:
+        log.error("Tier 1b failed: %s", exc)
+        raise HTTPException(503, f"Neo4j query failed — is the database running? ({exc})")
+
+    # Stage 3: Multi-Agent Debate
+    try:
+        run_debate_pipeline()
+    except Exception as exc:
+        log.error("Tier 2 failed: %s", exc)
+        raise HTTPException(500, f"Debate pipeline failed: {exc}")
+
+    # Return the freshly written blueprint
+    if not DECISION_BLUEPRINT_PATH.exists():
+        raise HTTPException(500, "Pipeline completed but decision_blueprint.json was not created.")
+
+    with open(DECISION_BLUEPRINT_PATH, "r", encoding="utf-8") as fh:
+        blueprint = json.load(fh)
+
+    log.info("─── /submit complete → winner: %s ───", blueprint.get("winning_dish", {}).get("name", "?"))
+    return blueprint
+
 
 @app.get("/decision_blueprint")
 def get_decision_blueprint():

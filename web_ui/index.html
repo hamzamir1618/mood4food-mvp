@@ -26,6 +26,24 @@
     </div>
   </header>
 
+  <!-- ── Query Input Bar ────────────────────────────────────────────── -->
+  <div class="query-bar-wrapper">
+    <div class="query-bar" id="query-bar">
+      <form id="query-form" autocomplete="off">
+        <div class="query-input-row">
+          <span class="query-icon">🔍</span>
+          <input type="text" id="query-input" class="query-input"
+                 placeholder='Try: "spicy food under 500 rupees, no dairy"'
+                 aria-label="Describe what you want to eat">
+          <button type="submit" class="query-submit" id="query-submit">
+            Find Food
+          </button>
+        </div>
+      </form>
+      <div class="query-status" id="query-status"></div>
+    </div>
+  </div>
+
   <div class="app-container">
 
     <!-- ── Loading State ─────────────────────────────────────────────── -->

@@ -21,6 +21,16 @@ const $errorMsg  = document.getElementById('error-message');
 // ── Boot ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refresh-btn').addEventListener('click', fetchBlueprint);
+
+  // Query form
+  const form = document.getElementById('query-form');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('query-input');
+    const text = input.value.trim();
+    if (text) submitQuery(text);
+  });
+
   fetchBlueprint();
 });
 
@@ -39,7 +49,49 @@ async function fetchBlueprint() {
   }
 }
 
-// ── Recalculate with New Budget Weight ─────────────────────────────────────
+// ── Submit New Query (full pipeline) ───────────────────────────────────────
+async function submitQuery(queryText) {
+  const $status = document.getElementById('query-status');
+  const $submit = document.getElementById('query-submit');
+  const $input  = document.getElementById('query-input');
+
+  // Disable input while pipeline runs
+  $submit.disabled = true;
+  $input.disabled = true;
+  $status.className = 'query-status running';
+  $status.textContent = '⟳ Running pipeline… parsing intent → querying database → finding best dish…';
+
+  showLoading();
+
+  try {
+    const resp = await fetch(`${API_BASE}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: queryText }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: `Server responded ${resp.status}` }));
+      throw new Error(err.detail || `Server responded ${resp.status}`);
+    }
+
+    blueprint = await resp.json();
+    budgetPriority = blueprint.agent_weights?.w_b ?? 0.3;
+    firstRenderDone = false;
+    render();
+
+    $status.className = 'query-status success';
+    $status.textContent = `✓ Found ${blueprint.all_candidate_scores?.length ?? 0} options — recommending ${blueprint.winning_dish?.name || 'a dish'}`;
+    setTimeout(() => { $status.textContent = ''; $status.className = 'query-status'; }, 4000);
+  } catch (err) {
+    showError(err.message);
+    $status.className = 'query-status error';
+    $status.textContent = `✗ ${err.message}`;
+  } finally {
+    $submit.disabled = false;
+    $input.disabled = false;
+  }
+}
 async function recalculate(wBudget) {
   const $status = document.getElementById('slider-status');
   if ($status) { $status.classList.add('visible'); $status.textContent = '⟳ Updating…'; }
