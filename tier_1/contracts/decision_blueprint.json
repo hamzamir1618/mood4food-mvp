@@ -1,0 +1,152 @@
+{
+    "winning_dish": {
+        "dish_id": "D016",
+        "name": "Anda Curry",
+        "price_pkr": 180
+    },
+    "utility_breakdown": {
+        "u_health": 1.0,
+        "u_budget": 0.165299,
+        "u_taste": 0.5,
+        "u_total": 0.63306
+    },
+    "agent_weights": {
+        "w_h": 0.4,
+        "w_b": 0.2,
+        "w_t": 0.4
+    },
+    "relaxation_rounds": 0,
+    "xai_traces": [
+        "slider_override: w_h=0.40 w_b=0.20 w_t=0.40",
+        "  Dal Tadka → U_h=0.7500 U_b=0.0821 U_t=0.5000 | U_total=0.5164",
+        "  Chana Masala → U_h=0.8000 U_b=0.0608 U_t=0.5000 | U_total=0.5322",
+        "  Palak Paneer → U_h=0.9000 U_b=0.0302 U_t=0.5000 | U_total=0.5660",
+        "  Aloo Gobi → U_h=0.4286 U_b=0.1353 U_t=0.5000 | U_total=0.3985",
+        "  Baingan Bharta → U_h=0.3846 U_b=0.1108 U_t=0.5000 | U_total=0.3760",
+        "  Vegetable Biryani → U_h=0.4444 U_b=0.0498 U_t=0.5000 | U_total=0.3877",
+        "  Dahi Bhalle → U_h=0.5333 U_b=0.1653 U_t=0.5000 | U_total=0.4464",
+        "  Fish Fry Lahori → U_h=1.0000 U_b=0.0067 U_t=0.5000 | U_total=0.6013",
+        "  Anda Curry → U_h=1.0000 U_b=0.1653 U_t=0.5000 | U_total=0.6331",
+        "  Plain Naan → U_h=0.2308 U_b=0.6065 U_t=0.5000 | U_total=0.4136",
+        "  Spicy Tofu Stir-Fry → U_h=1.0000 U_b=0.0408 U_t=0.5000 | U_total=0.6082",
+        "  Khichdi → U_h=0.5714 U_b=0.2231 U_t=0.5000 | U_total=0.4732",
+        "winner: Anda Curry (U_total=0.6331)"
+    ],
+    "all_candidate_scores": [
+        {
+            "dish_id": "D001",
+            "name": "Dal Tadka",
+            "u_health": 0.75,
+            "u_budget": 0.082085,
+            "u_taste": 0.5,
+            "u_total": 0.516417,
+            "price_pkr": 250
+        },
+        {
+            "dish_id": "D002",
+            "name": "Chana Masala",
+            "u_health": 0.8,
+            "u_budget": 0.06081,
+            "u_taste": 0.5,
+            "u_total": 0.532162,
+            "price_pkr": 280
+        },
+        {
+            "dish_id": "D003",
+            "name": "Palak Paneer",
+            "u_health": 0.9,
+            "u_budget": 0.030197,
+            "u_taste": 0.5,
+            "u_total": 0.566039,
+            "price_pkr": 350
+        },
+        {
+            "dish_id": "D004",
+            "name": "Aloo Gobi",
+            "u_health": 0.428571,
+            "u_budget": 0.135335,
+            "u_taste": 0.5,
+            "u_total": 0.398496,
+            "price_pkr": 200
+        },
+        {
+            "dish_id": "D005",
+            "name": "Baingan Bharta",
+            "u_health": 0.384615,
+            "u_budget": 0.110803,
+            "u_taste": 0.5,
+            "u_total": 0.376007,
+            "price_pkr": 220
+        },
+        {
+            "dish_id": "D006",
+            "name": "Vegetable Biryani",
+            "u_health": 0.444444,
+            "u_budget": 0.049787,
+            "u_taste": 0.5,
+            "u_total": 0.387735,
+            "price_pkr": 300
+        },
+        {
+            "dish_id": "D007",
+            "name": "Dahi Bhalle",
+            "u_health": 0.533333,
+            "u_budget": 0.165299,
+            "u_taste": 0.5,
+            "u_total": 0.446393,
+            "price_pkr": 180
+        },
+        {
+            "dish_id": "D015",
+            "name": "Fish Fry Lahori",
+            "u_health": 1.0,
+            "u_budget": 0.006738,
+            "u_taste": 0.5,
+            "u_total": 0.601348,
+            "price_pkr": 500
+        },
+        {
+            "dish_id": "D016",
+            "name": "Anda Curry",
+            "u_health": 1.0,
+            "u_budget": 0.165299,
+            "u_taste": 0.5,
+            "u_total": 0.63306,
+            "price_pkr": 180
+        },
+        {
+            "dish_id": "D017",
+            "name": "Plain Naan",
+            "u_health": 0.230769,
+            "u_budget": 0.606531,
+            "u_taste": 0.5,
+            "u_total": 0.413614,
+            "price_pkr": 50
+        },
+        {
+            "dish_id": "D018",
+            "name": "Spicy Tofu Stir-Fry",
+            "u_health": 1.0,
+            "u_budget": 0.040762,
+            "u_taste": 0.5,
+            "u_total": 0.608152,
+            "price_pkr": 320
+        },
+        {
+            "dish_id": "D019",
+            "name": "Khichdi",
+            "u_health": 0.571429,
+            "u_budget": 0.22313,
+            "u_taste": 0.5,
+            "u_total": 0.473197,
+            "price_pkr": 150
+        }
+    ],
+    "source_context": {
+        "budget_max_pkr": 800,
+        "allergens_pruned": [
+            "meat"
+        ],
+        "mood_vector_seed": "spicy"
+    }
+}

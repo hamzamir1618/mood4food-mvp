@@ -1,0 +1,99 @@
+{
+    "source_intent": {
+        "budget_max_pkr": 800,
+        "allergens_pruned": [
+            "meat"
+        ]
+    },
+    "soft_constraints": {
+        "protein_priority": "normal",
+        "mood_vector_seed": "spicy"
+    },
+    "safe_candidates": [
+        {
+            "dish_id": "D001",
+            "name": "Dal Tadka",
+            "price_pkr": 250,
+            "protein_g": 12.0,
+            "calories": 320
+        },
+        {
+            "dish_id": "D002",
+            "name": "Chana Masala",
+            "price_pkr": 280,
+            "protein_g": 14.0,
+            "calories": 350
+        },
+        {
+            "dish_id": "D003",
+            "name": "Palak Paneer",
+            "price_pkr": 350,
+            "protein_g": 18.0,
+            "calories": 400
+        },
+        {
+            "dish_id": "D004",
+            "name": "Aloo Gobi",
+            "price_pkr": 200,
+            "protein_g": 6.0,
+            "calories": 280
+        },
+        {
+            "dish_id": "D005",
+            "name": "Baingan Bharta",
+            "price_pkr": 220,
+            "protein_g": 5.0,
+            "calories": 260
+        },
+        {
+            "dish_id": "D006",
+            "name": "Vegetable Biryani",
+            "price_pkr": 300,
+            "protein_g": 10.0,
+            "calories": 450
+        },
+        {
+            "dish_id": "D007",
+            "name": "Dahi Bhalle",
+            "price_pkr": 180,
+            "protein_g": 8.0,
+            "calories": 300
+        },
+        {
+            "dish_id": "D015",
+            "name": "Fish Fry Lahori",
+            "price_pkr": 500,
+            "protein_g": 30.0,
+            "calories": 400
+        },
+        {
+            "dish_id": "D016",
+            "name": "Anda Curry",
+            "price_pkr": 180,
+            "protein_g": 14.0,
+            "calories": 280
+        },
+        {
+            "dish_id": "D017",
+            "name": "Plain Naan",
+            "price_pkr": 50,
+            "protein_g": 3.0,
+            "calories": 260
+        },
+        {
+            "dish_id": "D018",
+            "name": "Spicy Tofu Stir-Fry",
+            "price_pkr": 320,
+            "protein_g": 20.0,
+            "calories": 310
+        },
+        {
+            "dish_id": "D019",
+            "name": "Khichdi",
+            "price_pkr": 150,
+            "protein_g": 10.0,
+            "calories": 350
+        }
+    ],
+    "candidate_count": 12
+}

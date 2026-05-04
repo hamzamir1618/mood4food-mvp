@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Mood4Food — AI-powered food recommendation engine that finds the best dish for your budget, health goals, and taste preferences.">
+  <title>Mood4Food — Smart Food Recommender</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- ── Hero / Header ───────────────────────────────────────────────── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-brand">
+        <div class="hero-icon">🍽️</div>
+        <div class="hero-text">
+          <h1>Mood4Food</h1>
+          <p>Your Smart Food Recommender</p>
+        </div>
+      </div>
+      <button class="hero-refresh" id="refresh-btn" title="Refresh recommendations" aria-label="Refresh recommendations">
+        🔄
+      </button>
+    </div>
+  </header>
+
+  <div class="app-container">
+
+    <!-- ── Loading State ─────────────────────────────────────────────── -->
+    <div class="loading-state" id="loading-state">
+      <div class="spinner"></div>
+      <p>Finding the best dish for you…</p>
+    </div>
+
+    <!-- ── Error State ───────────────────────────────────────────────── -->
+    <div class="error-state" id="error-state" style="display:none;">
+      <div class="error-icon">😔</div>
+      <h3>Couldn't load recommendations</h3>
+      <p id="error-message">Make sure the backend server is running on port 8000.</p>
+      <button onclick="fetchBlueprint()">Try Again</button>
+    </div>
+
+    <!-- ── Main Content ──────────────────────────────────────────────── -->
+    <div class="main-content" id="main-content" style="display:none;">
+      <!-- Populated by app.js -->
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
