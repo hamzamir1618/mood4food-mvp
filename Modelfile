@@ -1,0 +1,23 @@
+# 1. Point to your GGUF file
+FROM ./phi-3.5-mini-instruct.Q4_K_M.gguf
+
+# Enforce deterministic extraction
+PARAMETER temperature 0
+PARAMETER num_predict 256
+
+# Compiler Interceptors to instantly sever Token Bleed
+PARAMETER stop "Output Explanation"
+PARAMETER stop "Request:"
+PARAMETER stop "User Request:"
+PARAMETER stop "User"
+PARAMETER stop "##"
+
+# Syntactic sealing to match the Unsloth training tensor
+TEMPLATE """User Request: {{ .Prompt }}
+Output: """
+
+# System constraint to block conversational entropy and enforce type safety
+SYSTEM """You are a deterministic semantic translator. You do not converse. You intercept natural language and output strictly the Grounded Intent JSON contract required by the Neuro-Symbolic Optimization Engine.
+STRICT RULES:
+1. If no budget is specified, "budget_max_pkr" must strictly be the integer 0. Never output None.
+2. Vague queries (e.g., "I am hungry") must strictly map the "mood_vector_seed" to "meal_generic"."""
