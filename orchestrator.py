@@ -10,7 +10,7 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +20,8 @@ from pydantic import BaseModel
 CONTRACTS_DIR = Path(__file__).resolve().parent / "tier_1" / "contracts"
 DECISION_BLUEPRINT_PATH = CONTRACTS_DIR / "decision_blueprint.json"
 CANDIDATE_EVAL_PATH = CONTRACTS_DIR / "candidate_evaluation.json"
+UPLOADS_DIR = Path(__file__).resolve().parent / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
@@ -59,25 +61,54 @@ class QueryInput(BaseModel):
 
 
 @app.post("/submit")
-def submit_query(payload: QueryInput):
+async def submit_query(
+    query: str = Form(default=""),
+    audio: UploadFile | None = File(default=None),
+    image: UploadFile | None = File(default=None),
+):
     """
-    Accepts a natural language food query from the user, runs the full
-    3-stage pipeline (intent parsing → Neo4j pruning → debate), and
-    returns the resulting decision_blueprint.
+    Accepts a natural language food query (text), plus optional audio and
+    image file uploads. Runs the full 3-stage multimodal pipeline:
+      Tier 1a (intent parsing) → Tier 1b (Neo4j pruning) → Tier 2 (debate)
+    Returns the resulting decision_blueprint.
     """
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.symbolic_anchoring import run_anchoring_pipeline
     from tier_2.consensus_manager import run_debate_pipeline
 
-    query = payload.query.strip()
-    if not query:
-        raise HTTPException(400, "Query cannot be empty.")
+    text = query.strip() if query else ""
+    audio_path = None
+    image_path = None
 
-    log.info("─── /submit received: %s ───", query)
+    # Save uploaded audio file
+    if audio and audio.filename:
+        audio_path = str(UPLOADS_DIR / audio.filename)
+        with open(audio_path, "wb") as f:
+            f.write(await audio.read())
+        log.info("saved audio upload: %s", audio_path)
 
-    # Stage 1: Intent Parsing
+    # Save uploaded image file
+    if image and image.filename:
+        image_path = str(UPLOADS_DIR / image.filename)
+        with open(image_path, "wb") as f:
+            f.write(await image.read())
+        log.info("saved image upload: %s", image_path)
+
+    if not text and not audio_path and not image_path:
+        raise HTTPException(400, "Provide at least a text query, audio file, or image.")
+
+    log.info("─── /submit received: text='%s' audio=%s image=%s ───",
+             text[:80] if text else '(none)',
+             audio.filename if audio and audio.filename else '(none)',
+             image.filename if image and image.filename else '(none)')
+
+    # Stage 1: Multimodal Intent Parsing
     try:
-        intent = run_ingestion_pipeline(query)
+        intent = run_ingestion_pipeline(
+            raw_input=text or None,
+            audio_path=audio_path,
+            image_path=image_path,
+        )
     except Exception as exc:
         log.error("Tier 1a failed: %s", exc)
         raise HTTPException(500, f"Intent parsing failed: {exc}")

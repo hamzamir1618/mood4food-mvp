@@ -29,16 +29,21 @@
   <!-- ── Query Input Bar ────────────────────────────────────────────── -->
   <div class="query-bar-wrapper">
     <div class="query-bar" id="query-bar">
-      <form id="query-form" autocomplete="off">
+      <form id="query-form" autocomplete="off" enctype="multipart/form-data">
         <div class="query-input-row">
           <span class="query-icon">🔍</span>
           <input type="text" id="query-input" class="query-input"
                  placeholder='Try: "spicy food under 500 rupees, no dairy"'
                  aria-label="Describe what you want to eat">
+          <button type="button" class="upload-btn" id="audio-btn" title="Attach audio">🎤</button>
+          <button type="button" class="upload-btn" id="image-btn" title="Attach image">📷</button>
+          <input type="file" id="audio-file" accept=".wav,.mp3,.m4a,.flac,.ogg,.webm" hidden>
+          <input type="file" id="image-file" accept=".jpg,.jpeg,.png,.webp" hidden>
           <button type="submit" class="query-submit" id="query-submit">
             Find Food
           </button>
         </div>
+        <div class="file-chips" id="file-chips"></div>
       </form>
       <div class="query-status" id="query-status"></div>
     </div>
