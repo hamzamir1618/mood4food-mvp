@@ -132,17 +132,97 @@ def _overlap_ratio(a: str, b: str) -> float:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# INTENT EXTRACTION
+# INTENT EXTRACTION — LLM (PRIMARY) + KEYWORD FALLBACK
 # ═══════════════════════════════════════════════════════════════════════════
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "mood4food"
 
-def extract_intent(raw_input: str) -> dict:
+
+def extract_intent_llm(raw_input: str) -> dict | None:
     """
-    Deterministic intent parser.
-    Takes a raw natural-language string and produces a structured intent dict.
+    Calls the fine-tuned Phi-3.5 model via Ollama to extract structured intent.
+    The model is a deterministic semantic translator — no conversation, no
+    decision-making. Raw string in, Grounded Intent JSON out.
 
-    In production this would call a local Phi-3.5 GGUF model via llama-cpp.
-    For the MVP it uses keyword matching to stay fully offline and reproducible.
+    Returns the parsed intent dict, or None if Ollama is unreachable or
+    the model returns invalid JSON (triggering keyword fallback).
+    """
+    import httpx
+
+    try:
+        log.info("🧠 LLM | sending to Ollama (%s)…", OLLAMA_MODEL)
+        resp = httpx.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": raw_input,
+                "stream": False,
+            },
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+        raw_output = payload.get("response", "").strip()
+        log.info("🧠 LLM | raw response: %s", raw_output)
+
+        # Parse the JSON from model output
+        intent = json.loads(raw_output)
+
+        # Normalize to downstream contract format
+        return _normalize_llm_intent(intent)
+
+    except httpx.ConnectError:
+        log.warning("🧠 LLM | Ollama not running — falling back to keyword parser")
+        return None
+    except httpx.HTTPStatusError as exc:
+        log.warning("🧠 LLM | Ollama HTTP error %s — falling back to keyword parser", exc.response.status_code)
+        return None
+    except httpx.TimeoutException:
+        log.warning("🧠 LLM | Ollama timed out — falling back to keyword parser")
+        return None
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        log.warning("🧠 LLM | failed to parse model output: %s — falling back to keyword parser", exc)
+        return None
+
+
+def _normalize_llm_intent(raw: dict) -> dict:
+    """
+    Maps the LLM output schema to the downstream pipeline contract.
+    Handles differences between the model's training format and what
+    symbolic_anchoring.py / consensus_manager.py expect.
+    """
+    hard = raw.get("hard_constraints", {})
+    soft = raw.get("soft_constraints", {})
+
+    # budget_max_pkr=0 means "not specified" in training data → default to 1000
+    budget = hard.get("budget_max_pkr", 0)
+    if budget == 0:
+        budget = 1000
+
+    # protein_priority: model outputs "none" for unspecified → map to "normal"
+    protein = soft.get("protein_priority", "normal")
+    if protein == "none":
+        protein = "normal"
+
+    intent = {
+        "hard_constraints": {
+            "budget_max_pkr": budget,
+            "allergens_pruned": sorted(hard.get("allergens_pruned", [])),
+        },
+        "soft_constraints": {
+            "protein_priority": protein,
+            "mood_vector_seed": soft.get("mood_vector_seed", "neutral"),
+        },
+    }
+    log.info("🧠 LLM | normalized intent: %s", json.dumps(intent))
+    return intent
+
+
+def extract_intent_keywords(raw_input: str) -> dict:
+    """
+    Deterministic keyword-based intent parser.
+    Used as a fallback when Ollama / the LLM is unavailable.
     """
     text = raw_input.strip().lower()
 
@@ -208,6 +288,21 @@ def extract_intent(raw_input: str) -> dict:
     return intent
 
 
+def extract_intent(raw_input: str) -> dict:
+    """
+    Primary intent extraction: tries LLM first, falls back to keywords.
+    This function is the single entry point used by the pipeline.
+    """
+    # Try LLM (Ollama + fine-tuned Phi-3.5)
+    intent = extract_intent_llm(raw_input)
+    if intent is not None:
+        return intent
+
+    # Fallback to keyword parser
+    log.info("📋 using keyword fallback parser")
+    return extract_intent_keywords(raw_input)
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # JSON CONTRACT WRITER
 # ═══════════════════════════════════════════════════════════════════════════
@@ -236,7 +331,7 @@ def run_ingestion_pipeline(
     Full Tier-1a multimodal pipeline:
       1. Ingest each modality (audio/vision/text)
       2. Merge modality outputs
-      3. Extract structured intent
+      3. Extract structured intent (LLM primary, keyword fallback)
       4. Write grounded_intent.json
     Returns the intent dict for downstream callers.
     """
@@ -257,7 +352,7 @@ def run_ingestion_pipeline(
         merged = "I want food under 1000 rupees"
         log.warning("no input from any modality, using default: '%s'", merged)
 
-    # Step 3 — Extract structured intent
+    # Step 3 — Extract structured intent (LLM → keyword fallback)
     intent = extract_intent(merged)
     log.info("extracted intent: %s", json.dumps(intent, indent=2))
 
