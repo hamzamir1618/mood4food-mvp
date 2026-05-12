@@ -21,6 +21,9 @@ fipe_flutter/pubspec.lock
 tier_2/vector_store.json
 tier_2/chroma_store/
 
+# ── Uploads & Model Cache ───────────────────────────────────────────────────
+uploads/
+
 # ── IDE / Editor ────────────────────────────────────────────────────────────
 .vscode/
 .idea/

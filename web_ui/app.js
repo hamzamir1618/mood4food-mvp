@@ -18,6 +18,10 @@ const $loading   = document.getElementById('loading-state');
 const $error     = document.getElementById('error-state');
 const $errorMsg  = document.getElementById('error-message');
 
+// ── File State ─────────────────────────────────────────────────────────────
+let audioFile = null;
+let imageFile = null;
+
 // ── Boot ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refresh-btn').addEventListener('click', fetchBlueprint);
@@ -26,13 +30,56 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('query-form');
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const input = document.getElementById('query-input');
-    const text = input.value.trim();
-    if (text) submitQuery(text);
+    const text = document.getElementById('query-input').value.trim();
+    if (text || audioFile || imageFile) submitQuery(text);
+  });
+
+  // Upload buttons
+  document.getElementById('audio-btn').addEventListener('click', () => {
+    document.getElementById('audio-file').click();
+  });
+  document.getElementById('image-btn').addEventListener('click', () => {
+    document.getElementById('image-file').click();
+  });
+
+  // File input handlers
+  document.getElementById('audio-file').addEventListener('change', (e) => {
+    audioFile = e.target.files[0] || null;
+    document.getElementById('audio-btn').classList.toggle('has-file', !!audioFile);
+    updateFileChips();
+  });
+  document.getElementById('image-file').addEventListener('change', (e) => {
+    imageFile = e.target.files[0] || null;
+    document.getElementById('image-btn').classList.toggle('has-file', !!imageFile);
+    updateFileChips();
   });
 
   fetchBlueprint();
 });
+
+function updateFileChips() {
+  const $chips = document.getElementById('file-chips');
+  $chips.innerHTML = '';
+  if (audioFile) {
+    $chips.innerHTML += `<div class="file-chip">🎤 ${audioFile.name}<button class="chip-remove" onclick="removeFile('audio')">✕</button></div>`;
+  }
+  if (imageFile) {
+    $chips.innerHTML += `<div class="file-chip">📷 ${imageFile.name}<button class="chip-remove" onclick="removeFile('image')">✕</button></div>`;
+  }
+}
+
+function removeFile(type) {
+  if (type === 'audio') {
+    audioFile = null;
+    document.getElementById('audio-file').value = '';
+    document.getElementById('audio-btn').classList.remove('has-file');
+  } else {
+    imageFile = null;
+    document.getElementById('image-file').value = '';
+    document.getElementById('image-btn').classList.remove('has-file');
+  }
+  updateFileChips();
+}
 
 // ── Fetch Decision Blueprint ───────────────────────────────────────────────
 async function fetchBlueprint() {
@@ -49,25 +96,36 @@ async function fetchBlueprint() {
   }
 }
 
-// ── Submit New Query (full pipeline) ───────────────────────────────────────
+// ── Submit New Query (full multimodal pipeline) ────────────────────────────
 async function submitQuery(queryText) {
   const $status = document.getElementById('query-status');
   const $submit = document.getElementById('query-submit');
   const $input  = document.getElementById('query-input');
 
-  // Disable input while pipeline runs
+  // Disable inputs while pipeline runs
   $submit.disabled = true;
   $input.disabled = true;
+
+  // Build status message
+  const parts = [];
+  if (queryText) parts.push('parsing text');
+  if (audioFile) parts.push('transcribing audio');
+  if (imageFile) parts.push('analyzing image');
   $status.className = 'query-status running';
-  $status.textContent = '⟳ Running pipeline… parsing intent → querying database → finding best dish…';
+  $status.textContent = `⟳ Running pipeline… ${parts.join(' + ')} → querying database → finding best dish…`;
 
   showLoading();
 
   try {
+    // Build FormData for multipart upload
+    const formData = new FormData();
+    formData.append('query', queryText || '');
+    if (audioFile) formData.append('audio', audioFile);
+    if (imageFile) formData.append('image', imageFile);
+
     const resp = await fetch(`${API_BASE}/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: queryText }),
+      body: formData,  // no Content-Type header — browser sets multipart boundary
     });
 
     if (!resp.ok) {
@@ -79,6 +137,10 @@ async function submitQuery(queryText) {
     budgetPriority = blueprint.agent_weights?.w_b ?? 0.3;
     firstRenderDone = false;
     render();
+
+    // Clear file attachments after successful submission
+    removeFile('audio');
+    removeFile('image');
 
     $status.className = 'query-status success';
     $status.textContent = `✓ Found ${blueprint.all_candidate_scores?.length ?? 0} options — recommending ${blueprint.winning_dish?.name || 'a dish'}`;

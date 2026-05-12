@@ -61,7 +61,7 @@ MVP/
 │   └── app.js
 │
 ├── tier_1/                      # Perception & Grounding
-│   ├── multi_modal_ingestion.py # Intent parsing → grounded_intent.json
+│   ├── multi_modal_ingestion.py # Multimodal intent parsing (Whisper audio + vision stub + text)
 │   ├── symbolic_anchoring.py    # Neo4j allergen pruning → candidate_evaluation.json
 │   └── contracts/               # JSON contract files (pipeline output)
 │       ├── grounded_intent.json
@@ -84,8 +84,11 @@ MVP/
 |-----------|---------|---------|
 | Python | 3.11+ | Backend runtime |
 | Docker | Any recent | Neo4j container |
+| FFmpeg | Any | Required by Whisper for audio transcription |
 | Git | Any | Version control |
 | Flutter *(optional)* | 3.x | Only if using the legacy Flutter frontend |
+
+> **FFmpeg install:** `winget install Gyan.FFmpeg` (Windows) · `brew install ffmpeg` (macOS) · `apt install ffmpeg` (Linux)
 
 ---
 
@@ -173,18 +176,20 @@ Open **http://localhost:8000/** in your browser. Done.
 |--------|----------|-------------|
 | `GET` | `/` | Serves the Mood4Food web UI |
 | `GET` | `/decision_blueprint` | Returns the current decision blueprint JSON |
-| `POST` | `/submit` | Accepts `{"query": "..."}`, runs the full 3-stage pipeline, returns blueprint |
+| `POST` | `/submit` | Accepts `multipart/form-data`: `query` (text), `audio` (file), `image` (file) — runs full pipeline |
 | `POST` | `/recalculate` | Accepts `{"w_budget": float}`, returns recalculated blueprint |
 
 ---
 
 ## Usage
 
-1. **Search for food** — Type a natural language query in the search bar, e.g. `"food under 300 rupees, no meat no dairy"`. The full pipeline runs and returns fresh results.
-2. **View the recommendation** — The app shows the best dish based on your constraints.
-3. **Adjust budget priority** — Use the slider to control how much weight is given to price. Dragging right favours the cheapest option; dragging left favours health and taste.
-4. **View all options** — Scroll down to see every candidate dish ranked by score.
-5. **Understand the reasoning** — Click "How It Works" to see the full AI reasoning trace.
+1. **Search for food** — Type a natural language query in the search bar, e.g. `"food under 300 rupees, no meat no dairy"`.
+2. **Attach audio** — Click 🎤 to upload an audio file (`.wav`, `.mp3`, `.m4a`). Whisper transcribes it and merges with your text.
+3. **Attach image** — Click 📷 to upload a food photo. Keywords are extracted from the filename.
+4. **View the recommendation** — The app shows the best dish based on your constraints.
+5. **Adjust budget priority** — Use the slider to control how much weight is given to price.
+6. **View all options** — Scroll down to see every candidate dish ranked by score.
+7. **Understand the reasoning** — Click "How It Works" to see the full AI reasoning trace.
 
 ---
 
