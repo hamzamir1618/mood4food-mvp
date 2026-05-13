@@ -1,9 +1,8 @@
 {
     "source_intent": {
-        "budget_max_pkr": 1000,
+        "budget_max_pkr": 500,
         "allergens_pruned": [
-            "dairy",
-            "meat"
+            "dairy"
         ]
     },
     "soft_constraints": {
@@ -40,6 +39,27 @@
             "calories": 260
         },
         {
+            "dish_id": "D008",
+            "name": "Chicken Karahi",
+            "price_pkr": 550,
+            "protein_g": 35.0,
+            "calories": 520
+        },
+        {
+            "dish_id": "D012",
+            "name": "Mutton Nihari",
+            "price_pkr": 700,
+            "protein_g": 28.0,
+            "calories": 620
+        },
+        {
+            "dish_id": "D013",
+            "name": "Beef Chapli Kebab",
+            "price_pkr": 350,
+            "protein_g": 25.0,
+            "calories": 480
+        },
+        {
             "dish_id": "D015",
             "name": "Fish Fry Lahori",
             "price_pkr": 500,
@@ -66,6 +86,13 @@
             "price_pkr": 150,
             "protein_g": 10.0,
             "calories": 350
+        },
+        {
+            "dish_id": "D020",
+            "name": "Haleem",
+            "price_pkr": 400,
+            "protein_g": 22.0,
+            "calories": 500
         },
         {
             "dish_id": "D021",
@@ -101,6 +128,20 @@
             "price_pkr": 300,
             "protein_g": 15.0,
             "calories": 370
+        },
+        {
+            "dish_id": "D026",
+            "name": "Chicken Corn Soup",
+            "price_pkr": 180,
+            "protein_g": 16.0,
+            "calories": 200
+        },
+        {
+            "dish_id": "D029",
+            "name": "Seekh Kebab",
+            "price_pkr": 300,
+            "protein_g": 22.0,
+            "calories": 380
         },
         {
             "dish_id": "D030",
@@ -194,5 +235,5 @@
             "calories": 160
         }
     ],
-    "candidate_count": 26
+    "candidate_count": 32
 }
