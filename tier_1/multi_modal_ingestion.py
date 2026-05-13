@@ -292,6 +292,52 @@ def extract_intent_keywords(raw_input: str) -> dict:
     return intent
 
 
+def post_process_llm_allergens(llm_allergens: list[str], raw_input: str) -> list[str]:
+    """
+    Deterministic guardrail for LLM output. Uses state-based keyword logic
+    to fix false positive and false negative allergen exclusions.
+    """
+    exclusion_keywords = {
+        "meat": "meat", "chicken": "meat", "beef": "meat", "mutton": "meat", "pork": "meat",
+        "dairy": "dairy", "milk": "dairy", "cheese": "dairy",
+        "gluten": "gluten", "wheat": "gluten",
+        "nuts": "nuts", "peanut": "nuts",
+        "shellfish": "shellfish", "shrimp": "shellfish",
+        "egg": "egg", "eggs": "egg",
+        "fish": "fish", "seafood": "fish",
+    }
+    negation_words = {"no", "without", "free", "allergy", "allergic", "cant", "don't", "dont", "not", "minus", "zero"}
+    
+    is_negated = False
+    explicitly_requested = set()
+    explicitly_negated = set()
+    
+    for word in raw_input.lower().split():
+        word_clean = word.strip(".,!?;:")
+        if word_clean in negation_words:
+            is_negated = True
+        elif word_clean in {"with", "but", "plus", "want", "like"}:
+            is_negated = False
+        elif word_clean in exclusion_keywords:
+            if is_negated:
+                explicitly_negated.add(exclusion_keywords[word_clean])
+            else:
+                explicitly_requested.add(exclusion_keywords[word_clean])
+                
+    # 1. Remove false exclusions (LLM excluded it, but user explicitly asked for it)
+    final_allergens = [a for a in llm_allergens if a not in explicitly_requested]
+    
+    # 2. Add missed exclusions (User explicitly negated it, but LLM missed it)
+    for a in explicitly_negated:
+        if a not in final_allergens:
+            final_allergens.append(a)
+            
+    if sorted(llm_allergens) != sorted(final_allergens):
+        log.info("🛡️ Guardrail applied: changed allergens from %s to %s", llm_allergens, final_allergens)
+            
+    return sorted(final_allergens)
+
+
 def extract_intent(raw_input: str) -> dict:
     """
     Primary intent extraction: tries LLM first, falls back to keywords.
@@ -299,6 +345,10 @@ def extract_intent(raw_input: str) -> dict:
     """
     # Try LLM (Ollama + fine-tuned Phi-3.5)
     intent = extract_intent_llm(raw_input)
+    if intent is not None:
+        llm_allergens = intent["hard_constraints"].get("allergens_pruned", [])
+        intent["hard_constraints"]["allergens_pruned"] = post_process_llm_allergens(llm_allergens, raw_input)
+        
     if intent is None:
         # Fallback to keyword parser
         log.info("📋 using keyword fallback parser")
