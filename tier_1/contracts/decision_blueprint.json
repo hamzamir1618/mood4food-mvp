@@ -1,56 +1,76 @@
 {
     "winning_dish": {
-        "dish_id": "D037",
-        "name": "Missi Roti",
-        "price_pkr": 40
+        "dish_id": "D050",
+        "name": "Raita Bowl",
+        "price_pkr": 80
     },
     "utility_breakdown": {
-        "u_health": 0.6,
-        "u_budget": 0.67032,
+        "u_health": 0.833333,
+        "u_budget": 0.449329,
         "u_taste": 0.5,
-        "u_total": 0.67032
+        "u_total": 0.618132
     },
     "agent_weights": {
-        "w_h": 0.0,
-        "w_b": 1.0,
-        "w_t": 0.0
+        "w_h": 0.4,
+        "w_b": 0.3,
+        "w_t": 0.3
     },
     "relaxation_rounds": 0,
     "xai_traces": [
-        "slider_override: w_h=0.00 w_b=1.00 w_t=0.00",
-        "  Dal Tadka → U_h=0.7500 U_b=0.0821 U_t=0.5000 | U_total=0.0821",
-        "  Chana Masala → U_h=0.8000 U_b=0.0608 U_t=0.5000 | U_total=0.0608",
-        "  Aloo Gobi → U_h=0.4286 U_b=0.1353 U_t=0.5000 | U_total=0.1353",
-        "  Baingan Bharta → U_h=0.3846 U_b=0.1108 U_t=0.5000 | U_total=0.1108",
-        "  Chicken Karahi → U_h=1.0000 U_b=0.0041 U_t=0.5000 | U_total=0.0041",
-        "  Mutton Nihari → U_h=0.9032 U_b=0.0009 U_t=0.5000 | U_total=0.0009",
-        "  Beef Chapli Kebab → U_h=1.0000 U_b=0.0302 U_t=0.5000 | U_total=0.0302",
-        "  Fish Fry Lahori → U_h=1.0000 U_b=0.0067 U_t=0.5000 | U_total=0.0067",
-        "  Anda Curry → U_h=1.0000 U_b=0.1653 U_t=0.5000 | U_total=0.1653",
-        "  Spicy Tofu Stir-Fry → U_h=1.0000 U_b=0.0408 U_t=0.5000 | U_total=0.0408",
-        "  Khichdi → U_h=0.5714 U_b=0.2231 U_t=0.5000 | U_total=0.2231",
-        "  Haleem → U_h=0.8800 U_b=0.0183 U_t=0.5000 | U_total=0.0183",
-        "  Rajma Chawal → U_h=0.6842 U_b=0.1353 U_t=0.5000 | U_total=0.1353",
-        "  Bhindi Masala → U_h=0.3636 U_b=0.1653 U_t=0.5000 | U_total=0.1653",
-        "  Mushroom Matar → U_h=0.7500 U_b=0.0743 U_t=0.5000 | U_total=0.0743",
-        "  Mixed Veg Curry → U_h=0.5185 U_b=0.1108 U_t=0.5000 | U_total=0.1108",
-        "  Coconut Chickpea Curry → U_h=0.8108 U_b=0.0498 U_t=0.5000 | U_total=0.0498",
-        "  Chicken Corn Soup → U_h=1.0000 U_b=0.1653 U_t=0.5000 | U_total=0.1653",
-        "  Seekh Kebab → U_h=1.0000 U_b=0.0498 U_t=0.5000 | U_total=0.0498",
-        "  Prawn Karahi → U_h=1.0000 U_b=0.0003 U_t=0.5000 | U_total=0.0003",
-        "  Shrimp Rice Bowl → U_h=1.0000 U_b=0.0015 U_t=0.5000 | U_total=0.0015",
-        "  Coconut Fish Curry → U_h=1.0000 U_b=0.0025 U_t=0.5000 | U_total=0.0025",
-        "  Egg Fried Rice → U_h=0.6000 U_b=0.1353 U_t=0.5000 | U_total=0.1353",
-        "  Omelette Paratha → U_h=0.7143 U_b=0.3012 U_t=0.5000 | U_total=0.3012",
-        "  Missi Roti → U_h=0.6000 U_b=0.6703 U_t=0.5000 | U_total=0.6703",
-        "  Tofu Rice Bowl → U_h=0.9474 U_b=0.0608 U_t=0.5000 | U_total=0.0608",
-        "  Suji Halwa → U_h=0.2000 U_b=0.3679 U_t=0.5000 | U_total=0.3679",
-        "  Samosa (2 pcs) → U_h=0.2500 U_b=0.5488 U_t=0.5000 | U_total=0.5488",
-        "  Pakora Plate → U_h=0.2857 U_b=0.4493 U_t=0.5000 | U_total=0.4493",
-        "  Gol Gappay (6 pcs) → U_h=0.2222 U_b=0.6065 U_t=0.5000 | U_total=0.6065",
-        "  Peanut Chaat Salad → U_h=0.8000 U_b=0.3012 U_t=0.5000 | U_total=0.3012",
-        "  Pomegranate Salad → U_h=0.3750 U_b=0.2231 U_t=0.5000 | U_total=0.2231",
-        "winner: Missi Roti (U_total=0.6703)"
+        "round_0: weights w_h=0.40 w_b=0.30 w_t=0.30",
+        "  Dal Tadka → U_h=0.7500 U_b=0.0821 U_t=0.5000 | U_total=0.4746",
+        "  Chana Masala → U_h=0.8000 U_b=0.0608 U_t=0.5000 | U_total=0.4882",
+        "  Palak Paneer → U_h=0.9000 U_b=0.0302 U_t=0.5000 | U_total=0.5191",
+        "  Aloo Gobi → U_h=0.4286 U_b=0.1353 U_t=0.5000 | U_total=0.3620",
+        "  Baingan Bharta → U_h=0.3846 U_b=0.1108 U_t=0.5000 | U_total=0.3371",
+        "  Vegetable Biryani → U_h=0.4444 U_b=0.0498 U_t=0.5000 | U_total=0.3427",
+        "  Dahi Bhalle → U_h=0.5333 U_b=0.1653 U_t=0.5000 | U_total=0.4129",
+        "  Chicken Karahi → U_h=1.0000 U_b=0.0041 U_t=0.5000 | U_total=0.5512",
+        "  Butter Chicken → U_h=1.0000 U_b=0.0025 U_t=0.5000 | U_total=0.5507",
+        "  Chicken Biryani → U_h=1.0000 U_b=0.0111 U_t=0.5000 | U_total=0.5533",
+        "  Chicken Tikka → U_h=1.0000 U_b=0.0183 U_t=0.5000 | U_total=0.5555",
+        "  Mutton Nihari → U_h=0.9032 U_b=0.0009 U_t=0.5000 | U_total=0.5116",
+        "  Beef Chapli Kebab → U_h=1.0000 U_b=0.0302 U_t=0.5000 | U_total=0.5591",
+        "  Mutton Korma → U_h=0.8667 U_b=0.0006 U_t=0.5000 | U_total=0.4968",
+        "  Fish Fry Lahori → U_h=1.0000 U_b=0.0067 U_t=0.5000 | U_total=0.5520",
+        "  Anda Curry → U_h=1.0000 U_b=0.1653 U_t=0.5000 | U_total=0.5996",
+        "  Plain Naan → U_h=0.2308 U_b=0.6065 U_t=0.5000 | U_total=0.4243",
+        "  Spicy Tofu Stir-Fry → U_h=1.0000 U_b=0.0408 U_t=0.5000 | U_total=0.5622",
+        "  Khichdi → U_h=0.5714 U_b=0.2231 U_t=0.5000 | U_total=0.4455",
+        "  Haleem → U_h=0.8800 U_b=0.0183 U_t=0.5000 | U_total=0.5075",
+        "  Rajma Chawal → U_h=0.6842 U_b=0.1353 U_t=0.5000 | U_total=0.4643",
+        "  Bhindi Masala → U_h=0.3636 U_b=0.1653 U_t=0.5000 | U_total=0.3450",
+        "  Mushroom Matar → U_h=0.7500 U_b=0.0743 U_t=0.5000 | U_total=0.4723",
+        "  Mixed Veg Curry → U_h=0.5185 U_b=0.1108 U_t=0.5000 | U_total=0.3906",
+        "  Coconut Chickpea Curry → U_h=0.8108 U_b=0.0498 U_t=0.5000 | U_total=0.4893",
+        "  Chicken Corn Soup → U_h=1.0000 U_b=0.1653 U_t=0.5000 | U_total=0.5996",
+        "  Chicken Shawarma → U_h=1.0000 U_b=0.0302 U_t=0.5000 | U_total=0.5591",
+        "  Beef Biryani → U_h=0.9846 U_b=0.0067 U_t=0.5000 | U_total=0.5459",
+        "  Seekh Kebab → U_h=1.0000 U_b=0.0498 U_t=0.5000 | U_total=0.5649",
+        "  Fish Tikka → U_h=1.0000 U_b=0.0041 U_t=0.5000 | U_total=0.5512",
+        "  Coconut Fish Curry → U_h=1.0000 U_b=0.0025 U_t=0.5000 | U_total=0.5507",
+        "  Egg Fried Rice → U_h=0.6000 U_b=0.1353 U_t=0.5000 | U_total=0.4306",
+        "  Omelette Paratha → U_h=0.7143 U_b=0.3012 U_t=0.5000 | U_total=0.5261",
+        "  Garlic Naan → U_h=0.2759 U_b=0.4493 U_t=0.5000 | U_total=0.3951",
+        "  Missi Roti → U_h=0.6000 U_b=0.6703 U_t=0.5000 | U_total=0.5911",
+        "  Tofu Rice Bowl → U_h=0.9474 U_b=0.0608 U_t=0.5000 | U_total=0.5472",
+        "  Kheer → U_h=0.3429 U_b=0.1353 U_t=0.5000 | U_total=0.3277",
+        "  Gulab Jamun → U_h=0.1500 U_b=0.2231 U_t=0.5000 | U_total=0.2769",
+        "  Gajar Halwa → U_h=0.2632 U_b=0.0821 U_t=0.5000 | U_total=0.2799",
+        "  Suji Halwa → U_h=0.2000 U_b=0.3679 U_t=0.5000 | U_total=0.3404",
+        "  Mango Lassi → U_h=0.3636 U_b=0.3012 U_t=0.5000 | U_total=0.3858",
+        "  Samosa (2 pcs) → U_h=0.2500 U_b=0.5488 U_t=0.5000 | U_total=0.4146",
+        "  Pakora Plate → U_h=0.2857 U_b=0.4493 U_t=0.5000 | U_total=0.3991",
+        "  Gol Gappay (6 pcs) → U_h=0.2222 U_b=0.6065 U_t=0.5000 | U_total=0.4208",
+        "  Aloo Tikki Chaat → U_h=0.3448 U_b=0.3679 U_t=0.5000 | U_total=0.3983",
+        "  Cashew Paneer Masala → U_h=0.6667 U_b=0.0111 U_t=0.5000 | U_total=0.4200",
+        "  Peanut Chaat Salad → U_h=0.8000 U_b=0.3012 U_t=0.5000 | U_total=0.5604",
+        "  Raita Bowl → U_h=0.8333 U_b=0.4493 U_t=0.5000 | U_total=0.6181",
+        "  Pomegranate Salad → U_h=0.3750 U_b=0.2231 U_t=0.5000 | U_total=0.3669",
+        "  Corn Chaat → U_h=0.4000 U_b=0.3679 U_t=0.5000 | U_total=0.4204",
+        "  Mutton Biryani → U_h=0.8824 U_b=0.0015 U_t=0.5000 | U_total=0.5034",
+        "  Lamb Chops → U_h=1.0000 U_b=0.0002 U_t=0.5000 | U_total=0.5501",
+        "winner: Raita Bowl (U_total=0.6181)"
     ],
     "all_candidate_scores": [
         {
@@ -59,8 +79,8 @@
             "u_health": 0.75,
             "u_budget": 0.082085,
             "u_taste": 0.5,
-            "u_total": 0.082085,
-            "price_pkr": 250
+            "price_pkr": 250,
+            "u_total": 0.474626
         },
         {
             "dish_id": "D002",
@@ -68,8 +88,17 @@
             "u_health": 0.8,
             "u_budget": 0.06081,
             "u_taste": 0.5,
-            "u_total": 0.06081,
-            "price_pkr": 280
+            "price_pkr": 280,
+            "u_total": 0.488243
+        },
+        {
+            "dish_id": "D003",
+            "name": "Palak Paneer",
+            "u_health": 0.9,
+            "u_budget": 0.030197,
+            "u_taste": 0.5,
+            "price_pkr": 350,
+            "u_total": 0.519059
         },
         {
             "dish_id": "D004",
@@ -77,8 +106,8 @@
             "u_health": 0.428571,
             "u_budget": 0.135335,
             "u_taste": 0.5,
-            "u_total": 0.135335,
-            "price_pkr": 200
+            "price_pkr": 200,
+            "u_total": 0.362029
         },
         {
             "dish_id": "D005",
@@ -86,8 +115,26 @@
             "u_health": 0.384615,
             "u_budget": 0.110803,
             "u_taste": 0.5,
-            "u_total": 0.110803,
-            "price_pkr": 220
+            "price_pkr": 220,
+            "u_total": 0.337087
+        },
+        {
+            "dish_id": "D006",
+            "name": "Vegetable Biryani",
+            "u_health": 0.444444,
+            "u_budget": 0.049787,
+            "u_taste": 0.5,
+            "price_pkr": 300,
+            "u_total": 0.342714
+        },
+        {
+            "dish_id": "D007",
+            "name": "Dahi Bhalle",
+            "u_health": 0.533333,
+            "u_budget": 0.165299,
+            "u_taste": 0.5,
+            "price_pkr": 180,
+            "u_total": 0.412923
         },
         {
             "dish_id": "D008",
@@ -95,8 +142,35 @@
             "u_health": 1.0,
             "u_budget": 0.004087,
             "u_taste": 0.5,
-            "u_total": 0.004087,
-            "price_pkr": 550
+            "price_pkr": 550,
+            "u_total": 0.551226
+        },
+        {
+            "dish_id": "D009",
+            "name": "Butter Chicken",
+            "u_health": 1.0,
+            "u_budget": 0.002479,
+            "u_taste": 0.5,
+            "price_pkr": 600,
+            "u_total": 0.550744
+        },
+        {
+            "dish_id": "D010",
+            "name": "Chicken Biryani",
+            "u_health": 1.0,
+            "u_budget": 0.011109,
+            "u_taste": 0.5,
+            "price_pkr": 450,
+            "u_total": 0.553333
+        },
+        {
+            "dish_id": "D011",
+            "name": "Chicken Tikka",
+            "u_health": 1.0,
+            "u_budget": 0.018316,
+            "u_taste": 0.5,
+            "price_pkr": 400,
+            "u_total": 0.555495
         },
         {
             "dish_id": "D012",
@@ -104,8 +178,8 @@
             "u_health": 0.903226,
             "u_budget": 0.000912,
             "u_taste": 0.5,
-            "u_total": 0.000912,
-            "price_pkr": 700
+            "price_pkr": 700,
+            "u_total": 0.511564
         },
         {
             "dish_id": "D013",
@@ -113,8 +187,17 @@
             "u_health": 1.0,
             "u_budget": 0.030197,
             "u_taste": 0.5,
-            "u_total": 0.030197,
-            "price_pkr": 350
+            "price_pkr": 350,
+            "u_total": 0.559059
+        },
+        {
+            "dish_id": "D014",
+            "name": "Mutton Korma",
+            "u_health": 0.866667,
+            "u_budget": 0.000553,
+            "u_taste": 0.5,
+            "price_pkr": 750,
+            "u_total": 0.496833
         },
         {
             "dish_id": "D015",
@@ -122,8 +205,8 @@
             "u_health": 1.0,
             "u_budget": 0.006738,
             "u_taste": 0.5,
-            "u_total": 0.006738,
-            "price_pkr": 500
+            "price_pkr": 500,
+            "u_total": 0.552021
         },
         {
             "dish_id": "D016",
@@ -131,8 +214,17 @@
             "u_health": 1.0,
             "u_budget": 0.165299,
             "u_taste": 0.5,
-            "u_total": 0.165299,
-            "price_pkr": 180
+            "price_pkr": 180,
+            "u_total": 0.59959
+        },
+        {
+            "dish_id": "D017",
+            "name": "Plain Naan",
+            "u_health": 0.230769,
+            "u_budget": 0.606531,
+            "u_taste": 0.5,
+            "price_pkr": 50,
+            "u_total": 0.424267
         },
         {
             "dish_id": "D018",
@@ -140,8 +232,8 @@
             "u_health": 1.0,
             "u_budget": 0.040762,
             "u_taste": 0.5,
-            "u_total": 0.040762,
-            "price_pkr": 320
+            "price_pkr": 320,
+            "u_total": 0.562229
         },
         {
             "dish_id": "D019",
@@ -149,8 +241,8 @@
             "u_health": 0.571429,
             "u_budget": 0.22313,
             "u_taste": 0.5,
-            "u_total": 0.22313,
-            "price_pkr": 150
+            "price_pkr": 150,
+            "u_total": 0.445511
         },
         {
             "dish_id": "D020",
@@ -158,8 +250,8 @@
             "u_health": 0.88,
             "u_budget": 0.018316,
             "u_taste": 0.5,
-            "u_total": 0.018316,
-            "price_pkr": 400
+            "price_pkr": 400,
+            "u_total": 0.507495
         },
         {
             "dish_id": "D021",
@@ -167,8 +259,8 @@
             "u_health": 0.684211,
             "u_budget": 0.135335,
             "u_taste": 0.5,
-            "u_total": 0.135335,
-            "price_pkr": 200
+            "price_pkr": 200,
+            "u_total": 0.464285
         },
         {
             "dish_id": "D022",
@@ -176,8 +268,8 @@
             "u_health": 0.363636,
             "u_budget": 0.165299,
             "u_taste": 0.5,
-            "u_total": 0.165299,
-            "price_pkr": 180
+            "price_pkr": 180,
+            "u_total": 0.345044
         },
         {
             "dish_id": "D023",
@@ -185,8 +277,8 @@
             "u_health": 0.75,
             "u_budget": 0.074274,
             "u_taste": 0.5,
-            "u_total": 0.074274,
-            "price_pkr": 260
+            "price_pkr": 260,
+            "u_total": 0.472282
         },
         {
             "dish_id": "D024",
@@ -194,8 +286,8 @@
             "u_health": 0.518519,
             "u_budget": 0.110803,
             "u_taste": 0.5,
-            "u_total": 0.110803,
-            "price_pkr": 220
+            "price_pkr": 220,
+            "u_total": 0.390648
         },
         {
             "dish_id": "D025",
@@ -203,8 +295,8 @@
             "u_health": 0.810811,
             "u_budget": 0.049787,
             "u_taste": 0.5,
-            "u_total": 0.049787,
-            "price_pkr": 300
+            "price_pkr": 300,
+            "u_total": 0.48926
         },
         {
             "dish_id": "D026",
@@ -212,8 +304,26 @@
             "u_health": 1.0,
             "u_budget": 0.165299,
             "u_taste": 0.5,
-            "u_total": 0.165299,
-            "price_pkr": 180
+            "price_pkr": 180,
+            "u_total": 0.59959
+        },
+        {
+            "dish_id": "D027",
+            "name": "Chicken Shawarma",
+            "u_health": 1.0,
+            "u_budget": 0.030197,
+            "u_taste": 0.5,
+            "price_pkr": 350,
+            "u_total": 0.559059
+        },
+        {
+            "dish_id": "D028",
+            "name": "Beef Biryani",
+            "u_health": 0.984615,
+            "u_budget": 0.006738,
+            "u_taste": 0.5,
+            "price_pkr": 500,
+            "u_total": 0.545867
         },
         {
             "dish_id": "D029",
@@ -221,26 +331,17 @@
             "u_health": 1.0,
             "u_budget": 0.049787,
             "u_taste": 0.5,
-            "u_total": 0.049787,
-            "price_pkr": 300
+            "price_pkr": 300,
+            "u_total": 0.564936
         },
         {
-            "dish_id": "D030",
-            "name": "Prawn Karahi",
+            "dish_id": "D031",
+            "name": "Fish Tikka",
             "u_health": 1.0,
-            "u_budget": 0.000335,
+            "u_budget": 0.004087,
             "u_taste": 0.5,
-            "u_total": 0.000335,
-            "price_pkr": 800
-        },
-        {
-            "dish_id": "D032",
-            "name": "Shrimp Rice Bowl",
-            "u_health": 1.0,
-            "u_budget": 0.001503,
-            "u_taste": 0.5,
-            "u_total": 0.001503,
-            "price_pkr": 650
+            "price_pkr": 550,
+            "u_total": 0.551226
         },
         {
             "dish_id": "D033",
@@ -248,8 +349,8 @@
             "u_health": 1.0,
             "u_budget": 0.002479,
             "u_taste": 0.5,
-            "u_total": 0.002479,
-            "price_pkr": 600
+            "price_pkr": 600,
+            "u_total": 0.550744
         },
         {
             "dish_id": "D034",
@@ -257,8 +358,8 @@
             "u_health": 0.6,
             "u_budget": 0.135335,
             "u_taste": 0.5,
-            "u_total": 0.135335,
-            "price_pkr": 200
+            "price_pkr": 200,
+            "u_total": 0.4306
         },
         {
             "dish_id": "D035",
@@ -266,8 +367,17 @@
             "u_health": 0.714286,
             "u_budget": 0.301194,
             "u_taste": 0.5,
-            "u_total": 0.301194,
-            "price_pkr": 120
+            "price_pkr": 120,
+            "u_total": 0.526073
+        },
+        {
+            "dish_id": "D036",
+            "name": "Garlic Naan",
+            "u_health": 0.275862,
+            "u_budget": 0.449329,
+            "u_taste": 0.5,
+            "price_pkr": 80,
+            "u_total": 0.395143
         },
         {
             "dish_id": "D037",
@@ -275,8 +385,8 @@
             "u_health": 0.6,
             "u_budget": 0.67032,
             "u_taste": 0.5,
-            "u_total": 0.67032,
-            "price_pkr": 40
+            "price_pkr": 40,
+            "u_total": 0.591096
         },
         {
             "dish_id": "D038",
@@ -284,8 +394,35 @@
             "u_health": 0.947368,
             "u_budget": 0.06081,
             "u_taste": 0.5,
-            "u_total": 0.06081,
-            "price_pkr": 280
+            "price_pkr": 280,
+            "u_total": 0.54719
+        },
+        {
+            "dish_id": "D039",
+            "name": "Kheer",
+            "u_health": 0.342857,
+            "u_budget": 0.135335,
+            "u_taste": 0.5,
+            "price_pkr": 200,
+            "u_total": 0.327743
+        },
+        {
+            "dish_id": "D040",
+            "name": "Gulab Jamun",
+            "u_health": 0.15,
+            "u_budget": 0.22313,
+            "u_taste": 0.5,
+            "price_pkr": 150,
+            "u_total": 0.276939
+        },
+        {
+            "dish_id": "D041",
+            "name": "Gajar Halwa",
+            "u_health": 0.263158,
+            "u_budget": 0.082085,
+            "u_taste": 0.5,
+            "price_pkr": 250,
+            "u_total": 0.279889
         },
         {
             "dish_id": "D042",
@@ -293,8 +430,17 @@
             "u_health": 0.2,
             "u_budget": 0.367879,
             "u_taste": 0.5,
-            "u_total": 0.367879,
-            "price_pkr": 100
+            "price_pkr": 100,
+            "u_total": 0.340364
+        },
+        {
+            "dish_id": "D043",
+            "name": "Mango Lassi",
+            "u_health": 0.363636,
+            "u_budget": 0.301194,
+            "u_taste": 0.5,
+            "price_pkr": 120,
+            "u_total": 0.385813
         },
         {
             "dish_id": "D044",
@@ -302,8 +448,8 @@
             "u_health": 0.25,
             "u_budget": 0.548812,
             "u_taste": 0.5,
-            "u_total": 0.548812,
-            "price_pkr": 60
+            "price_pkr": 60,
+            "u_total": 0.414644
         },
         {
             "dish_id": "D045",
@@ -311,8 +457,8 @@
             "u_health": 0.285714,
             "u_budget": 0.449329,
             "u_taste": 0.5,
-            "u_total": 0.449329,
-            "price_pkr": 80
+            "price_pkr": 80,
+            "u_total": 0.399084
         },
         {
             "dish_id": "D046",
@@ -320,8 +466,26 @@
             "u_health": 0.222222,
             "u_budget": 0.606531,
             "u_taste": 0.5,
-            "u_total": 0.606531,
-            "price_pkr": 50
+            "price_pkr": 50,
+            "u_total": 0.420848
+        },
+        {
+            "dish_id": "D047",
+            "name": "Aloo Tikki Chaat",
+            "u_health": 0.344828,
+            "u_budget": 0.367879,
+            "u_taste": 0.5,
+            "price_pkr": 100,
+            "u_total": 0.398295
+        },
+        {
+            "dish_id": "D048",
+            "name": "Cashew Paneer Masala",
+            "u_health": 0.666667,
+            "u_budget": 0.011109,
+            "u_taste": 0.5,
+            "price_pkr": 450,
+            "u_total": 0.42
         },
         {
             "dish_id": "D049",
@@ -329,8 +493,17 @@
             "u_health": 0.8,
             "u_budget": 0.301194,
             "u_taste": 0.5,
-            "u_total": 0.301194,
-            "price_pkr": 120
+            "price_pkr": 120,
+            "u_total": 0.560358
+        },
+        {
+            "dish_id": "D050",
+            "name": "Raita Bowl",
+            "u_health": 0.833333,
+            "u_budget": 0.449329,
+            "u_taste": 0.5,
+            "price_pkr": 80,
+            "u_total": 0.618132
         },
         {
             "dish_id": "D051",
@@ -338,14 +511,41 @@
             "u_health": 0.375,
             "u_budget": 0.22313,
             "u_taste": 0.5,
-            "u_total": 0.22313,
-            "price_pkr": 150
+            "price_pkr": 150,
+            "u_total": 0.366939
+        },
+        {
+            "dish_id": "D052",
+            "name": "Corn Chaat",
+            "u_health": 0.4,
+            "u_budget": 0.367879,
+            "u_taste": 0.5,
+            "price_pkr": 100,
+            "u_total": 0.420364
+        },
+        {
+            "dish_id": "D053",
+            "name": "Mutton Biryani",
+            "u_health": 0.882353,
+            "u_budget": 0.001503,
+            "u_taste": 0.5,
+            "price_pkr": 650,
+            "u_total": 0.503392
+        },
+        {
+            "dish_id": "D055",
+            "name": "Lamb Chops",
+            "u_health": 1.0,
+            "u_budget": 0.000203,
+            "u_taste": 0.5,
+            "price_pkr": 850,
+            "u_total": 0.550061
         }
     ],
     "source_context": {
-        "budget_max_pkr": 500,
+        "budget_max_pkr": 1000,
         "allergens_pruned": [
-            "dairy"
+            "shellfish"
         ],
         "mood_vector_seed": "neutral"
     }

@@ -1,12 +1,13 @@
 {
     "hard_constraints": {
-        "budget_max_pkr": 500,
+        "budget_max_pkr": 1000,
         "allergens_pruned": [
-            "dairy"
+            "shellfish"
         ]
     },
     "soft_constraints": {
         "protein_priority": "normal",
-        "mood_vector_seed": "neutral"
+        "mood_vector_seed": "neutral",
+        "direct_dish_prompt": "cheap seafood, allergy to shrimp"
     }
 }

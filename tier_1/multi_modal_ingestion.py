@@ -256,10 +256,14 @@ def extract_intent_keywords(raw_input: str) -> dict:
         "seafood":   "fish",
     }
     allergens_found: set[str] = set()
-    for word in text.split():
+    words = text.split()
+    negation_words = {"no", "without", "free", "allergy", "allergic", "cant", "don't", "dont", "not", "minus"}
+    for i, word in enumerate(words):
         word_clean = word.strip(".,!?;:")
         if word_clean in exclusion_keywords:
-            allergens_found.add(exclusion_keywords[word_clean])
+            prev_words = {w.strip(".,!?;:") for w in words[max(0, i-2):i]}
+            if prev_words & negation_words:
+                allergens_found.add(exclusion_keywords[word_clean])
 
     # ── Protein priority ──
     protein_priority = "high" if any(k in text for k in ("protein", "gym", "muscle", "high protein")) else "normal"
@@ -295,12 +299,15 @@ def extract_intent(raw_input: str) -> dict:
     """
     # Try LLM (Ollama + fine-tuned Phi-3.5)
     intent = extract_intent_llm(raw_input)
-    if intent is not None:
-        return intent
-
-    # Fallback to keyword parser
-    log.info("📋 using keyword fallback parser")
-    return extract_intent_keywords(raw_input)
+    if intent is None:
+        # Fallback to keyword parser
+        log.info("📋 using keyword fallback parser")
+        intent = extract_intent_keywords(raw_input)
+        
+    if "direct_dish_prompt" not in intent.get("soft_constraints", {}):
+        intent.setdefault("soft_constraints", {})["direct_dish_prompt"] = raw_input.strip().lower()
+        
+    return intent
 
 
 # ═══════════════════════════════════════════════════════════════════════════
