@@ -165,6 +165,7 @@ def recalculate(payload: WeightUpdate):
     candidates = evaluation.get("safe_candidates", [])
     budget_max = evaluation.get("source_intent", {}).get("budget_max_pkr", 1000)
     mood_seed = evaluation.get("soft_constraints", {}).get("mood_vector_seed", "neutral")
+    direct_dish_prompt = evaluation.get("soft_constraints", {}).get("direct_dish_prompt", "")
 
     # Rebalance weights: user controls w_b, remainder split equally
     w_b = max(0.0, min(1.0, payload.w_budget))
@@ -185,6 +186,11 @@ def recalculate(payload: WeightUpdate):
         u_t = 0.5  # default without live vectors
 
         u_total = (w_h * u_h) + (w_b * u_b) + (w_t * u_t)
+        
+        cand_name_lower = cand.get("name", "").lower()
+        if direct_dish_prompt and len(direct_dish_prompt) > 3 and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower):
+            u_total = 1000.0
+            
         entry = {
             "dish_id": cand.get("dish_id", "?"),
             "name": cand.get("name", "unnamed"),

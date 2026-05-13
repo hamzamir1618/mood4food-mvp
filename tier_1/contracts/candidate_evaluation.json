@@ -1,13 +1,14 @@
 {
     "source_intent": {
-        "budget_max_pkr": 500,
+        "budget_max_pkr": 1000,
         "allergens_pruned": [
-            "dairy"
+            "shellfish"
         ]
     },
     "soft_constraints": {
         "protein_priority": "normal",
-        "mood_vector_seed": "neutral"
+        "mood_vector_seed": "neutral",
+        "direct_dish_prompt": "cheap seafood, allergy to shrimp"
     },
     "safe_candidates": [
         {
@@ -25,6 +26,13 @@
             "calories": 350
         },
         {
+            "dish_id": "D003",
+            "name": "Palak Paneer",
+            "price_pkr": 350,
+            "protein_g": 18.0,
+            "calories": 400
+        },
+        {
             "dish_id": "D004",
             "name": "Aloo Gobi",
             "price_pkr": 200,
@@ -39,11 +47,46 @@
             "calories": 260
         },
         {
+            "dish_id": "D006",
+            "name": "Vegetable Biryani",
+            "price_pkr": 300,
+            "protein_g": 10.0,
+            "calories": 450
+        },
+        {
+            "dish_id": "D007",
+            "name": "Dahi Bhalle",
+            "price_pkr": 180,
+            "protein_g": 8.0,
+            "calories": 300
+        },
+        {
             "dish_id": "D008",
             "name": "Chicken Karahi",
             "price_pkr": 550,
             "protein_g": 35.0,
             "calories": 520
+        },
+        {
+            "dish_id": "D009",
+            "name": "Butter Chicken",
+            "price_pkr": 600,
+            "protein_g": 32.0,
+            "calories": 580
+        },
+        {
+            "dish_id": "D010",
+            "name": "Chicken Biryani",
+            "price_pkr": 450,
+            "protein_g": 30.0,
+            "calories": 600
+        },
+        {
+            "dish_id": "D011",
+            "name": "Chicken Tikka",
+            "price_pkr": 400,
+            "protein_g": 38.0,
+            "calories": 350
         },
         {
             "dish_id": "D012",
@@ -60,6 +103,13 @@
             "calories": 480
         },
         {
+            "dish_id": "D014",
+            "name": "Mutton Korma",
+            "price_pkr": 750,
+            "protein_g": 26.0,
+            "calories": 600
+        },
+        {
             "dish_id": "D015",
             "name": "Fish Fry Lahori",
             "price_pkr": 500,
@@ -72,6 +122,13 @@
             "price_pkr": 180,
             "protein_g": 14.0,
             "calories": 280
+        },
+        {
+            "dish_id": "D017",
+            "name": "Plain Naan",
+            "price_pkr": 50,
+            "protein_g": 3.0,
+            "calories": 260
         },
         {
             "dish_id": "D018",
@@ -137,6 +194,20 @@
             "calories": 200
         },
         {
+            "dish_id": "D027",
+            "name": "Chicken Shawarma",
+            "price_pkr": 350,
+            "protein_g": 28.0,
+            "calories": 420
+        },
+        {
+            "dish_id": "D028",
+            "name": "Beef Biryani",
+            "price_pkr": 500,
+            "protein_g": 32.0,
+            "calories": 650
+        },
+        {
             "dish_id": "D029",
             "name": "Seekh Kebab",
             "price_pkr": 300,
@@ -144,18 +215,11 @@
             "calories": 380
         },
         {
-            "dish_id": "D030",
-            "name": "Prawn Karahi",
-            "price_pkr": 800,
-            "protein_g": 28.0,
-            "calories": 380
-        },
-        {
-            "dish_id": "D032",
-            "name": "Shrimp Rice Bowl",
-            "price_pkr": 650,
-            "protein_g": 26.0,
-            "calories": 450
+            "dish_id": "D031",
+            "name": "Fish Tikka",
+            "price_pkr": 550,
+            "protein_g": 32.0,
+            "calories": 320
         },
         {
             "dish_id": "D033",
@@ -179,6 +243,13 @@
             "calories": 420
         },
         {
+            "dish_id": "D036",
+            "name": "Garlic Naan",
+            "price_pkr": 80,
+            "protein_g": 4.0,
+            "calories": 290
+        },
+        {
             "dish_id": "D037",
             "name": "Missi Roti",
             "price_pkr": 40,
@@ -193,11 +264,39 @@
             "calories": 380
         },
         {
+            "dish_id": "D039",
+            "name": "Kheer",
+            "price_pkr": 200,
+            "protein_g": 6.0,
+            "calories": 350
+        },
+        {
+            "dish_id": "D040",
+            "name": "Gulab Jamun",
+            "price_pkr": 150,
+            "protein_g": 3.0,
+            "calories": 400
+        },
+        {
+            "dish_id": "D041",
+            "name": "Gajar Halwa",
+            "price_pkr": 250,
+            "protein_g": 5.0,
+            "calories": 380
+        },
+        {
             "dish_id": "D042",
             "name": "Suji Halwa",
             "price_pkr": 100,
             "protein_g": 3.0,
             "calories": 300
+        },
+        {
+            "dish_id": "D043",
+            "name": "Mango Lassi",
+            "price_pkr": 120,
+            "protein_g": 4.0,
+            "calories": 220
         },
         {
             "dish_id": "D044",
@@ -221,6 +320,20 @@
             "calories": 180
         },
         {
+            "dish_id": "D047",
+            "name": "Aloo Tikki Chaat",
+            "price_pkr": 100,
+            "protein_g": 5.0,
+            "calories": 290
+        },
+        {
+            "dish_id": "D048",
+            "name": "Cashew Paneer Masala",
+            "price_pkr": 450,
+            "protein_g": 16.0,
+            "calories": 480
+        },
+        {
             "dish_id": "D049",
             "name": "Peanut Chaat Salad",
             "price_pkr": 120,
@@ -228,12 +341,40 @@
             "calories": 250
         },
         {
+            "dish_id": "D050",
+            "name": "Raita Bowl",
+            "price_pkr": 80,
+            "protein_g": 5.0,
+            "calories": 120
+        },
+        {
             "dish_id": "D051",
             "name": "Pomegranate Salad",
             "price_pkr": 150,
             "protein_g": 3.0,
             "calories": 160
+        },
+        {
+            "dish_id": "D052",
+            "name": "Corn Chaat",
+            "price_pkr": 100,
+            "protein_g": 4.0,
+            "calories": 200
+        },
+        {
+            "dish_id": "D053",
+            "name": "Mutton Biryani",
+            "price_pkr": 650,
+            "protein_g": 30.0,
+            "calories": 680
+        },
+        {
+            "dish_id": "D055",
+            "name": "Lamb Chops",
+            "price_pkr": 850,
+            "protein_g": 35.0,
+            "calories": 500
         }
     ],
-    "candidate_count": 32
+    "candidate_count": 52
 }

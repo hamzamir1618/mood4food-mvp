@@ -98,7 +98,8 @@ def score_candidate(candidate: dict,
 def run_debate(candidates: list[dict],
                mood_vector: list[float],
                budget_max: int,
-               dish_collection=None) -> dict:
+               dish_collection=None,
+               direct_dish_prompt: str = "") -> dict:
     """
     Weighted utility aggregation loop:
       U_total = (w_h * U_h) + (w_b * U_b) + (w_t * U_t)
@@ -125,6 +126,12 @@ def run_debate(candidates: list[dict],
         for cand in candidates:
             sc = score_candidate(cand, mood_vector, budget_max, dish_collection)
             u_total = (w_h * sc["u_health"]) + (w_b * sc["u_budget"]) + (w_t * sc["u_taste"])
+            
+            cand_name_lower = sc["name"].lower()
+            if direct_dish_prompt and len(direct_dish_prompt) > 3 and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower):
+                u_total = 1000.0
+                xai_traces.append(f"  {sc['name']} → EXACT MATCH OVERRIDE (prompt='{direct_dish_prompt}')")
+
             sc["u_total"] = round(u_total, 6)
             scored.append(sc)
 
@@ -240,6 +247,7 @@ def run_debate_pipeline() -> dict:
     candidates = evaluation.get("safe_candidates", [])
     budget_max = evaluation.get("source_intent", {}).get("budget_max_pkr", 1000)
     mood_seed = evaluation.get("soft_constraints", {}).get("mood_vector_seed", "neutral")
+    direct_dish_prompt = evaluation.get("soft_constraints", {}).get("direct_dish_prompt", "")
 
     # Step 2 — Vector store (best-effort — pipeline still works without embeddings)
     vector_store = None
@@ -251,7 +259,7 @@ def run_debate_pipeline() -> dict:
         log.warning("vector store unavailable, proceeding without vectors: %s", exc)
 
     # Step 3 — debate
-    debate_result = run_debate(candidates, mood_vector, budget_max, vector_store)
+    debate_result = run_debate(candidates, mood_vector, budget_max, vector_store, direct_dish_prompt)
 
     # Step 4 — persist contract
     intent_context = {
