@@ -2,12 +2,12 @@
     "hard_constraints": {
         "budget_max_pkr": 1000,
         "allergens_pruned": [
-            "shellfish"
+            "dairy"
         ]
     },
     "soft_constraints": {
         "protein_priority": "normal",
         "mood_vector_seed": "neutral",
-        "direct_dish_prompt": "cheap seafood, allergy to shrimp"
+        "direct_dish_prompt": "palak paneer but no dairy"
     }
 }

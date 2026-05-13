@@ -120,7 +120,7 @@ def calculate_budget_utility(price: float, max_budget: float) -> float:
     """
     if price < 0:
         return 1.0
-    return math.exp(-0.01 * price)
+    return math.exp(-0.002 * price)
 
 
 # ── Vector Retrieval Helpers ────────────────────────────────────────────────
