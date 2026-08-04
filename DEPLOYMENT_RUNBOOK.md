@@ -75,11 +75,7 @@ docker --version
 Spin up the local Neo4j instance:
 
 ```bash
-docker run --name neo4j_mood4food \
-  -p 7474:7474 \
-  -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/Mood4Food \
-  -d neo4j:latest
+docker run --name neo4j_mood4food -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/Mood4Food -d neo4j:latest
 ```
 
 **Windows (single-line):**
