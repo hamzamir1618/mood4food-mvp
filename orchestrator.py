@@ -132,7 +132,7 @@ async def submit_query(
       Tier 1a (intent parsing) → Tier 1b (Neo4j pruning) → Tier 2 (debate)
     Returns the resulting decision_blueprint enriched with fulfillment data.
     """
-    from tier_1.contracts.session_store import save_contract
+    from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.symbolic_anchoring import run_anchoring_pipeline
     from tier_2.consensus_manager import run_debate_pipeline
@@ -203,19 +203,18 @@ async def submit_query(
 
     # Stage 3: Multi-Agent Debate
     try:
-        run_debate_pipeline()
+        run_debate_pipeline(request.state.session_id)
     except Exception as exc:
         log.error("Tier 2 failed: %s", exc)
         raise HTTPException(500, f"Debate pipeline failed: {exc}")
 
-    # Return the freshly written blueprint
-    if not DECISION_BLUEPRINT_PATH.exists():
-        raise HTTPException(500, "Pipeline completed but decision_blueprint.json was not created.")
+    # Return the freshly written blueprint from the session store
+    blueprint = load_contract(request.state.session_id, "decision_blueprint")
+    if not blueprint:
+        raise HTTPException(500, "Pipeline completed but decision_blueprint was not created.")
 
-    with open(DECISION_BLUEPRINT_PATH, "r", encoding="utf-8") as fh:
-        blueprint = json.load(fh)
-
-    save_contract(request.state.session_id, "decision_blueprint", blueprint)
+    if hasattr(blueprint, "model_dump"):
+        blueprint = blueprint.model_dump()
 
     # Enrich with fulfillment data (recipe + restaurants)
     blueprint = enrich_blueprint(blueprint)
@@ -253,9 +252,10 @@ def recalculate(request: Request, payload: WeightUpdate):
     and an optional persona key. Re-scores all candidates with new weights
     **without re-querying the LLM or database**. Instant.
     """
+    from tier_1.contracts.schemas import Candidate, TasteProfile
     from tier_1.contracts.session_store import load_contract
     from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
-    from tier_2.agents import calculate_taste_utility_6d
+    from tier_2.agents import TasteAgent
     from tier_3.fulfillment_engine import enrich_blueprint
 
     evaluation = load_contract(request.state.session_id, "candidate_evaluation")
@@ -321,7 +321,9 @@ def recalculate(request: Request, payload: WeightUpdate):
         # 6D taste profile utility
         dish_taste_profile = cand.get("taste_profile", {})
         if dish_taste_profile and persona_taste:
-            u_t = calculate_taste_utility_6d(dish_taste_profile, persona_taste)
+            agent = TasteAgent(persona_taste=TasteProfile(**persona_taste))
+            c_model = Candidate(taste_profile=TasteProfile(**dish_taste_profile))
+            u_t = agent.score(c_model)
         else:
             u_t = 0.5  # fallback without taste data
 
@@ -353,41 +355,39 @@ def recalculate(request: Request, payload: WeightUpdate):
             f"  {entry['name']} → U_h={u_h:.4f} U_b={u_b:.4f} U_t={u_t:.4f} | U_total={u_total:.4f}"
         )
 
-    winner = (
-        max(scored, key=lambda x: x["u_total"])
-        if scored
-        else {
-            "dish_id": "none",
-            "name": "no_candidates",
-            "u_health": 0,
-            "u_budget": 0,
-            "u_taste": 0,
-            "u_total": 0,
-            "price_pkr": 0,
-        }
-    )
-    xai_traces.append(f"winner: {winner['name']} (U_total={winner['u_total']:.4f})")
-
-    blueprint = {
-        "winning_dish": {
+    if scored:
+        winner = max(scored, key=lambda x: x["u_total"])
+        winning_dish = {
             "dish_id": winner["dish_id"],
             "name": winner["name"],
             "price_pkr": winner.get("price_pkr", 0),
             "category": winner.get("category", ""),
             "image_url": winner.get("image_url", ""),
             "human_tags": winner.get("human_tags", []),
-        },
-        "utility_breakdown": {
+        }
+        utility_breakdown = {
             "u_health": winner["u_health"],
             "u_budget": winner["u_budget"],
             "u_taste": winner["u_taste"],
             "u_total": winner["u_total"],
-        },
+        }
+        xai_traces.append(f"winner: {winner['name']} (U_total={winner['u_total']:.4f})")
+    else:
+        winning_dish = None
+        utility_breakdown = {"u_health": 0.0, "u_budget": 0.0, "u_taste": 0.0, "u_total": 0.0}
+        xai_traces.append("FALLBACK: no candidates to score")
+
+    relaxation_notice = evaluation.get("message", "") or None
+
+    blueprint = {
+        "winning_dish": winning_dish,
+        "utility_breakdown": utility_breakdown,
         "agent_weights": {"w_h": round(w_h, 4), "w_b": round(w_b, 4), "w_t": round(w_t, 4)},
         "persona": persona_key,
         "relaxation_rounds": 0,
         "xai_traces": xai_traces,
         "all_candidate_scores": scored,
+        "top_candidates": sorted(scored, key=lambda x: x.get("u_total", 0.0), reverse=True)[:5],
         "source_context": {
             "budget_max_pkr": budget_max,
             "allergens_pruned": evaluation.get("source_intent", {}).get("allergens_pruned", []),
@@ -401,6 +401,7 @@ def recalculate(request: Request, payload: WeightUpdate):
             }
             for k, v in get_all_personas().items()
         },
+        "relaxation_notice": relaxation_notice,
     }
 
     # Enrich with fulfillment data

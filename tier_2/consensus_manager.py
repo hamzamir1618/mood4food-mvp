@@ -8,12 +8,13 @@ import json
 import logging
 from pathlib import Path
 
+from tier_1.contracts.schemas import Candidate, TasteProfile
 from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
 from tier_2.agents import (
-    calculate_budget_utility,
-    calculate_health_utility,
+    BudgetAgent,
+    HealthAgent,
+    TasteAgent,
     calculate_taste_utility,
-    calculate_taste_utility_6d,
     get_vector_store,
     retrieve_dish_vector,
     retrieve_mood_vector,
@@ -72,21 +73,33 @@ def score_candidate(
     dish_id = candidate.get("dish_id", "unknown")
     name = candidate.get("name", "unnamed")
 
+    cand_model = Candidate(
+        dish_id=dish_id,
+        name=name,
+        price_pkr=candidate.get("price_pkr", 0.0),
+        category=candidate.get("category", ""),
+        taste_profile=TasteProfile(**candidate.get("taste_profile", {})),
+        image_url=candidate.get("image_url", ""),
+        human_tags=candidate.get("human_tags", []),
+        macros={
+            "protein_g": candidate.get("protein_g", 15.0),
+            "calories": candidate.get("calories", 500.0),
+        },
+    )
+
     # ── Health utility ──
-    dish_data = {
-        "protein_g": candidate.get("protein_g", 15.0),
-        "calories": candidate.get("calories", 500.0),
-    }
-    u_health = calculate_health_utility(dish_data)
+    health_agent = HealthAgent()
+    u_health = health_agent.score(cand_model)
 
     # ── Budget utility ──
-    price = candidate.get("price_pkr", 0.0)
-    u_budget = calculate_budget_utility(price, budget_max)
+    budget_agent = BudgetAgent(max_budget=budget_max)
+    u_budget = budget_agent.score(cand_model)
 
     # ── Taste utility (6D profile preferred, legacy vector fallback) ──
     dish_taste_profile = candidate.get("taste_profile", {})
     if dish_taste_profile and persona_taste:
-        u_taste = calculate_taste_utility_6d(dish_taste_profile, persona_taste)
+        taste_agent = TasteAgent(persona_taste=TasteProfile(**persona_taste))
+        u_taste = taste_agent.score(cand_model)
     else:
         dish_vector = candidate.get("embedding", [])
         if not dish_vector and dish_collection is not None:
@@ -103,10 +116,10 @@ def score_candidate(
         "u_health": round(u_health, 6),
         "u_budget": round(u_budget, 6),
         "u_taste": round(u_taste, 6),
-        "price_pkr": price,
-        "category": candidate.get("category", ""),
-        "image_url": candidate.get("image_url", ""),
-        "human_tags": candidate.get("human_tags", []),
+        "price_pkr": cand_model.price_pkr,
+        "category": cand_model.category,
+        "image_url": cand_model.image_url,
+        "human_tags": cand_model.human_tags,
         "taste_profile": dish_taste_profile,
     }
 
@@ -152,6 +165,10 @@ def run_debate(
             sc = score_candidate(cand, mood_vector, budget_max, dish_collection, persona_taste)
             u_total = (w_h * sc["u_health"]) + (w_b * sc["u_budget"]) + (w_t * sc["u_taste"])
 
+            w_h_contrib = w_h * sc["u_health"]
+            w_b_contrib = w_b * sc["u_budget"]
+            w_t_contrib = w_t * sc["u_taste"]
+
             cand_name_lower = sc["name"].lower()
             if (
                 direct_dish_prompt
@@ -166,11 +183,42 @@ def run_debate(
             sc["u_total"] = round(u_total, 6)
             scored.append(sc)
 
-            xai_traces.append(
-                f"  {sc['name']} → U_h={sc['u_health']:.4f} "
-                f"U_b={sc['u_budget']:.4f} U_t={sc['u_taste']:.4f} "
-                f"| U_total={sc['u_total']:.4f}"
+            # Extended XAI Trace
+            xai_traces.append(f"  {sc['name']} Candidate Breakdown:")
+
+            # Health
+            health_reason = (
+                "strong match"
+                if sc["u_health"] >= 0.7
+                else ("moderate match" if sc["u_health"] >= 0.3 else "poor match")
             )
+            xai_traces.append(
+                f"    - Health Agent: {health_reason} (raw: {sc['u_health']:.4f}, weight-adjusted: {w_h_contrib:.4f})"
+            )
+
+            # Budget
+            price = sc.get("price_pkr", 0.0)
+            budget_max_val = budget_max if budget_max and budget_max > 0 else 1000
+            budget_reason = (
+                f"Rs. {price} well under your Rs. {budget_max_val} limit"
+                if price <= budget_max_val
+                else f"Rs. {price} exceeds Rs. {budget_max_val} limit"
+            )
+            xai_traces.append(
+                f"    - Budget Agent: {budget_reason} (raw: {sc['u_budget']:.4f}, weight-adjusted: {w_b_contrib:.4f})"
+            )
+
+            # Taste
+            taste_reason = (
+                "strong alignment"
+                if sc["u_taste"] >= 0.7
+                else ("moderate alignment" if sc["u_taste"] >= 0.3 else "poor alignment")
+            )
+            xai_traces.append(
+                f"    - Taste Agent: {taste_reason} to persona taste (raw: {sc['u_taste']:.4f}, weight-adjusted: {w_t_contrib:.4f})"
+            )
+
+            xai_traces.append(f"    => Final U_total: {sc['u_total']:.4f}")
 
         # Find the winner
         if scored:
@@ -230,27 +278,37 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
     Writes decision_blueprint.json with the winning dish, utility breakdown,
     XAI traces, and the originating intent context.
     """
-    winner = debate_result["winner"]
-    blueprint = {
-        "winning_dish": {
+    winner = debate_result.get("winner")
+    if winner and winner.get("dish_id") != "none":
+        winning_dish = {
             "dish_id": winner["dish_id"],
             "name": winner["name"],
             "price_pkr": winner.get("price_pkr", 0),
             "category": winner.get("category", ""),
             "image_url": winner.get("image_url", ""),
             "human_tags": winner.get("human_tags", []),
-        },
-        "utility_breakdown": {
-            "u_health": winner["u_health"],
-            "u_budget": winner["u_budget"],
-            "u_taste": winner["u_taste"],
-            "u_total": winner["u_total"],
-        },
+        }
+        utility_breakdown = {
+            "u_health": winner.get("u_health", 0.0),
+            "u_budget": winner.get("u_budget", 0.0),
+            "u_taste": winner.get("u_taste", 0.0),
+            "u_total": winner.get("u_total", 0.0),
+        }
+        all_scores = winner.get("all_scores", [])
+    else:
+        winning_dish = None
+        utility_breakdown = {"u_health": 0.0, "u_budget": 0.0, "u_taste": 0.0, "u_total": 0.0}
+        all_scores = []
+
+    blueprint = {
+        "winning_dish": winning_dish,
+        "utility_breakdown": utility_breakdown,
         "agent_weights": debate_result["final_weights"],
         "persona": debate_result.get("persona", DEFAULT_PERSONA),
         "relaxation_rounds": debate_result["relaxation_rounds"],
         "xai_traces": debate_result["xai_traces"],
-        "all_candidate_scores": winner.get("all_scores", []),
+        "all_candidate_scores": all_scores,
+        "top_candidates": sorted(all_scores, key=lambda x: x.get("u_total", 0.0), reverse=True)[:5],
         "source_context": {
             "budget_max_pkr": intent_context.get("budget_max_pkr", 0),
             "allergens_pruned": intent_context.get("allergens_pruned", []),
@@ -276,18 +334,25 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
 # ── Pipeline Entry Point ────────────────────────────────────────────────────
 
 
-def run_debate_pipeline() -> dict:
+def run_debate_pipeline(session_id: str = "default_session") -> dict:
     """
     Full Tier-2b pipeline:
-      1. Load candidate_evaluation.json
+      1. Load candidate_evaluation.json via session store
       2. Initialise ChromaDB (best-effort; runs without vectors)
       3. Run Nash-equilibrium debate with constraint relaxation
-      4. Write decision_blueprint.json
+      4. Write decision_blueprint.json via session store
     """
-    log.info("─── Tier 2b: Multi-Agent Debate Pipeline START ───")
+    log.info(f"─── Tier 2b: Multi-Agent Debate Pipeline START (Session: {session_id}) ───")
+    from tier_1.contracts.session_store import load_contract, save_contract
 
     # Step 1 — load upstream contract
-    evaluation = load_candidate_evaluation()
+    evaluation = load_contract(session_id, "candidate_evaluation")
+    if not evaluation:
+        raise ValueError(f"No candidate_evaluation found for session {session_id}")
+
+    if hasattr(evaluation, "model_dump"):
+        evaluation = evaluation.model_dump()
+
     candidates = evaluation.get("safe_candidates", [])
     budget_max = evaluation.get("source_intent", {}).get("budget_max_pkr", 1000)
     mood_seed = evaluation.get("soft_constraints", {}).get("mood_vector_seed", "neutral")
@@ -313,13 +378,80 @@ def run_debate_pipeline() -> dict:
         "allergens_pruned": evaluation.get("source_intent", {}).get("allergens_pruned", []),
         "mood_vector_seed": mood_seed,
     }
-    write_decision_blueprint(debate_result, intent_context)
+
+    # We use a mocked/local version of write_decision_blueprint logic to create the dict
+    # but we save it via Redis instead of filesystem directly. Let's do that below.
+    winner = debate_result.get("winner")
+
+    if winner and winner.get("dish_id") != "none":
+        winning_dish = {
+            "dish_id": winner["dish_id"],
+            "name": winner["name"],
+            "price_pkr": winner.get("price_pkr", 0),
+            "category": winner.get("category", ""),
+            "image_url": winner.get("image_url", ""),
+            "human_tags": winner.get("human_tags", []),
+        }
+        utility_breakdown = {
+            "u_health": winner.get("u_health", 0.0),
+            "u_budget": winner.get("u_budget", 0.0),
+            "u_taste": winner.get("u_taste", 0.0),
+            "u_total": winner.get("u_total", 0.0),
+        }
+        all_scores = winner.get("all_scores", [])
+    else:
+        winning_dish = None
+        utility_breakdown = {"u_health": 0.0, "u_budget": 0.0, "u_taste": 0.0, "u_total": 0.0}
+        all_scores = []
+
+    relaxation_notice = evaluation.get("message", "") or None
+
+    blueprint = {
+        "winning_dish": winning_dish,
+        "utility_breakdown": utility_breakdown,
+        "agent_weights": debate_result["final_weights"],
+        "persona": debate_result.get("persona", DEFAULT_PERSONA),
+        "relaxation_rounds": debate_result["relaxation_rounds"],
+        "xai_traces": debate_result["xai_traces"],
+        "all_candidate_scores": all_scores,
+        "top_candidates": sorted(all_scores, key=lambda x: x.get("u_total", 0.0), reverse=True)[:5],
+        "source_context": intent_context,
+        "personas_available": {
+            k: {
+                "display_name": v["display_name"],
+                "icon": v["icon"],
+                "description": v["description"],
+            }
+            for k, v in get_all_personas().items()
+        },
+        "relaxation_notice": relaxation_notice,
+    }
+    save_contract(session_id, "decision_blueprint", blueprint)
 
     log.info("─── Tier 2b: Multi-Agent Debate Pipeline DONE ────")
     return debate_result
 
 
+def get_alternate(session_id: str, excluded_dish_ids: list[str]) -> Candidate | dict:
+    """
+    Returns the next-highest-ranked candidate from the cached runners-up shortlist
+    that is not in excluded_dish_ids. If exhausted, returns a signal dict.
+    """
+    from tier_1.contracts.session_store import load_contract
+
+    blueprint = load_contract(session_id, "decision_blueprint")
+    if not blueprint:
+        return {"error": "no more alternates"}
+
+    top_candidates = blueprint.top_candidates
+    for cand in top_candidates:
+        if cand.dish_id not in excluded_dish_ids:
+            return cand
+
+    return {"error": "no more alternates"}
+
+
 # ── Standalone execution ────────────────────────────────────────────────────
 if __name__ == "__main__":
-    result = run_debate_pipeline()
+    result = run_debate_pipeline("default_session")
     print(json.dumps(result, indent=4, default=str))

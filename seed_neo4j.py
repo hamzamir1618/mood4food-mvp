@@ -301,7 +301,7 @@ DISHES = [
         "Lentil/Rice",
         "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=800&h=600&fit=crop&q=75",
         ["Budget Friendly", "High Protein", "Hearty", "Comfort Food"],
-        {"sweet": 0.1, "salty": 0.5, "sour": 0.2, "bitter": 0.1, "umami": 0.6, "spice": 0.5},
+        {"sweet": 0.1, "salty": 0.5, "sour": 0.2, "bitter": 0.2, "umami": 0.7, "spice": 0.6},
     ),
     (
         "D022",
@@ -514,7 +514,7 @@ DISHES = [
         "D026",
         "Chicken Corn Soup",
         180,
-        16.0,
+        8.0,
         200,
         ["chicken", "meat", "corn", "egg", "garlic", "ginger", "salt", "oil"],
         "Chicken",
@@ -607,7 +607,7 @@ DISHES = [
         "Mutton/Beef",
         "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop&q=80",
         ["High Protein", "Spicy", "Street Style", "Quick Bite"],
-        {"sweet": 0.1, "salty": 0.6, "sour": 0.2, "bitter": 0.1, "umami": 0.8, "spice": 0.7},
+        {"sweet": 0.1, "salty": 0.7, "sour": 0.4, "bitter": 0.2, "umami": 0.8, "spice": 0.9},
     ),
     (
         "D014",
@@ -1308,7 +1308,7 @@ DISHES = [
         "Premium",
         "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f4?w=800&h=600&fit=crop&q=65",
         ["Premium", "Hearty", "Comfort Food", "Spicy"],
-        {"sweet": 0.1, "salty": 0.6, "sour": 0.2, "bitter": 0.1, "umami": 0.9, "spice": 0.7},
+        {"sweet": 0.1, "salty": 0.6, "sour": 0.2, "bitter": 0.1, "umami": 0.8, "spice": 0.8},
     ),
     (
         "D054",
@@ -1364,7 +1364,7 @@ DISHES = [
         "Premium",
         "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop&q=65",
         ["Premium", "High Protein", "Gluten Free", "Hearty"],
-        {"sweet": 0.1, "salty": 0.6, "sour": 0.2, "bitter": 0.1, "umami": 0.9, "spice": 0.7},
+        {"sweet": 0.1, "salty": 0.6, "sour": 0.2, "bitter": 0.3, "umami": 0.9, "spice": 0.7},
     ),
 ]
 

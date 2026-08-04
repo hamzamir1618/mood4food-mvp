@@ -54,7 +54,10 @@ def test_submit_session_isolation(monkeypatch):
     def mock_anchor(*args, **kwargs):
         return {"safe_candidates": [{"name": "fake candidate"}]}
 
-    def mock_debate(*args, **kwargs):
+    def mock_debate(session_id, *args, **kwargs):
+        from tier_1.contracts.session_store import save_contract
+
+        save_contract(session_id, "decision_blueprint", {"winning_dish": {"name": "dummy"}})
         return {}
 
     monkeypatch.setattr("tier_1.multi_modal_ingestion.run_ingestion_pipeline", mock_ingest)
@@ -148,14 +151,17 @@ def test_recalculate_after_submit_200(monkeypatch):
             "safe_candidates": [{"name": "fake candidate", "taste_profile": {}}],
         }
 
-    def mock_debate(*args, **kwargs):
+    def mock_debate(session_id, *args, **kwargs):
+        from tier_1.contracts.session_store import save_contract
+
+        save_contract(session_id, "decision_blueprint", {"winning_dish": {"name": "dummy"}})
         return {}
 
     monkeypatch.setattr("tier_1.multi_modal_ingestion.run_ingestion_pipeline", mock_ingest)
     monkeypatch.setattr("tier_1.symbolic_anchoring.run_anchoring_pipeline", mock_anchor)
     monkeypatch.setattr("tier_2.consensus_manager.run_debate_pipeline", mock_debate)
     monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda x: x)
-    monkeypatch.setattr("tier_2.agents.calculate_taste_utility_6d", lambda x, y: 0.5)
+    monkeypatch.setattr("tier_2.agents.TasteAgent.score", lambda self, x: 0.5)
 
     from fastapi.testclient import TestClient
 

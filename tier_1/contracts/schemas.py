@@ -40,6 +40,8 @@ class CandidateEvaluation(BaseModel):
     source_intent: GroundedIntent = Field(default_factory=GroundedIntent)
     safe_candidates: List[Candidate] = Field(default_factory=list)
     soft_constraints: Dict[str, Any] = Field(default_factory=dict)
+    relaxations: List[Dict[str, Any]] = Field(default_factory=list)
+    message: str = ""
 
 
 class SourceContext(BaseModel):
@@ -59,3 +61,4 @@ class DecisionBlueprint(BaseModel):
     top_candidates: List[Candidate] = Field(default_factory=list)
     source_context: SourceContext = Field(default_factory=SourceContext)
     personas_available: Dict[str, Persona] = Field(default_factory=dict)
+    relaxation_notice: Optional[str] = None
