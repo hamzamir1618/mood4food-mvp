@@ -43,4 +43,8 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run tests
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: dummy
+          NEO4J_PASSWORD: dummy
         run: pytest
