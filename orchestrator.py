@@ -91,6 +91,7 @@ class QueryInput(BaseModel):
 
 @app.post("/submit")
 async def submit_query(
+    request: Request,
     query: str = Form(default=""),
     audio: UploadFile | None = File(default=None),
     image: UploadFile | None = File(default=None),
@@ -101,6 +102,7 @@ async def submit_query(
       Tier 1a (intent parsing) → Tier 1b (Neo4j pruning) → Tier 2 (debate)
     Returns the resulting decision_blueprint enriched with fulfillment data.
     """
+    from tier_1.contracts.session_store import save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.symbolic_anchoring import run_anchoring_pipeline
     from tier_2.consensus_manager import run_debate_pipeline
@@ -141,13 +143,15 @@ async def submit_query(
             audio_path=audio_path,
             image_path=image_path,
         )
+        save_contract(request.state.session_id, "grounded_intent", intent)
     except Exception as exc:
         log.error("Tier 1a failed: %s", exc)
         raise HTTPException(500, f"Intent parsing failed: {exc}")
 
     # Stage 2: Neo4j Allergen Pruning
     try:
-        run_anchoring_pipeline()
+        evaluation = run_anchoring_pipeline()
+        save_contract(request.state.session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)
         raise HTTPException(503, f"Neo4j query failed — is the database running? ({exc})")
@@ -165,6 +169,8 @@ async def submit_query(
 
     with open(DECISION_BLUEPRINT_PATH, "r", encoding="utf-8") as fh:
         blueprint = json.load(fh)
+
+    save_contract(request.state.session_id, "decision_blueprint", blueprint)
 
     # Enrich with fulfillment data (recipe + restaurants)
     blueprint = enrich_blueprint(blueprint)
