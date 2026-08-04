@@ -78,11 +78,10 @@ def health_check():
 
     # Ping Neo4j
     try:
-        driver = GraphDatabase.driver(
+        with GraphDatabase.driver(
             settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
-        )
-        driver.verify_connectivity()
-        driver.close()
+        ) as driver:
+            driver.verify_connectivity()
     except Exception:
         health_status["neo4j"] = "unreachable"
         status_code = 503
