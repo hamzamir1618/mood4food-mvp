@@ -7,7 +7,10 @@ vector store stub (no C++ build dependency).
 import json
 import logging
 import math
+from abc import ABC, abstractmethod
 from pathlib import Path
+
+from tier_1.contracts.schemas import Candidate, TasteProfile
 
 # ── Config ──────────────────────────────────────────────────────────────────
 VECTOR_STORE_PATH = Path(__file__).resolve().parent / "vector_store.json"
@@ -55,11 +58,6 @@ class LocalVectorStore:
 def get_vector_store() -> LocalVectorStore:
     """Returns the local vector store instance."""
     return LocalVectorStore()
-
-
-from abc import ABC, abstractmethod
-
-from tier_1.contracts.schemas import Candidate, TasteProfile
 
 
 class BaseAgent(ABC):
@@ -180,36 +178,3 @@ def retrieve_dish_vector(store: LocalVectorStore, dish_id: str) -> list[float]:
 def retrieve_mood_vector(store: LocalVectorStore, mood_seed: str) -> list[float]:
     """Retrieves a mood vector by seed key (e.g. 'mood_spicy')."""
     return store.get_embedding(f"mood_{mood_seed}")
-
-
-# ── Standalone smoke test ───────────────────────────────────────────────────
-if __name__ == "__main__":
-    print("-- Utility Calculator Smoke Test --")
-
-    # Taste: identical vectors -> 1.0
-    t = calculate_taste_utility([1, 0, 0], [1, 0, 0])
-    print(f"taste (identical):   {t:.4f}")  # 1.0
-
-    # Taste: orthogonal -> 0.0
-    t2 = calculate_taste_utility([1, 0, 0], [0, 1, 0])
-    print(f"taste (orthogonal):  {t2:.4f}")  # 0.0
-
-    # Health: 25g protein, 500 cal -> ratio 0.05 -> 1.0
-    h = calculate_health_utility({"protein_g": 25, "calories": 500})
-    print(f"health (25g/500cal): {h:.4f}")  # 1.0
-
-    # Health: 10g protein, 800 cal -> ratio 0.0125 -> 0.25
-    h2 = calculate_health_utility({"protein_g": 10, "calories": 800})
-    print(f"health (10g/800cal): {h2:.4f}")  # 0.25
-
-    # Budget: price 100 -> exp(-1) ~ 0.3679
-    b = calculate_budget_utility(100, 800)
-    print(f"budget (100 PKR):    {b:.4f}")  # 0.3679
-
-    # Budget: price 0 -> 1.0
-    b2 = calculate_budget_utility(0, 800)
-    print(f"budget (0 PKR):      {b2:.4f}")  # 1.0
-
-    print("\n-- Local Vector Store Test --")
-    store = get_vector_store()
-    print(f"store count: {store.count()}")
