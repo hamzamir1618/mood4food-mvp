@@ -6,9 +6,9 @@ utility aggregation with constraint relaxation, and emits decision_blueprint.jso
 
 import json
 import logging
-import math
 from pathlib import Path
 
+from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
 from tier_2.agents import (
     calculate_budget_utility,
     calculate_health_utility,
@@ -18,7 +18,6 @@ from tier_2.agents import (
     retrieve_dish_vector,
     retrieve_mood_vector,
 )
-from tier_1.persona_manager import get_persona, get_all_personas, DEFAULT_PERSONA
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CONTRACTS_DIR = Path(__file__).resolve().parent.parent / "tier_1" / "contracts"
@@ -42,6 +41,7 @@ log = logging.getLogger(__name__)
 
 # ── Contract Loader ─────────────────────────────────────────────────────────
 
+
 def load_candidate_evaluation() -> dict:
     """Reads candidate_evaluation.json produced by Tier 1b."""
     if not CANDIDATE_EVAL_PATH.exists():
@@ -57,11 +57,14 @@ def load_candidate_evaluation() -> dict:
 
 # ── Utility Scorer ──────────────────────────────────────────────────────────
 
-def score_candidate(candidate: dict,
-                    mood_vector: list[float],
-                    budget_max: int,
-                    dish_collection,
-                    persona_taste: dict | None = None) -> dict:
+
+def score_candidate(
+    candidate: dict,
+    mood_vector: list[float],
+    budget_max: int,
+    dish_collection,
+    persona_taste: dict | None = None,
+) -> dict:
     """
     Computes U_h, U_b, U_t for a single candidate dish.
     Returns a dict with individual utilities and metadata.
@@ -88,7 +91,11 @@ def score_candidate(candidate: dict,
         dish_vector = candidate.get("embedding", [])
         if not dish_vector and dish_collection is not None:
             dish_vector = retrieve_dish_vector(dish_collection, str(dish_id))
-        u_taste = calculate_taste_utility(dish_vector, mood_vector) if dish_vector and mood_vector else 0.5
+        u_taste = (
+            calculate_taste_utility(dish_vector, mood_vector)
+            if dish_vector and mood_vector
+            else 0.5
+        )
 
     return {
         "dish_id": dish_id,
@@ -106,12 +113,15 @@ def score_candidate(candidate: dict,
 
 # ── Nash Equilibrium Aggregation with Constraint Relaxation ─────────────────
 
-def run_debate(candidates: list[dict],
-               mood_vector: list[float],
-               budget_max: int,
-               dish_collection=None,
-               direct_dish_prompt: str = "",
-               persona_key: str = DEFAULT_PERSONA) -> dict:
+
+def run_debate(
+    candidates: list[dict],
+    mood_vector: list[float],
+    budget_max: int,
+    dish_collection=None,
+    direct_dish_prompt: str = "",
+    persona_key: str = DEFAULT_PERSONA,
+) -> dict:
     """
     Weighted utility aggregation loop:
       U_total = (w_h * U_h) + (w_b * U_b) + (w_t * U_t)
@@ -135,18 +145,23 @@ def run_debate(candidates: list[dict],
         xai_traces.append(
             f"round_{relaxation_round}: weights w_h={w_h:.2f} w_b={w_b:.2f} w_t={w_t:.2f}"
         )
-        log.info("debate round %d | w_h=%.2f w_b=%.2f w_t=%.2f",
-                 relaxation_round, w_h, w_b, w_t)
+        log.info("debate round %d | w_h=%.2f w_b=%.2f w_t=%.2f", relaxation_round, w_h, w_b, w_t)
 
         scored: list[dict] = []
         for cand in candidates:
             sc = score_candidate(cand, mood_vector, budget_max, dish_collection, persona_taste)
             u_total = (w_h * sc["u_health"]) + (w_b * sc["u_budget"]) + (w_t * sc["u_taste"])
-            
+
             cand_name_lower = sc["name"].lower()
-            if direct_dish_prompt and len(direct_dish_prompt) > 3 and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower):
+            if (
+                direct_dish_prompt
+                and len(direct_dish_prompt) > 3
+                and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower)
+            ):
                 u_total = 1000.0
-                xai_traces.append(f"  {sc['name']} → EXACT MATCH OVERRIDE (prompt='{direct_dish_prompt}')")
+                xai_traces.append(
+                    f"  {sc['name']} → EXACT MATCH OVERRIDE (prompt='{direct_dish_prompt}')"
+                )
 
             sc["u_total"] = round(u_total, 6)
             scored.append(sc)
@@ -163,9 +178,7 @@ def run_debate(candidates: list[dict],
             if best["u_total"] > 0.0:
                 winner = best
                 winner["all_scores"] = [dict(s) for s in scored]
-                xai_traces.append(
-                    f"winner: {best['name']} (U_total={best['u_total']:.4f})"
-                )
+                xai_traces.append(f"winner: {best['name']} (U_total={best['u_total']:.4f})")
                 log.info("winner elected: %s (U_total=%.4f)", best["name"], best["u_total"])
                 break
 
@@ -211,6 +224,7 @@ def run_debate(candidates: list[dict],
 
 # ── JSON Contract Writer ────────────────────────────────────────────────────
 
+
 def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
     """
     Writes decision_blueprint.json with the winning dish, utility breakdown,
@@ -242,7 +256,14 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
             "allergens_pruned": intent_context.get("allergens_pruned", []),
             "mood_vector_seed": intent_context.get("mood_vector_seed", "neutral"),
         },
-        "personas_available": {k: {"display_name": v["display_name"], "icon": v["icon"], "description": v["description"]} for k, v in get_all_personas().items()},
+        "personas_available": {
+            k: {
+                "display_name": v["display_name"],
+                "icon": v["icon"],
+                "description": v["description"],
+            }
+            for k, v in get_all_personas().items()
+        },
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -253,6 +274,7 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
 
 
 # ── Pipeline Entry Point ────────────────────────────────────────────────────
+
 
 def run_debate_pipeline() -> dict:
     """
@@ -281,7 +303,9 @@ def run_debate_pipeline() -> dict:
         log.warning("vector store unavailable, proceeding without vectors: %s", exc)
 
     # Step 3 — debate
-    debate_result = run_debate(candidates, mood_vector, budget_max, vector_store, direct_dish_prompt)
+    debate_result = run_debate(
+        candidates, mood_vector, budget_max, vector_store, direct_dish_prompt
+    )
 
     # Step 4 — persist contract
     intent_context = {

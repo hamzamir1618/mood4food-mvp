@@ -12,7 +12,7 @@ import math
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Form, UploadFile, File
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -56,6 +56,7 @@ def health_check():
 
 
 # ── Models ──────────────────────────────────────────────────────────────────
+
 
 class WeightUpdate(BaseModel):
     w_health: Optional[float] = None
@@ -111,14 +112,16 @@ async def submit_query(
     if not text and not audio_path and not image_path:
         raise HTTPException(400, "Provide at least a text query, audio file, or image.")
 
-    log.info("─── /submit received: text='%s' audio=%s image=%s ───",
-             text[:80] if text else '(none)',
-             audio.filename if audio and audio.filename else '(none)',
-             image.filename if image and image.filename else '(none)')
+    log.info(
+        "─── /submit received: text='%s' audio=%s image=%s ───",
+        text[:80] if text else "(none)",
+        audio.filename if audio and audio.filename else "(none)",
+        image.filename if image and image.filename else "(none)",
+    )
 
     # Stage 1: Multimodal Intent Parsing
     try:
-        intent = run_ingestion_pipeline(
+        intent = run_ingestion_pipeline(  # noqa: F841
             raw_input=text or None,
             audio_path=audio_path,
             image_path=image_path,
@@ -151,7 +154,9 @@ async def submit_query(
     # Enrich with fulfillment data (recipe + restaurants)
     blueprint = enrich_blueprint(blueprint)
 
-    log.info("─── /submit complete → winner: %s ───", blueprint.get("winning_dish", {}).get("name", "?"))
+    log.info(
+        "─── /submit complete → winner: %s ───", blueprint.get("winning_dish", {}).get("name", "?")
+    )
     return blueprint
 
 
@@ -171,6 +176,7 @@ def get_decision_blueprint():
 def get_personas():
     """Returns all available persona definitions for the frontend to render."""
     from tier_1.persona_manager import get_all_personas
+
     return get_all_personas()
 
 
@@ -181,7 +187,7 @@ def recalculate(payload: WeightUpdate):
     and an optional persona key. Re-scores all candidates with new weights
     **without re-querying the LLM or database**. Instant.
     """
-    from tier_1.persona_manager import get_persona, get_all_personas, DEFAULT_PERSONA
+    from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
     from tier_2.agents import calculate_taste_utility_6d
     from tier_3.fulfillment_engine import enrich_blueprint
 
@@ -202,7 +208,11 @@ def recalculate(payload: WeightUpdate):
     persona_taste = persona["taste_preference"]
 
     # Use explicitly provided weights, or fall back to persona defaults
-    if payload.w_health is not None and payload.w_budget is not None and payload.w_taste is not None:
+    if (
+        payload.w_health is not None
+        and payload.w_budget is not None
+        and payload.w_taste is not None
+    ):
         raw_h, raw_b, raw_t = payload.w_health, payload.w_budget, payload.w_taste
     elif payload.w_budget_legacy is not None:
         # Legacy single-slider mode
@@ -220,7 +230,9 @@ def recalculate(payload: WeightUpdate):
     else:
         w_h, w_b, w_t = 0.34, 0.33, 0.33
 
-    xai_traces = [f"slider_override: w_h={w_h:.2f} w_b={w_b:.2f} w_t={w_t:.2f} (persona={persona_key})"]
+    xai_traces = [
+        f"slider_override: w_h={w_h:.2f} w_b={w_b:.2f} w_t={w_t:.2f} (persona={persona_key})"
+    ]
 
     scored = []
     for cand in candidates:
@@ -248,7 +260,11 @@ def recalculate(payload: WeightUpdate):
         u_total = (w_h * u_h) + (w_b * u_b) + (w_t * u_t)
 
         cand_name_lower = cand.get("name", "").lower()
-        if direct_dish_prompt and len(direct_dish_prompt) > 3 and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower):
+        if (
+            direct_dish_prompt
+            and len(direct_dish_prompt) > 3
+            and (cand_name_lower in direct_dish_prompt or direct_dish_prompt in cand_name_lower)
+        ):
             u_total = 1000.0
 
         entry = {
@@ -269,10 +285,19 @@ def recalculate(payload: WeightUpdate):
             f"  {entry['name']} → U_h={u_h:.4f} U_b={u_b:.4f} U_t={u_t:.4f} | U_total={u_total:.4f}"
         )
 
-    winner = max(scored, key=lambda x: x["u_total"]) if scored else {
-        "dish_id": "none", "name": "no_candidates",
-        "u_health": 0, "u_budget": 0, "u_taste": 0, "u_total": 0, "price_pkr": 0,
-    }
+    winner = (
+        max(scored, key=lambda x: x["u_total"])
+        if scored
+        else {
+            "dish_id": "none",
+            "name": "no_candidates",
+            "u_health": 0,
+            "u_budget": 0,
+            "u_taste": 0,
+            "u_total": 0,
+            "price_pkr": 0,
+        }
+    )
     xai_traces.append(f"winner: {winner['name']} (U_total={winner['u_total']:.4f})")
 
     blueprint = {
@@ -300,7 +325,14 @@ def recalculate(payload: WeightUpdate):
             "allergens_pruned": evaluation.get("source_intent", {}).get("allergens_pruned", []),
             "mood_vector_seed": mood_seed,
         },
-        "personas_available": {k: {"display_name": v["display_name"], "icon": v["icon"], "description": v["description"]} for k, v in get_all_personas().items()},
+        "personas_available": {
+            k: {
+                "display_name": v["display_name"],
+                "icon": v["icon"],
+                "description": v["description"],
+            }
+            for k, v in get_all_personas().items()
+        },
     }
 
     # Enrich with fulfillment data
@@ -309,7 +341,13 @@ def recalculate(payload: WeightUpdate):
     # Persist updated blueprint
     with open(DECISION_BLUEPRINT_PATH, "w", encoding="utf-8") as fh:
         json.dump(blueprint, fh, indent=4, ensure_ascii=False)
-    log.info("recalculated blueprint with w_h=%.2f w_b=%.2f w_t=%.2f persona=%s → winner: %s",
-             w_h, w_b, w_t, persona_key, winner["name"])
+    log.info(
+        "recalculated blueprint with w_h=%.2f w_b=%.2f w_t=%.2f persona=%s → winner: %s",
+        w_h,
+        w_b,
+        w_t,
+        persona_key,
+        winner["name"],
+    )
 
     return blueprint

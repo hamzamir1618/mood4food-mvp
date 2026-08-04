@@ -6,7 +6,6 @@ merges them, extracts structured intent, and emits grounded_intent.json.
 
 import json
 import logging
-import os
 import re
 from pathlib import Path
 
@@ -26,6 +25,7 @@ def _get_whisper_model():
     global _whisper_model
     if _whisper_model is None:
         import whisper
+
         log.info("loading Whisper 'base' model (74 MB, first run downloads it)…")
         _whisper_model = whisper.load_model("base")
         log.info("Whisper model loaded ✓")
@@ -176,13 +176,18 @@ def extract_intent_llm(raw_input: str) -> dict | None:
         log.warning("🧠 LLM | Ollama not running — falling back to keyword parser")
         return None
     except httpx.HTTPStatusError as exc:
-        log.warning("🧠 LLM | Ollama HTTP error %s — falling back to keyword parser", exc.response.status_code)
+        log.warning(
+            "🧠 LLM | Ollama HTTP error %s — falling back to keyword parser",
+            exc.response.status_code,
+        )
         return None
     except httpx.TimeoutException:
         log.warning("🧠 LLM | Ollama timed out — falling back to keyword parser")
         return None
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
-        log.warning("🧠 LLM | failed to parse model output: %s — falling back to keyword parser", exc)
+        log.warning(
+            "🧠 LLM | failed to parse model output: %s — falling back to keyword parser", exc
+        )
         return None
 
 
@@ -236,43 +241,66 @@ def extract_intent_keywords(raw_input: str) -> dict:
 
     # ── Allergen / exclusion extraction ──
     exclusion_keywords = {
-        "meat":      "meat",
-        "chicken":   "meat",
-        "beef":      "meat",
-        "mutton":    "meat",
-        "pork":      "meat",
-        "dairy":     "dairy",
-        "milk":      "dairy",
-        "cheese":    "dairy",
-        "gluten":    "gluten",
-        "wheat":     "gluten",
-        "nuts":      "nuts",
-        "peanut":    "nuts",
+        "meat": "meat",
+        "chicken": "meat",
+        "beef": "meat",
+        "mutton": "meat",
+        "pork": "meat",
+        "dairy": "dairy",
+        "milk": "dairy",
+        "cheese": "dairy",
+        "gluten": "gluten",
+        "wheat": "gluten",
+        "nuts": "nuts",
+        "peanut": "nuts",
         "shellfish": "shellfish",
-        "shrimp":    "shellfish",
-        "egg":       "egg",
-        "eggs":      "egg",
-        "fish":      "fish",
-        "seafood":   "fish",
+        "shrimp": "shellfish",
+        "egg": "egg",
+        "eggs": "egg",
+        "fish": "fish",
+        "seafood": "fish",
     }
     allergens_found: set[str] = set()
     words = text.split()
-    negation_words = {"no", "without", "free", "allergy", "allergic", "cant", "don't", "dont", "not", "minus"}
+    negation_words = {
+        "no",
+        "without",
+        "free",
+        "allergy",
+        "allergic",
+        "cant",
+        "don't",
+        "dont",
+        "not",
+        "minus",
+    }
     for i, word in enumerate(words):
         word_clean = word.strip(".,!?;:")
         if word_clean in exclusion_keywords:
-            prev_words = {w.strip(".,!?;:") for w in words[max(0, i-2):i]}
+            prev_words = {w.strip(".,!?;:") for w in words[max(0, i - 2) : i]}
             if prev_words & negation_words:
                 allergens_found.add(exclusion_keywords[word_clean])
 
     # ── Protein priority ──
-    protein_priority = "high" if any(k in text for k in ("protein", "gym", "muscle", "high protein")) else "normal"
+    protein_priority = (
+        "high" if any(k in text for k in ("protein", "gym", "muscle", "high protein")) else "normal"
+    )
 
     # ── Mood vector seed ──
-    mood_map = {"spicy": "spicy", "sweet": "sweet", "comfort": "comfort",
-                "light": "light", "hearty": "hearty", "fresh": "fresh",
-                "crispy": "comfort", "rich": "hearty", "creamy": "comfort",
-                "tangy": "fresh", "hot": "spicy", "mild": "light"}
+    mood_map = {
+        "spicy": "spicy",
+        "sweet": "sweet",
+        "comfort": "comfort",
+        "light": "light",
+        "hearty": "hearty",
+        "fresh": "fresh",
+        "crispy": "comfort",
+        "rich": "hearty",
+        "creamy": "comfort",
+        "tangy": "fresh",
+        "hot": "spicy",
+        "mild": "light",
+    }
     mood = "neutral"
     for keyword, mood_label in mood_map.items():
         if keyword in text:
@@ -298,20 +326,43 @@ def post_process_llm_allergens(llm_allergens: list[str], raw_input: str) -> list
     to fix false positive and false negative allergen exclusions.
     """
     exclusion_keywords = {
-        "meat": "meat", "chicken": "meat", "beef": "meat", "mutton": "meat", "pork": "meat",
-        "dairy": "dairy", "milk": "dairy", "cheese": "dairy",
-        "gluten": "gluten", "wheat": "gluten",
-        "nuts": "nuts", "peanut": "nuts",
-        "shellfish": "shellfish", "shrimp": "shellfish",
-        "egg": "egg", "eggs": "egg",
-        "fish": "fish", "seafood": "fish",
+        "meat": "meat",
+        "chicken": "meat",
+        "beef": "meat",
+        "mutton": "meat",
+        "pork": "meat",
+        "dairy": "dairy",
+        "milk": "dairy",
+        "cheese": "dairy",
+        "gluten": "gluten",
+        "wheat": "gluten",
+        "nuts": "nuts",
+        "peanut": "nuts",
+        "shellfish": "shellfish",
+        "shrimp": "shellfish",
+        "egg": "egg",
+        "eggs": "egg",
+        "fish": "fish",
+        "seafood": "fish",
     }
-    negation_words = {"no", "without", "free", "allergy", "allergic", "cant", "don't", "dont", "not", "minus", "zero"}
-    
+    negation_words = {
+        "no",
+        "without",
+        "free",
+        "allergy",
+        "allergic",
+        "cant",
+        "don't",
+        "dont",
+        "not",
+        "minus",
+        "zero",
+    }
+
     is_negated = False
     explicitly_requested = set()
     explicitly_negated = set()
-    
+
     for word in raw_input.lower().split():
         word_clean = word.strip(".,!?;:")
         if word_clean in negation_words:
@@ -323,18 +374,20 @@ def post_process_llm_allergens(llm_allergens: list[str], raw_input: str) -> list
                 explicitly_negated.add(exclusion_keywords[word_clean])
             else:
                 explicitly_requested.add(exclusion_keywords[word_clean])
-                
+
     # 1. Remove false exclusions (LLM excluded it, but user explicitly asked for it)
     final_allergens = [a for a in llm_allergens if a not in explicitly_requested]
-    
+
     # 2. Add missed exclusions (User explicitly negated it, but LLM missed it)
     for a in explicitly_negated:
         if a not in final_allergens:
             final_allergens.append(a)
-            
+
     if sorted(llm_allergens) != sorted(final_allergens):
-        log.info("🛡️ Guardrail applied: changed allergens from %s to %s", llm_allergens, final_allergens)
-            
+        log.info(
+            "🛡️ Guardrail applied: changed allergens from %s to %s", llm_allergens, final_allergens
+        )
+
     return sorted(final_allergens)
 
 
@@ -347,16 +400,18 @@ def extract_intent(raw_input: str) -> dict:
     intent = extract_intent_llm(raw_input)
     if intent is not None:
         llm_allergens = intent["hard_constraints"].get("allergens_pruned", [])
-        intent["hard_constraints"]["allergens_pruned"] = post_process_llm_allergens(llm_allergens, raw_input)
-        
+        intent["hard_constraints"]["allergens_pruned"] = post_process_llm_allergens(
+            llm_allergens, raw_input
+        )
+
     if intent is None:
         # Fallback to keyword parser
         log.info("📋 using keyword fallback parser")
         intent = extract_intent_keywords(raw_input)
-        
+
     if "direct_dish_prompt" not in intent.get("soft_constraints", {}):
         intent.setdefault("soft_constraints", {})["direct_dish_prompt"] = raw_input.strip().lower()
-        
+
     return intent
 
 

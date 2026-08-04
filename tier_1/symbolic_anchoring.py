@@ -10,12 +10,12 @@ from pathlib import Path
 
 from neo4j import GraphDatabase
 
+from config import settings
+
 # ── Config ──────────────────────────────────────────────────────────────────
 CONTRACTS_DIR = Path(__file__).resolve().parent / "contracts"
 GROUNDED_INTENT_PATH = CONTRACTS_DIR / "grounded_intent.json"
 CANDIDATE_EVAL_PATH = CONTRACTS_DIR / "candidate_evaluation.json"
-
-from config import settings
 
 NEO4J_URI = settings.NEO4J_URI
 NEO4J_AUTH = (settings.NEO4J_USER, settings.NEO4J_PASSWORD)
@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 
 
 # ── Intent Loader ───────────────────────────────────────────────────────────
+
 
 def load_grounded_intent() -> dict:
     """Reads the grounded_intent.json contract produced by Tier 1a."""
@@ -64,7 +65,8 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
     Connects to local Neo4j and executes a deterministic Cypher query that:
       - Filters dishes with synthesized_calories <= 1000
       - Prunes any dish linked (up to 5 hops) to a banned ingredient
-    Returns a list of {dish_id, name, price_pkr, protein_g, calories} dicts for surviving candidates.
+    Returns a list of {dish_id, name, price_pkr, protein_g, calories} dicts
+    for surviving candidates.
     """
     pruned_list = [a.strip().lower() for a in allergens]
     log.info("neo4j query | pruned_list=%s, budget_max=%d", pruned_list, budget_max)
@@ -79,24 +81,26 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
         with driver.session() as session:
             result = session.run(PRUNE_CYPHER, pruned_list=pruned_list)
             for record in result:
-                candidates.append({
-                    "dish_id": record["dish_id"],
-                    "name": record["name"],
-                    "price_pkr": record["price_pkr"],
-                    "protein_g": record["protein_g"],
-                    "calories": record["calories"],
-                    "category": record.get("category", ""),
-                    "image_url": record.get("image_url", ""),
-                    "human_tags": record.get("human_tags", []),
-                    "taste_profile": {
-                        "sweet": record.get("taste_sweet", 0.0) or 0.0,
-                        "salty": record.get("taste_salty", 0.0) or 0.0,
-                        "sour": record.get("taste_sour", 0.0) or 0.0,
-                        "bitter": record.get("taste_bitter", 0.0) or 0.0,
-                        "umami": record.get("taste_umami", 0.0) or 0.0,
-                        "spice": record.get("taste_spice", 0.0) or 0.0,
-                    },
-                })
+                candidates.append(
+                    {
+                        "dish_id": record["dish_id"],
+                        "name": record["name"],
+                        "price_pkr": record["price_pkr"],
+                        "protein_g": record["protein_g"],
+                        "calories": record["calories"],
+                        "category": record.get("category", ""),
+                        "image_url": record.get("image_url", ""),
+                        "human_tags": record.get("human_tags", []),
+                        "taste_profile": {
+                            "sweet": record.get("taste_sweet", 0.0) or 0.0,
+                            "salty": record.get("taste_salty", 0.0) or 0.0,
+                            "sour": record.get("taste_sour", 0.0) or 0.0,
+                            "bitter": record.get("taste_bitter", 0.0) or 0.0,
+                            "umami": record.get("taste_umami", 0.0) or 0.0,
+                            "spice": record.get("taste_spice", 0.0) or 0.0,
+                        },
+                    }
+                )
         log.info("neo4j returned %d safe candidates", len(candidates))
     except Exception as exc:
         log.error("neo4j query failed: %s", exc)
@@ -108,6 +112,7 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
 
 
 # ── JSON Contract Writer ────────────────────────────────────────────────────
+
 
 def write_candidate_evaluation(intent: dict, candidates: list[dict]) -> Path:
     """
@@ -132,6 +137,7 @@ def write_candidate_evaluation(intent: dict, candidates: list[dict]) -> Path:
 
 
 # ── Pipeline Entry Point ────────────────────────────────────────────────────
+
 
 def run_anchoring_pipeline() -> dict:
     """
