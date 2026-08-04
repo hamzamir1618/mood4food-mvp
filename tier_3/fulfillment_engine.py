@@ -4,9 +4,7 @@ Bridges the gap between recommendation and action.
 Generates recipes, grocery lists, and mock restaurant order data.
 """
 
-import json
 import logging
-from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
@@ -29,7 +27,7 @@ RECIPES = {
             "Add chopped tomatoes and cook until soft.",
             "Add chili powder and coriander. Mix well.",
             "Pour the tadka over the cooked dal. Stir and simmer for 5 minutes.",
-            "Garnish with fresh coriander and serve hot with rice or naan."
+            "Garnish with fresh coriander and serve hot with rice or naan.",
         ],
         "grocery_list": [
             {"item": "Red Lentils (Masoor Dal)", "qty": "1 cup", "est_cost": 60},
@@ -42,7 +40,7 @@ RECIPES = {
             {"item": "Turmeric", "qty": "½ tsp", "est_cost": 5},
             {"item": "Red chili powder", "qty": "1 tsp", "est_cost": 5},
             {"item": "Fresh coriander", "qty": "1 bunch", "est_cost": 10},
-        ]
+        ],
     },
     "Chicken Karahi": {
         "prep_time": "15 min",
@@ -57,7 +55,7 @@ RECIPES = {
             "Add chopped tomatoes, salt, and red chili. Cover and cook for 15 minutes.",
             "Add sliced capsicum and garam masala. Cook uncovered for 10 minutes.",
             "Add green chilies and fresh coriander. Toss well.",
-            "Serve hot in the karahi with naan."
+            "Serve hot in the karahi with naan.",
         ],
         "grocery_list": [
             {"item": "Chicken (whole cut)", "qty": "500g", "est_cost": 250},
@@ -69,7 +67,7 @@ RECIPES = {
             {"item": "Garam masala", "qty": "1 tsp", "est_cost": 10},
             {"item": "Cooking oil", "qty": "3 tbsp", "est_cost": 15},
             {"item": "Fresh coriander", "qty": "1 bunch", "est_cost": 10},
-        ]
+        ],
     },
     "Anda Curry": {
         "prep_time": "5 min",
@@ -84,7 +82,7 @@ RECIPES = {
             "Add turmeric, chili powder, and salt. Mix well.",
             "Add ½ cup water and let the gravy simmer for 5 minutes.",
             "Gently add the boiled eggs. Spoon gravy over them.",
-            "Cover and cook for 5 more minutes. Garnish with coriander."
+            "Cover and cook for 5 more minutes. Garnish with coriander.",
         ],
         "grocery_list": [
             {"item": "Eggs", "qty": "4", "est_cost": 60},
@@ -96,7 +94,7 @@ RECIPES = {
             {"item": "Turmeric", "qty": "½ tsp", "est_cost": 5},
             {"item": "Red chili powder", "qty": "1 tsp", "est_cost": 5},
             {"item": "Cooking oil", "qty": "2 tbsp", "est_cost": 10},
-        ]
+        ],
     },
     "Palak Paneer": {
         "prep_time": "15 min",
@@ -111,7 +109,7 @@ RECIPES = {
             "Sauté until onion is soft. Add tomatoes and cook 5 minutes.",
             "Add the spinach puree, salt, garam masala, and a pinch of sugar.",
             "Simmer for 10 minutes. Add cream and paneer cubes.",
-            "Cook for 5 more minutes. Serve hot with naan or roti."
+            "Cook for 5 more minutes. Serve hot with naan or roti.",
         ],
         "grocery_list": [
             {"item": "Fresh spinach", "qty": "300g", "est_cost": 40},
@@ -121,9 +119,10 @@ RECIPES = {
             {"item": "Cream", "qty": "2 tbsp", "est_cost": 25},
             {"item": "Garam masala", "qty": "1 tsp", "est_cost": 10},
             {"item": "Garlic-ginger", "qty": "1 tbsp", "est_cost": 10},
-        ]
+        ],
     },
 }
+
 
 # ── Generic recipe generator for dishes not in the curated database ──────────
 def _generate_generic_recipe(dish_name: str, ingredients: list[str], price: float) -> dict:
@@ -141,21 +140,31 @@ def _generate_generic_recipe(dish_name: str, ingredients: list[str], price: floa
             "Add main ingredients and cook according to type.",
             "Season with spices, salt, and any sauces.",
             "Simmer until fully cooked and flavours meld together.",
-            "Garnish and serve hot."
+            "Garnish and serve hot.",
         ],
         "grocery_list": [
             {"item": ing.title(), "qty": "as needed", "est_cost": max(5, int(price * 0.08))}
             for ing in ingredients[:8]  # Top 8 ingredients
-        ]
+        ],
     }
 
 
 # ── Mock Restaurant Database ────────────────────────────────────────────────
 MOCK_RESTAURANTS = [
-    {"name": "Karachi Kitchen Express", "delivery_time": "25-35 min", "rating": 4.3, "delivery_fee": 50},
+    {
+        "name": "Karachi Kitchen Express",
+        "delivery_time": "25-35 min",
+        "rating": 4.3,
+        "delivery_fee": 50,
+    },
     {"name": "Lahore Food Street", "delivery_time": "30-40 min", "rating": 4.5, "delivery_fee": 70},
     {"name": "Desi Dhaba Online", "delivery_time": "20-30 min", "rating": 4.1, "delivery_fee": 40},
-    {"name": "Spice Route Delivery", "delivery_time": "35-45 min", "rating": 4.6, "delivery_fee": 80},
+    {
+        "name": "Spice Route Delivery",
+        "delivery_time": "35-45 min",
+        "rating": 4.6,
+        "delivery_fee": 80,
+    },
 ]
 
 
@@ -166,7 +175,7 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
         recipe = RECIPES[dish_name].copy()
         recipe["source"] = "curated"
         return recipe
-    
+
     log.info("recipe generated (generic): %s", dish_name)
     recipe = _generate_generic_recipe(dish_name, ingredients or [], price)
     recipe["source"] = "generated"
@@ -176,6 +185,7 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
 def get_restaurants(dish_name: str) -> list[dict]:
     """Returns mock restaurant options that serve the dish."""
     import random
+
     random.seed(hash(dish_name) % 2**32)  # Deterministic per dish
     count = random.randint(2, len(MOCK_RESTAURANTS))
     selected = random.sample(MOCK_RESTAURANTS, count)
@@ -189,15 +199,15 @@ def enrich_blueprint(blueprint: dict) -> dict:
     dish_name = blueprint.get("winning_dish", {}).get("name", "")
     if not dish_name:
         return blueprint
-    
+
     # Get ingredients from candidate scores if available
     ingredients = blueprint.get("winning_dish", {}).get("ingredients", [])
     price = blueprint.get("winning_dish", {}).get("price_pkr", 0)
-    
+
     blueprint["fulfillment"] = {
         "recipe": get_recipe(dish_name, ingredients, price),
         "restaurants": get_restaurants(dish_name),
     }
-    
+
     log.info("blueprint enriched with fulfillment data for: %s", dish_name)
     return blueprint

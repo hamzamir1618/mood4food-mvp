@@ -5,8 +5,8 @@ vector store stub (no C++ build dependency).
 """
 
 import json
-import math
 import logging
+import math
 from pathlib import Path
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 # Drop-in stub that mirrors the ChromaDB API surface we actually use.
 # Stores vectors as a JSON file on disk.  Swap for real ChromaDB when MSVC
 # Build Tools are available: pip install chromadb==0.5.15
+
 
 class LocalVectorStore:
     """Minimal persistent vector store backed by a JSON file."""
@@ -59,8 +60,8 @@ def get_vector_store() -> LocalVectorStore:
 # ── Utility Calculators ─────────────────────────────────────────────────────
 # Each returns a float in [0.0, 1.0].  No external models — pure math.
 
-def calculate_taste_utility(dish_vector: list[float],
-                            mood_vector: list[float]) -> float:
+
+def calculate_taste_utility(dish_vector: list[float], mood_vector: list[float]) -> float:
     """
     Cosine similarity between a dish embedding and a mood embedding.
 
@@ -69,8 +70,11 @@ def calculate_taste_utility(dish_vector: list[float],
     Returns 0.0 when vectors are orthogonal/zero, 1.0 when identical.
     """
     if len(dish_vector) != len(mood_vector):
-        log.warning("vector length mismatch: dish=%d mood=%d — returning 0.0",
-                    len(dish_vector), len(mood_vector))
+        log.warning(
+            "vector length mismatch: dish=%d mood=%d — returning 0.0",
+            len(dish_vector),
+            len(mood_vector),
+        )
         return 0.0
 
     dot = sum(a * b for a, b in zip(dish_vector, mood_vector))
@@ -85,8 +89,7 @@ def calculate_taste_utility(dish_vector: list[float],
     return max(0.0, min(1.0, cosine))
 
 
-def calculate_taste_utility_6d(dish_taste_profile: dict,
-                                persona_taste_preference: dict) -> float:
+def calculate_taste_utility_6d(dish_taste_profile: dict, persona_taste_preference: dict) -> float:
     """
     6-dimensional taste cosine similarity between a dish's taste profile
     and a persona's taste preference.
@@ -148,6 +151,7 @@ def calculate_budget_utility(price: float, max_budget: float) -> float:
 
 
 # ── Vector Retrieval Helpers ────────────────────────────────────────────────
+
 
 def retrieve_dish_vector(store: LocalVectorStore, dish_id: str) -> list[float]:
     """Retrieves the embedding for a dish_id from the local store."""
