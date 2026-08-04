@@ -46,6 +46,7 @@ def load_grounded_intent() -> dict:
 PRUNE_CYPHER = """
 MATCH (d:Dish)
 WHERE d.synthesized_calories <= 1000
+  AND d.price_pkr <= $budget_max
   AND NOT EXISTS {
     MATCH (d)-[:CONTAINS*1..5]->(i:Ingredient)
     WHERE toLower(i.name) IN $pruned_list
@@ -98,7 +99,7 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
 
     try:
         with driver.session() as session:
-            result = session.run(PRUNE_CYPHER, pruned_list=pruned_list)
+            result = session.run(PRUNE_CYPHER, pruned_list=pruned_list, budget_max=budget_max)
             for record in result:
                 candidates.append(
                     {
