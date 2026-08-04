@@ -202,21 +202,20 @@ def get_personas():
 
 
 @app.post("/recalculate")
-def recalculate(payload: WeightUpdate):
+def recalculate(request: Request, payload: WeightUpdate):
     """
     Accepts new weights from the UI sliders (w_health, w_budget, w_taste)
     and an optional persona key. Re-scores all candidates with new weights
     **without re-querying the LLM or database**. Instant.
     """
+    from tier_1.contracts.session_store import load_contract
     from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
     from tier_2.agents import calculate_taste_utility_6d
     from tier_3.fulfillment_engine import enrich_blueprint
 
-    if not CANDIDATE_EVAL_PATH.exists():
-        raise HTTPException(404, "candidate_evaluation.json not found — run Tier 1 first")
-
-    with open(CANDIDATE_EVAL_PATH, "r", encoding="utf-8") as fh:
-        evaluation = json.load(fh)
+    evaluation = load_contract(request.state.session_id, "candidate_evaluation")
+    if not evaluation:
+        raise HTTPException(400, "No active session data found. Please submit a new query first.")
 
     candidates = evaluation.get("safe_candidates", [])
     budget_max = evaluation.get("source_intent", {}).get("budget_max_pkr", 1000)
