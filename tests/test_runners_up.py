@@ -89,7 +89,8 @@ def test_top_candidates_ranked_correctly(monkeypatch):
     monkeypatch.setattr("tier_2.consensus_manager.get_vector_store", lambda: None)
     monkeypatch.setattr("tier_2.consensus_manager.retrieve_mood_vector", lambda store, seed: [])
 
-    # Map dish_id to scores so agents can retrieve them without needing them to be passed through Candidate
+    # Map dish_id to scores so agents can retrieve them without needing
+    # them to be passed through Candidate
     score_map = {c["dish_id"]: c for c in candidates}
 
     # Mock agent scoring so the provided raw values translate into u_total properly

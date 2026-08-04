@@ -23,7 +23,6 @@ def test_consensus_xai_trace_and_sum():
     budget_max = 500
 
     # Run the debate pipeline directly
-    # Note: run_debate takes: candidates, mood_vector, budget_max, dish_collection=None, direct_dish_prompt="", persona_key=DEFAULT_PERSONA
     result = run_debate(candidates=candidates, mood_vector=[], budget_max=budget_max)
 
     # Assert winner is found

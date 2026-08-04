@@ -193,7 +193,8 @@ def run_debate(
                 else ("moderate match" if sc["u_health"] >= 0.3 else "poor match")
             )
             xai_traces.append(
-                f"    - Health Agent: {health_reason} (raw: {sc['u_health']:.4f}, weight-adjusted: {w_h_contrib:.4f})"
+                f"    - Health Agent: {health_reason} "
+                f"(raw: {sc['u_health']:.4f}, weight-adjusted: {w_h_contrib:.4f})"
             )
 
             # Budget
@@ -205,7 +206,8 @@ def run_debate(
                 else f"Rs. {price} exceeds Rs. {budget_max_val} limit"
             )
             xai_traces.append(
-                f"    - Budget Agent: {budget_reason} (raw: {sc['u_budget']:.4f}, weight-adjusted: {w_b_contrib:.4f})"
+                f"    - Budget Agent: {budget_reason} "
+                f"(raw: {sc['u_budget']:.4f}, weight-adjusted: {w_b_contrib:.4f})"
             )
 
             # Taste
@@ -215,7 +217,8 @@ def run_debate(
                 else ("moderate alignment" if sc["u_taste"] >= 0.3 else "poor alignment")
             )
             xai_traces.append(
-                f"    - Taste Agent: {taste_reason} to persona taste (raw: {sc['u_taste']:.4f}, weight-adjusted: {w_t_contrib:.4f})"
+                f"    - Taste Agent: {taste_reason} to persona taste "
+                f"(raw: {sc['u_taste']:.4f}, weight-adjusted: {w_t_contrib:.4f})"
             )
 
             xai_traces.append(f"    => Final U_total: {sc['u_total']:.4f}")
