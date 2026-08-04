@@ -6,6 +6,7 @@ candidate_evaluation.json with the surviving safe dish nodes.
 
 import json
 import logging
+import time
 from pathlib import Path
 
 from neo4j import GraphDatabase
@@ -71,13 +72,31 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
     pruned_list = [a.strip().lower() for a in allergens]
     log.info("neo4j query | pruned_list=%s, budget_max=%d", pruned_list, budget_max)
 
-    driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
     candidates: list[dict] = []
+    driver = None
+    max_attempts = 3
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
+            driver.verify_connectivity()
+            log.info("neo4j connection verified at %s", NEO4J_URI)
+            break
+        except Exception as exc:
+            if attempt == max_attempts:
+                log.error("neo4j connection failed after %d attempts: %s", max_attempts, exc)
+                raise
+            sleep_time = 2**attempt
+            log.warning(
+                "neo4j connection failed (attempt %d/%d). Retrying in %ds... Error: %s",
+                attempt,
+                max_attempts,
+                sleep_time,
+                exc,
+            )
+            time.sleep(sleep_time)
 
     try:
-        driver.verify_connectivity()
-        log.info("neo4j connection verified at %s", NEO4J_URI)
-
         with driver.session() as session:
             result = session.run(PRUNE_CYPHER, pruned_list=pruned_list)
             for record in result:
