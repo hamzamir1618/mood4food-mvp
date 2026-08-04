@@ -139,25 +139,40 @@ async def submit_query(
     from tier_3.fulfillment_engine import enrich_blueprint
 
     text = query.strip() if query else ""
+    if len(text) > 500:
+        raise HTTPException(400, "Text query exceeds 500 characters.")
+
     audio_path = None
     image_path = None
 
     # Save uploaded audio file
     if audio and audio.filename:
+        ext = audio.filename.split(".")[-1].lower()
+        if ext not in ["m4a", "mp3", "wav"]:
+            raise HTTPException(400, f"Unsupported audio extension: {ext}")
+        content = await audio.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Audio file exceeds 10MB limit.")
         audio_path = str(UPLOADS_DIR / audio.filename)
         with open(audio_path, "wb") as f:
-            f.write(await audio.read())
+            f.write(content)
         log.info("saved audio upload: %s", audio_path)
 
     # Save uploaded image file
     if image and image.filename:
+        ext = image.filename.split(".")[-1].lower()
+        if ext not in ["jpg", "jpeg", "png"]:
+            raise HTTPException(400, f"Unsupported image extension: {ext}")
+        content = await image.read()
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(413, "Image file exceeds 10MB limit.")
         image_path = str(UPLOADS_DIR / image.filename)
         with open(image_path, "wb") as f:
-            f.write(await image.read())
+            f.write(content)
         log.info("saved image upload: %s", image_path)
 
     if not text and not audio_path and not image_path:
-        raise HTTPException(400, "Provide at least a text query, audio file, or image.")
+        raise HTTPException(400, "Provide at least a non-empty text query, audio file, or image.")
 
     log.info(
         "─── /submit received: text='%s' audio=%s image=%s ───",
@@ -247,6 +262,9 @@ def recalculate(request: Request, payload: WeightUpdate):
     if not evaluation:
         raise HTTPException(400, "No active session data found. Please submit a new query first.")
 
+    if hasattr(evaluation, "model_dump"):
+        evaluation = evaluation.model_dump()
+
     candidates = evaluation.get("safe_candidates", [])
     budget_max = evaluation.get("source_intent", {}).get("budget_max_pkr", 1000)
     mood_seed = evaluation.get("soft_constraints", {}).get("mood_vector_seed", "neutral")
@@ -295,7 +313,7 @@ def recalculate(request: Request, payload: WeightUpdate):
         # Log-scaled budget utility for better spread
         if price < 0:
             u_b = 1.0
-        elif budget_max <= 0:
+        elif budget_max is None or budget_max <= 0:
             u_b = math.exp(-0.002 * price)
         else:
             u_b = max(0.0, 1.0 - math.log(1 + price) / math.log(1 + budget_max))

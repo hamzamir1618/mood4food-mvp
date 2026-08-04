@@ -145,7 +145,7 @@ def calculate_budget_utility(price: float, max_budget: float) -> float:
     """
     if price < 0:
         return 1.0
-    if max_budget <= 0:
+    if max_budget is None or max_budget <= 0:
         max_budget = 1000
     return max(0.0, 1.0 - math.log(1 + price) / math.log(1 + max_budget))
 

@@ -142,3 +142,18 @@ def get_persona_weights(persona_key: str) -> dict:
 def get_persona_taste(persona_key: str) -> dict:
     """Returns the 6D taste preference vector for a persona."""
     return get_persona(persona_key)["taste_preference"]
+
+
+import math
+
+
+def validate_persona_weights():
+    """Validates that all defined persona weights sum to 1.0."""
+    for key, data in PERSONAS.items():
+        weights = data["weights"]
+        total = sum(weights.values())
+        if not math.isclose(total, 1.0, rel_tol=1e-5):
+            raise ValueError(f"Persona '{key}' weights must sum to 1.0, but got {total}")
+
+
+validate_persona_weights()
