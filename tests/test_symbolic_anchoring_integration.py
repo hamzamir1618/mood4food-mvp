@@ -14,7 +14,7 @@ from tier_1.symbolic_anchoring import query_safe_candidates
 
 @pytest.fixture(scope="module")
 def neo4j_container():
-    with Neo4jContainer("neo4j:5.12", password="password1234") as neo4j:
+    with Neo4jContainer("neo4j:5.12", username="neo4j", password="password1234") as neo4j:
         yield neo4j
 
 
