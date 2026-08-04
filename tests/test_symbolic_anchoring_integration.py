@@ -2,7 +2,11 @@ from unittest import mock
 
 import pytest
 from neo4j import GraphDatabase
-from testcontainers.community.neo4j import Neo4jContainer
+
+try:
+    from testcontainers.community.neo4j import Neo4jContainer
+except ImportError:
+    from testcontainers.neo4j import Neo4jContainer
 
 import seed_neo4j
 from tier_1.symbolic_anchoring import query_safe_candidates
