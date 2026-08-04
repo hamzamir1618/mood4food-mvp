@@ -30,3 +30,82 @@ def test_save_and_load_contract(monkeypatch):
     # Verify TTL (should be set to 900 seconds)
     ttl = fake_redis.ttl(f"{session_id}:{contract_name}")
     assert 0 < ttl <= 900
+
+
+def test_submit_session_isolation(monkeypatch):
+    """
+    Simulates two distinct browsers hitting /submit with different queries,
+    verifying their contracts are saved under distinct session keys in Redis.
+    """
+    import json
+
+    from fastapi.testclient import TestClient
+
+    from orchestrator import DECISION_BLUEPRINT_PATH, app
+
+    fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr(ss, "get_redis", lambda: fake_redis)
+
+    # Mock the pipelines to avoid needing live Neo4j / LLMs
+    def mock_ingest(raw_input, *args, **kwargs):
+        return {"query_intent": raw_input}
+
+    def mock_anchor(*args, **kwargs):
+        return {"safe_candidates": [{"name": "fake candidate"}]}
+
+    def mock_debate(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr("tier_1.multi_modal_ingestion.run_ingestion_pipeline", mock_ingest)
+    monkeypatch.setattr("tier_1.symbolic_anchoring.run_anchoring_pipeline", mock_anchor)
+    monkeypatch.setattr("tier_2.consensus_manager.run_debate_pipeline", mock_debate)
+    monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda x: x)
+
+    # Ensure the dummy blueprint file exists so orchestrator doesn't crash reading it
+    DECISION_BLUEPRINT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(DECISION_BLUEPRINT_PATH, "w", encoding="utf-8") as f:
+        json.dump({"winning_dish": {"name": "dummy"}}, f)
+
+    client1 = TestClient(app)
+    client2 = TestClient(app)
+
+    res1 = client1.post("/submit", data={"query": "I want pizza"})
+    res2 = client2.post("/submit", data={"query": "I want salad"})
+
+    assert res1.status_code == 200
+    assert res2.status_code == 200
+
+    # The session_id comes from Starlette SessionMiddleware's internal tracking
+    # but we can look directly inside fakeredis to find the keys since the
+    # test_save_and_load_contract asserts redis works.
+
+    # Let's extract the session IDs from the cookies by decoding them?
+    # No need, we can just inspect FakeRedis keys.
+    keys = fake_redis.keys("*")
+
+    # We expect 2 session IDs, each with 3 contracts
+    assert len(keys) == 6
+
+    pizza_intents = [
+        k
+        for k in keys
+        if "grounded_intent" in k
+        and json.loads(fake_redis.get(k)).get("query_intent") == "I want pizza"
+    ]
+    salad_intents = [
+        k
+        for k in keys
+        if "grounded_intent" in k
+        and json.loads(fake_redis.get(k)).get("query_intent") == "I want salad"
+    ]
+
+    assert len(pizza_intents) == 1
+    assert len(salad_intents) == 1
+
+    # Ensure they have different session prefixes
+    pizza_session_id = pizza_intents[0].split(":")[0]
+    salad_session_id = salad_intents[0].split(":")[0]
+
+    assert pizza_session_id != salad_session_id
+    assert pizza_session_id != ""
+    assert salad_session_id != ""
