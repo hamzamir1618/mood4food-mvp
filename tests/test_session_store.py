@@ -109,3 +109,73 @@ def test_submit_session_isolation(monkeypatch):
     assert pizza_session_id != salad_session_id
     assert pizza_session_id != ""
     assert salad_session_id != ""
+
+
+def test_recalculate_no_session_400(monkeypatch):
+    import fakeredis
+
+    fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr("tier_1.contracts.session_store.get_redis", lambda: fake_redis)
+
+    from fastapi.testclient import TestClient
+
+    from orchestrator import app
+
+    client = TestClient(app)
+    # Never called /submit
+    res = client.post("/recalculate", json={"w_health": 0.5, "w_budget": 0.3, "w_taste": 0.2})
+
+    assert res.status_code == 400
+    assert "No active session data found" in res.json()["detail"]
+
+
+def test_recalculate_after_submit_200(monkeypatch):
+    import json
+
+    import fakeredis
+
+    fake_redis = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr("tier_1.contracts.session_store.get_redis", lambda: fake_redis)
+
+    # Mock pipelines
+    def mock_ingest(*args, **kwargs):
+        return {"query_intent": "foo", "hard_constraints": {}, "soft_constraints": {}}
+
+    def mock_anchor(*args, **kwargs):
+        return {
+            "source_intent": {},
+            "safe_candidates": [{"name": "fake candidate", "taste_profile": {}}],
+        }
+
+    def mock_debate(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr("tier_1.multi_modal_ingestion.run_ingestion_pipeline", mock_ingest)
+    monkeypatch.setattr("tier_1.symbolic_anchoring.run_anchoring_pipeline", mock_anchor)
+    monkeypatch.setattr("tier_2.consensus_manager.run_debate_pipeline", mock_debate)
+    monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda x: x)
+    monkeypatch.setattr("tier_2.agents.calculate_taste_utility_6d", lambda x, y: 0.5)
+
+    from fastapi.testclient import TestClient
+
+    from orchestrator import DECISION_BLUEPRINT_PATH, app
+
+    DECISION_BLUEPRINT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(DECISION_BLUEPRINT_PATH, "w", encoding="utf-8") as f:
+        json.dump({"winning_dish": {"name": "dummy"}}, f)
+
+    client = TestClient(app)
+
+    # 1. Call /submit to populate session
+    res1 = client.post("/submit", data={"query": "pizza"})
+    assert res1.status_code == 200
+
+    # 2. Call /recalculate (session cookie will be automatically sent by TestClient)
+    res2 = client.post("/recalculate", json={"w_health": 0.5, "w_budget": 0.3, "w_taste": 0.2})
+    assert res2.status_code == 200
+
+    # Assert data is consistent
+    data = res2.json()
+    assert "utility_breakdown" in data
+    assert "agent_weights" in data
+    assert data["agent_weights"]["w_h"] == 0.5
