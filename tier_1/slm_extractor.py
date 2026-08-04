@@ -17,7 +17,8 @@ class SLMExtractorImpl(IntentExtractor):
 
     def extract(self, text: str) -> GroundedIntent:
         prompt = f"""
-Extract food intent from the following text and output ONLY a JSON object matching this schema. If a value is unknown, use null or defaults.
+You are a food ordering assistant. Extract the customer's intent from their message
+into ONLY a JSON object matching this schema. If a value is unknown, use null or defaults.
 {{
     "raw_input": "{text}",
     "budget_max_pkr": float (or null),

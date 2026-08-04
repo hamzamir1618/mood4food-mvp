@@ -13,7 +13,7 @@ def test_classify_dish_biryani():
     candidate_labels = get_all_dish_names()
 
     # Ensure there's a robust list of labels for the test, particularly if Neo4j returned a fallback
-    if "spicy chicken biryani" not in [l.lower() for l in candidate_labels]:
+    if "spicy chicken biryani" not in [lbl.lower() for lbl in candidate_labels]:
         candidate_labels.append("Spicy Chicken Biryani")
 
     result = classify_dish(image_path, candidate_labels)

@@ -144,7 +144,7 @@ def get_persona_taste(persona_key: str) -> dict:
     return get_persona(persona_key)["taste_preference"]
 
 
-import math
+import math  # noqa: E402
 
 
 def validate_persona_weights():
