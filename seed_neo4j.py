@@ -15,6 +15,8 @@ Relationships:
     (:Dish)-[:CONTAINS]->(:Ingredient)
 """
 
+import argparse
+
 from neo4j import GraphDatabase
 
 from config import settings
@@ -1433,11 +1435,20 @@ def seed(tx):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Seed Neo4j database")
+    parser.add_argument(
+        "--reset", action="store_true", help="Wipe all nodes and relationships before seeding"
+    )
+    args = parser.parse_args()
+
     driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
     driver.verify_connectivity()
     print("[OK]  Connected to Neo4j at", NEO4J_URI)
 
     with driver.session() as session:
+        if args.reset:
+            print("[INFO] Wiping existing data (--reset flag passed)")
+            session.execute_write(lambda tx: tx.run("MATCH (n) DETACH DELETE n"))
         session.execute_write(seed)
 
     # Quick verification
