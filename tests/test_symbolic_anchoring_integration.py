@@ -14,7 +14,7 @@ from tier_1.symbolic_anchoring import query_safe_candidates
 
 @pytest.fixture(scope="module")
 def neo4j_container():
-    with Neo4jContainer("neo4j:5.12") as neo4j:
+    with Neo4jContainer("neo4j:5.12", password="password1234") as neo4j:
         yield neo4j
 
 
@@ -22,7 +22,7 @@ def neo4j_container():
 def seeded_neo4j(neo4j_container):
     uri = neo4j_container.get_connection_url()
     user = "neo4j"
-    password = "password"  # Default testcontainers Neo4j password
+    password = "password1234"
     auth = (user, password)
 
     driver = GraphDatabase.driver(uri, auth=auth)
