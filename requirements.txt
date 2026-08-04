@@ -4,3 +4,4 @@ python-multipart
 neo4j==5.25.0
 pydantic==2.9.2
 pydantic-settings
+redis
