@@ -23,7 +23,7 @@ try:
     from testcontainers.community.neo4j import Neo4jContainer
 except ImportError:
     from testcontainers.neo4j import Neo4jContainer
-import seed_neo4j
+import seed_neo4j  # noqa: E402
 
 
 @pytest.fixture(scope="module")
