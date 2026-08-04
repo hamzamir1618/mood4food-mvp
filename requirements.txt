@@ -6,3 +6,9 @@ pydantic==2.9.2
 pydantic-settings
 redis
 itsdangerous
+structlog
+httpx
+faster-whisper
+transformers
+torch
+pillow

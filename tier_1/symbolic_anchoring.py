@@ -131,22 +131,51 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
     return candidates
 
 
+def get_all_dish_names() -> list[str]:
+    """
+    Fetches all dish names from Neo4j to be used as classification labels.
+    """
+    names: list[str] = []
+    driver = None
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=NEO4J_AUTH)
+        with driver.session() as session:
+            result = session.run("MATCH (d:Dish) RETURN d.name AS name")
+            names = [record["name"] for record in result]
+        log.info("neo4j | fetched %d dish names for candidate labels", len(names))
+    except Exception as exc:
+        log.error("neo4j query failed in get_all_dish_names: %s", exc)
+        # return a fallback list just in case
+        return ["pizza", "burger", "biryani", "salad", "pasta"]
+    finally:
+        if driver:
+            driver.close()
+    return names
+
+
 # ── JSON Contract Writer ────────────────────────────────────────────────────
 
 
-def write_candidate_evaluation(intent: dict, candidates: list[dict]) -> Path:
+def write_candidate_evaluation(
+    intent: dict, candidates: list[dict], relaxations: list[dict] = None, message: str = ""
+) -> Path:
     """
     Writes candidate_evaluation.json containing the original intent context
     and the list of safe candidate dishes that survived allergen pruning.
     """
+    if relaxations is None:
+        relaxations = []
+
     contract = {
-        "source_intent": {
-            "budget_max_pkr": intent["hard_constraints"]["budget_max_pkr"],
-            "allergens_pruned": intent["hard_constraints"]["allergens_pruned"],
+        "source_intent": intent,
+        "soft_constraints": {
+            "mood_vector_seed": "neutral",
+            "direct_dish_prompt": intent.get("craving", ""),
         },
-        "soft_constraints": intent["soft_constraints"],
         "safe_candidates": candidates,
         "candidate_count": len(candidates),
+        "relaxations": relaxations,
+        "message": message,
     }
 
     CONTRACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -171,14 +200,46 @@ def run_anchoring_pipeline() -> dict:
 
     # Step 1 — load upstream contract
     intent = load_grounded_intent()
-    allergens = intent["hard_constraints"]["allergens_pruned"]
-    budget = intent["hard_constraints"]["budget_max_pkr"]
+    allergens = intent.get("allergens_pruned", [])
 
-    # Step 2 — deterministic graph query
-    candidates = query_safe_candidates(allergens, budget)
+    # We never drop allergens because it's a safety constraint!
+
+    budget = intent.get("budget_max_pkr")
+    if budget is None:
+        budget = 999999  # unlimited if no budget specified
+
+    candidates = []
+    relaxations = []
+
+    # Attempt up to 3 times (1 initial + 2 relaxations)
+    for attempt in range(3):
+        candidates = query_safe_candidates(allergens, budget)
+        if candidates:
+            break
+
+        if attempt < 2:
+            old_budget = budget
+            budget = budget * 1.2
+            relaxations.append(
+                {
+                    "constraint": "budget_max_pkr",
+                    "old_value": old_budget,
+                    "new_value": budget,
+                    "reason": "zero_candidates_found",
+                }
+            )
+            log.warning(
+                "0 candidates found. Relaxing budget to %.2f (attempt %d/2)", budget, attempt + 1
+            )
+
+    if not candidates:
+        msg = "No matches even after maximum relaxation attempts."
+        log.warning(msg)
+    else:
+        msg = f"Found {len(candidates)} candidates."
 
     # Step 3 — persist contract
-    write_candidate_evaluation(intent, candidates)
+    write_candidate_evaluation(intent, candidates, relaxations, msg)
 
     log.info("─── Tier 1b: Graph Constraint Pipeline DONE ────")
 
@@ -186,6 +247,8 @@ def run_anchoring_pipeline() -> dict:
         "source_intent": intent,
         "safe_candidates": candidates,
         "candidate_count": len(candidates),
+        "relaxations": relaxations,
+        "message": msg,
     }
 
 

@@ -1,6 +1,7 @@
 import fakeredis
 
 import tier_1.contracts.session_store as ss
+from tier_1.contracts.schemas import GroundedIntent
 from tier_1.contracts.session_store import load_contract, save_contract
 
 
@@ -15,7 +16,7 @@ def test_save_and_load_contract(monkeypatch):
 
     session_id = "test-session-123"
     contract_name = "grounded_intent"
-    data = {"budget_max_pkr": 1000, "allergens_pruned": ["dairy"]}
+    data = GroundedIntent(budget_max_pkr=1000, allergens_pruned=["dairy"])
 
     # Ensure it's empty first
     assert load_contract(session_id, contract_name) is None
