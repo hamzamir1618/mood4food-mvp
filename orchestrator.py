@@ -49,6 +49,12 @@ def serve_frontend():
     return FileResponse(str(WEB_UI_DIR / "index.html"))
 
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint (no Neo4j query yet)."""
+    return {"status": "ok"}
+
+
 # ── Models ──────────────────────────────────────────────────────────────────
 
 class WeightUpdate(BaseModel):
