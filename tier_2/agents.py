@@ -85,6 +85,30 @@ def calculate_taste_utility(dish_vector: list[float],
     return max(0.0, min(1.0, cosine))
 
 
+def calculate_taste_utility_6d(dish_taste_profile: dict,
+                                persona_taste_preference: dict) -> float:
+    """
+    6-dimensional taste cosine similarity between a dish's taste profile
+    and a persona's taste preference.
+
+    Both inputs are dicts with keys: sweet, salty, sour, bitter, umami, spice.
+    Returns 0.0 when orthogonal/zero, 1.0 when identical.
+    """
+    keys = ["sweet", "salty", "sour", "bitter", "umami", "spice"]
+    dish_vec = [dish_taste_profile.get(k, 0.0) for k in keys]
+    pref_vec = [persona_taste_preference.get(k, 0.0) for k in keys]
+
+    dot = sum(a * b for a, b in zip(dish_vec, pref_vec))
+    mag_a = math.sqrt(sum(a * a for a in dish_vec))
+    mag_b = math.sqrt(sum(b * b for b in pref_vec))
+
+    if mag_a == 0.0 or mag_b == 0.0:
+        return 0.0
+
+    cosine = dot / (mag_a * mag_b)
+    return max(0.0, min(1.0, cosine))
+
+
 def calculate_health_utility(dish_data: dict) -> float:
     """
     Simple protein-to-calorie ratio normalisation.
@@ -110,17 +134,17 @@ def calculate_health_utility(dish_data: dict) -> float:
 
 def calculate_budget_utility(price: float, max_budget: float) -> float:
     """
-    Exponential decay budget utility.
+    Log-scaled budget utility that creates high sensitivity in the
+    typical price range (100-500 PKR), ensuring small price differences
+    produce meaningful utility differences.
 
-    U_b = exp(-0.01 * price)
-
-    Dishes near 0 PKR → ~1.0, dishes at 800 PKR → ~0.00034.
-    The max_budget parameter is accepted for interface consistency but the
-    formula is price-only per spec.
+    U_b = 1 - log(1 + price) / log(1 + max_budget)
     """
     if price < 0:
         return 1.0
-    return math.exp(-0.002 * price)
+    if max_budget <= 0:
+        max_budget = 1000
+    return max(0.0, 1.0 - math.log(1 + price) / math.log(1 + max_budget))
 
 
 # ── Vector Retrieval Helpers ────────────────────────────────────────────────

@@ -6,6 +6,9 @@
   <meta name="description" content="Mood4Food — AI-powered food recommendation engine that finds the best dish for your budget, health goals, and taste preferences.">
   <title>Mood4Food — Smart Food Recommender</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -70,6 +73,14 @@
       <!-- Populated by app.js -->
     </div>
 
+  </div>
+
+  <!-- ── Recipe Modal Overlay ──────────────────────────────────────── -->
+  <div class="recipe-modal" id="recipe-modal">
+    <div class="recipe-modal-backdrop" id="recipe-modal-backdrop"></div>
+    <div class="recipe-modal-content" id="recipe-modal-content">
+      <!-- Populated by app.js -->
+    </div>
   </div>
 
   <script src="/static/app.js"></script>

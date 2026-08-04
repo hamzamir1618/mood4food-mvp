@@ -13,10 +13,12 @@ from tier_2.agents import (
     calculate_budget_utility,
     calculate_health_utility,
     calculate_taste_utility,
+    calculate_taste_utility_6d,
     get_vector_store,
     retrieve_dish_vector,
     retrieve_mood_vector,
 )
+from tier_1.persona_manager import get_persona, get_all_personas, DEFAULT_PERSONA
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CONTRACTS_DIR = Path(__file__).resolve().parent.parent / "tier_1" / "contracts"
@@ -58,7 +60,8 @@ def load_candidate_evaluation() -> dict:
 def score_candidate(candidate: dict,
                     mood_vector: list[float],
                     budget_max: int,
-                    dish_collection) -> dict:
+                    dish_collection,
+                    persona_taste: dict | None = None) -> dict:
     """
     Computes U_h, U_b, U_t for a single candidate dish.
     Returns a dict with individual utilities and metadata.
@@ -77,11 +80,15 @@ def score_candidate(candidate: dict,
     price = candidate.get("price_pkr", 0.0)
     u_budget = calculate_budget_utility(price, budget_max)
 
-    # ── Taste utility ──
-    dish_vector = candidate.get("embedding", [])
-    if not dish_vector and dish_collection is not None:
-        dish_vector = retrieve_dish_vector(dish_collection, str(dish_id))
-    u_taste = calculate_taste_utility(dish_vector, mood_vector) if dish_vector and mood_vector else 0.5
+    # ── Taste utility (6D profile preferred, legacy vector fallback) ──
+    dish_taste_profile = candidate.get("taste_profile", {})
+    if dish_taste_profile and persona_taste:
+        u_taste = calculate_taste_utility_6d(dish_taste_profile, persona_taste)
+    else:
+        dish_vector = candidate.get("embedding", [])
+        if not dish_vector and dish_collection is not None:
+            dish_vector = retrieve_dish_vector(dish_collection, str(dish_id))
+        u_taste = calculate_taste_utility(dish_vector, mood_vector) if dish_vector and mood_vector else 0.5
 
     return {
         "dish_id": dish_id,
@@ -90,6 +97,10 @@ def score_candidate(candidate: dict,
         "u_budget": round(u_budget, 6),
         "u_taste": round(u_taste, 6),
         "price_pkr": price,
+        "category": candidate.get("category", ""),
+        "image_url": candidate.get("image_url", ""),
+        "human_tags": candidate.get("human_tags", []),
+        "taste_profile": dish_taste_profile,
     }
 
 
@@ -99,7 +110,8 @@ def run_debate(candidates: list[dict],
                mood_vector: list[float],
                budget_max: int,
                dish_collection=None,
-               direct_dish_prompt: str = "") -> dict:
+               direct_dish_prompt: str = "",
+               persona_key: str = DEFAULT_PERSONA) -> dict:
     """
     Weighted utility aggregation loop:
       U_total = (w_h * U_h) + (w_b * U_b) + (w_t * U_t)
@@ -107,9 +119,13 @@ def run_debate(candidates: list[dict],
     If max U_total == 0 after scoring, auto-degrades w_b by 0.1 and re-runs.
     Returns the winning dish, its utility breakdown, and XAI traces.
     """
-    w_h = W_HEALTH
-    w_b = W_BUDGET
-    w_t = W_TASTE
+    persona = get_persona(persona_key)
+    persona_weights = persona["weights"]
+    persona_taste = persona["taste_preference"]
+
+    w_h = persona_weights.get("w_health", W_HEALTH)
+    w_b = persona_weights.get("w_budget", W_BUDGET)
+    w_t = persona_weights.get("w_taste", W_TASTE)
 
     xai_traces: list[str] = []
     relaxation_round = 0
@@ -124,7 +140,7 @@ def run_debate(candidates: list[dict],
 
         scored: list[dict] = []
         for cand in candidates:
-            sc = score_candidate(cand, mood_vector, budget_max, dish_collection)
+            sc = score_candidate(cand, mood_vector, budget_max, dish_collection, persona_taste)
             u_total = (w_h * sc["u_health"]) + (w_b * sc["u_budget"]) + (w_t * sc["u_taste"])
             
             cand_name_lower = sc["name"].lower()
@@ -187,6 +203,7 @@ def run_debate(candidates: list[dict],
     return {
         "winner": winner,
         "final_weights": {"w_h": round(w_h, 4), "w_b": round(w_b, 4), "w_t": round(w_t, 4)},
+        "persona": persona_key,
         "relaxation_rounds": relaxation_round,
         "xai_traces": xai_traces,
     }
@@ -205,6 +222,9 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
             "dish_id": winner["dish_id"],
             "name": winner["name"],
             "price_pkr": winner.get("price_pkr", 0),
+            "category": winner.get("category", ""),
+            "image_url": winner.get("image_url", ""),
+            "human_tags": winner.get("human_tags", []),
         },
         "utility_breakdown": {
             "u_health": winner["u_health"],
@@ -213,6 +233,7 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
             "u_total": winner["u_total"],
         },
         "agent_weights": debate_result["final_weights"],
+        "persona": debate_result.get("persona", DEFAULT_PERSONA),
         "relaxation_rounds": debate_result["relaxation_rounds"],
         "xai_traces": debate_result["xai_traces"],
         "all_candidate_scores": winner.get("all_scores", []),
@@ -221,6 +242,7 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
             "allergens_pruned": intent_context.get("allergens_pruned", []),
             "mood_vector_seed": intent_context.get("mood_vector_seed", "neutral"),
         },
+        "personas_available": {k: {"display_name": v["display_name"], "icon": v["icon"], "description": v["description"]} for k, v in get_all_personas().items()},
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,13 +1,13 @@
 {
     "hard_constraints": {
-        "budget_max_pkr": 1000,
+        "budget_max_pkr": 800,
         "allergens_pruned": [
-            "dairy"
+            "meat"
         ]
     },
     "soft_constraints": {
         "protein_priority": "normal",
-        "mood_vector_seed": "neutral",
-        "direct_dish_prompt": "palak paneer but no dairy"
+        "mood_vector_seed": "spicy",
+        "direct_dish_prompt": "i want something spicy under 800 rupees, no meat"
     }
 }

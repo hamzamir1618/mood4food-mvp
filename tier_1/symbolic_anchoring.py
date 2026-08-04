@@ -15,8 +15,10 @@ CONTRACTS_DIR = Path(__file__).resolve().parent / "contracts"
 GROUNDED_INTENT_PATH = CONTRACTS_DIR / "grounded_intent.json"
 CANDIDATE_EVAL_PATH = CONTRACTS_DIR / "candidate_evaluation.json"
 
-NEO4J_URI = "bolt://localhost:7687"
-NEO4J_AUTH = ("neo4j", "Mood4Food")
+from config import settings
+
+NEO4J_URI = settings.NEO4J_URI
+NEO4J_AUTH = (settings.NEO4J_USER, settings.NEO4J_PASSWORD)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
@@ -48,7 +50,12 @@ WHERE d.synthesized_calories <= 1000
   }
 RETURN d.dish_id AS dish_id, d.name AS name,
        d.price_pkr AS price_pkr, d.protein_g AS protein_g,
-       d.calories AS calories
+       d.calories AS calories,
+       d.category AS category, d.image_url AS image_url,
+       d.human_tags AS human_tags,
+       d.taste_sweet AS taste_sweet, d.taste_salty AS taste_salty,
+       d.taste_sour AS taste_sour, d.taste_bitter AS taste_bitter,
+       d.taste_umami AS taste_umami, d.taste_spice AS taste_spice
 """
 
 
@@ -78,6 +85,17 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
                     "price_pkr": record["price_pkr"],
                     "protein_g": record["protein_g"],
                     "calories": record["calories"],
+                    "category": record.get("category", ""),
+                    "image_url": record.get("image_url", ""),
+                    "human_tags": record.get("human_tags", []),
+                    "taste_profile": {
+                        "sweet": record.get("taste_sweet", 0.0) or 0.0,
+                        "salty": record.get("taste_salty", 0.0) or 0.0,
+                        "sour": record.get("taste_sour", 0.0) or 0.0,
+                        "bitter": record.get("taste_bitter", 0.0) or 0.0,
+                        "umami": record.get("taste_umami", 0.0) or 0.0,
+                        "spice": record.get("taste_spice", 0.0) or 0.0,
+                    },
                 })
         log.info("neo4j returned %d safe candidates", len(candidates))
     except Exception as exc:
