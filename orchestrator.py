@@ -9,14 +9,17 @@ Open: http://localhost:8000/
 import json
 import logging
 import math
+import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CONTRACTS_DIR = Path(__file__).resolve().parent / "tier_1" / "contracts"
@@ -32,6 +35,18 @@ WEB_UI_DIR = Path(__file__).resolve().parent / "web_ui"
 
 app = FastAPI(title="FIPE Orchestrator", version="0.2.0")
 
+
+class SessionIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if "session_id" not in request.session:
+            request.session["session_id"] = uuid.uuid4().hex
+        request.state.session_id = request.session["session_id"]
+        response = await call_next(request)
+        return response
+
+
+app.add_middleware(SessionIDMiddleware)
+app.add_middleware(SessionMiddleware, secret_key="fipe-secret-key-change-in-prod")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
