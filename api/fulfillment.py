@@ -1,12 +1,13 @@
 import logging
+from typing import Dict
 
 from fastapi import APIRouter, HTTPException, Request
+
+from tier_1.contracts.schemas import DecisionBlueprint, Persona
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
 
 
 @router.get("/decision_blueprint", response_model=DecisionBlueprint)
