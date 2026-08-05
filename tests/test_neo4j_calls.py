@@ -49,7 +49,7 @@ def test_neo4j_call_count_submit_vs_recalculate(mock_enrich, mock_ingest, mock_q
     mock_enrich.side_effect = lambda x: x
 
     # 1. Trigger /submit
-    res = client.post("/submit", data={"query": "I want spicy chicken"})
+    res = client.post("/submit", data={"text": "I want something spicy"})
     assert res.status_code == 200
 
     # query_safe_candidates must be called exactly once during /submit

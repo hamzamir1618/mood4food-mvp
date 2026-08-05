@@ -8,13 +8,13 @@ client = TestClient(app)
 
 
 def test_empty_string():
-    response = client.post("/submit", data={"query": "   "})
+    response = client.post("/submit", data={"text": "   "})
     assert response.status_code == 400
-    assert "non-empty text" in response.json()["detail"]
+    assert "Provide exactly one of" in response.json()["detail"]
 
 
 def test_long_string():
-    response = client.post("/submit", data={"query": "a" * 10000})
+    response = client.post("/submit", data={"text": "a" * 10000})
     assert response.status_code == 400
     assert "exceeds 500 characters" in response.json()["detail"]
 
@@ -63,7 +63,7 @@ def test_cypher_injection(seeded_neo4j, monkeypatch):
     monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda bp: bp)
 
     # This should pass validation, hit the graph query, and not delete anything
-    response = client.post("/submit", data={"query": "'; MATCH (n) DETACH DELETE n; --"})
+    response = client.post("/submit", data={"text": "'; MATCH (n) DETACH DELETE n; --"})
     assert response.status_code == 200
 
     # Verify DB count

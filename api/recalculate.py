@@ -5,6 +5,9 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from api.rate_limit import limiter
+from tier_1.contracts.schemas import DecisionBlueprint
+
 log = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -19,7 +22,10 @@ class WeightUpdate(BaseModel):
     persona: Optional[str] = None
 
 
-@router.post("/recalculate")
+
+
+@router.post("/recalculate", response_model=DecisionBlueprint)
+@limiter.limit("20/minute")
 def recalculate(request: Request, payload: WeightUpdate):
     """
     Accepts new weights from the UI sliders (w_health, w_budget, w_taste)
@@ -189,7 +195,7 @@ def recalculate(request: Request, payload: WeightUpdate):
         w_b,
         w_t,
         persona_key,
-        winner["name"],
+        winner["name"] if scored else "None",
     )
 
     return blueprint

@@ -63,11 +63,11 @@ def test_full_session_isolation(monkeypatch):
     client2 = TestClient(app)
 
     # Session 1 submits
-    res1_submit = client1.post("/submit", data={"query": "I want pizza"})
+    res1_submit = client1.post("/submit", data={"text": "I want pizza"})
     assert res1_submit.status_code == 200
 
     # Session 2 submits
-    res2_submit = client2.post("/submit", data={"query": "I want salad"})
+    res2_submit = client2.post("/submit", data={"text": "I want salad"})
     assert res2_submit.status_code == 200
 
     # Both call /recalculate

@@ -12,3 +12,4 @@ faster-whisper
 transformers
 torch
 pillow
+slowapi

@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str
     REDIS_URL: str = "redis://localhost:6379/0"
     INTENT_EXTRACTOR: str = "keyword"
+    FRONTEND_ORIGIN: str = "http://localhost:8000"
+    DEPLOY_MODE: str = "full"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

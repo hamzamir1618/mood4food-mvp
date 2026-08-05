@@ -17,7 +17,18 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
     fake_redis = fakeredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr("tier_1.contracts.session_store.get_redis", lambda: fake_redis)
 
-    monkeypatch.setitem(RECIPES, "First Dish", {"grocery_list": []})
+    monkeypatch.setitem(
+        RECIPES,
+        "First Dish",
+        {
+            "prep_time": "10 min",
+            "cook_time": "20 min",
+            "servings": 2,
+            "difficulty": "Easy",
+            "steps": ["Step 1"],
+            "grocery_list": [],
+        },
+    )
 
     # 1. Without session/blueprint, /decision_blueprint should return 400
     res_no_session = client.get("/decision_blueprint")
@@ -74,7 +85,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
     }
 
     # 2. Trigger /submit
-    res_submit = client.post("/submit", data={"query": "I want food"})
+    res_submit = client.post("/submit", data={"text": "I want food"})
     assert res_submit.status_code == 200
 
     # 3. Trigger /recalculate
