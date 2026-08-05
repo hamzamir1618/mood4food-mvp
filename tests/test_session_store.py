@@ -73,8 +73,8 @@ def test_submit_session_isolation(monkeypatch):
     client1 = TestClient(app)
     client2 = TestClient(app)
 
-    res1 = client1.post("/submit", data={"query": "I want pizza"})
-    res2 = client2.post("/submit", data={"query": "I want salad"})
+    res1 = client1.post("/submit", data={"text": "I want pizza"})
+    res2 = client2.post("/submit", data={"text": "I want salad"})
 
     assert res1.status_code == 200
     assert res2.status_code == 200
@@ -174,7 +174,7 @@ def test_recalculate_after_submit_200(monkeypatch):
     client = TestClient(app)
 
     # 1. Call /submit to populate session
-    res1 = client.post("/submit", data={"query": "pizza"})
+    res1 = client.post("/submit", data={"text": "pizza"})
     assert res1.status_code == 200
 
     # 2. Call /recalculate (session cookie will be automatically sent by TestClient)

@@ -56,6 +56,39 @@ class Persona(BaseModel):
     description: str = ""
 
 
+class GroceryItem(BaseModel):
+    item: str
+    qty: str
+    est_cost: Any
+
+
+class Recipe(BaseModel):
+    prep_time: str
+    cook_time: str
+    servings: int
+    difficulty: str
+    steps: List[str]
+    grocery_list: List[GroceryItem]
+    source: Optional[str] = None
+    total_cost: Optional[Any] = None
+
+
+class Restaurant(BaseModel):
+    name: str
+    delivery_time: Optional[str] = None
+    rating: Optional[float] = None
+    delivery_fee: Optional[float] = None
+    dish_available: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+
+
+class Fulfillment(BaseModel):
+    recipe: Recipe
+    restaurants: List[Restaurant]
+
+
 class DecisionBlueprint(BaseModel):
     winning_dish: Optional[Dict[str, Any]] = None
     utility_breakdown: Optional[Dict[str, float]] = None
@@ -69,14 +102,4 @@ class DecisionBlueprint(BaseModel):
     source_context: SourceContext = Field(default_factory=SourceContext)
     personas_available: Dict[str, Persona] = Field(default_factory=dict)
     relaxation_notice: Optional[str] = None
-
-
-class Restaurant(BaseModel):
-    name: str
-    delivery_time: Optional[str] = None
-    rating: Optional[float] = None
-    delivery_fee: Optional[float] = None
-    dish_available: Optional[str] = None
-    address: Optional[str] = None
-    lat: Optional[float] = None
-    lon: Optional[float] = None
+    fulfillment: Optional[Fulfillment] = None

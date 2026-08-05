@@ -7,7 +7,9 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/decision_blueprint")
+
+
+@router.get("/decision_blueprint", response_model=DecisionBlueprint)
 def get_decision_blueprint(request: Request):
     """Returns the current decision_blueprint.json to the frontend."""
     from tier_1.contracts.session_store import load_contract
@@ -25,7 +27,7 @@ def get_decision_blueprint(request: Request):
     return enrich_blueprint(blueprint)
 
 
-@router.get("/personas")
+@router.get("/personas", response_model=Dict[str, Persona])
 def get_personas():
     """Returns all available persona definitions for the frontend to render."""
     from tier_1.persona_manager import get_all_personas
