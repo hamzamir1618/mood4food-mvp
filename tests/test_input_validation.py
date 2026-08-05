@@ -60,7 +60,7 @@ def test_cypher_injection(seeded_neo4j, monkeypatch):
 
     # Mock enrich_blueprint because we don't care about fulfillment in this test
     # and the seeded Neo4j mock might not have ingredients for all candidates
-    monkeypatch.setattr("orchestrator.enrich_blueprint", lambda bp: bp)
+    monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda bp: bp)
 
     # This should pass validation, hit the graph query, and not delete anything
     response = client.post("/submit", data={"query": "'; MATCH (n) DETACH DELETE n; --"})
