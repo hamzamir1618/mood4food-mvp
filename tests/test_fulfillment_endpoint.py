@@ -90,7 +90,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
     fulfillment_json = res_fulfillment.json()
     winner_fulfill = fulfillment_json["winning_dish"]["name"]
 
-    # 5. Assert the fulfillment response's dish matches the winning dish from /recalculate's response
+    # 5. Assert fulfillment dish matches /recalculate winner
     assert winner_fulfill == winner_recalc
     assert winner_fulfill == "First Dish"
 
