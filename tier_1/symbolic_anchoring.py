@@ -188,18 +188,21 @@ def write_candidate_evaluation(
 # ── Pipeline Entry Point ────────────────────────────────────────────────────
 
 
-def run_anchoring_pipeline() -> dict:
-    """
-    Full Tier-1b pipeline:
-      1. Load grounded_intent.json
-      2. Query Neo4j to prune allergens
-      3. Write candidate_evaluation.json
-    Returns the candidate evaluation dict.
+def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
+    """Executes the symbolic grounding pipeline.
+
+    - Loads Tier 1a grounded intent
+    - Queries Neo4j for safe candidates
+    - Automatically relaxes budget constraints if no matches are found
     """
     log.info("─── Tier 1b: Graph Constraint Pipeline START ───")
 
     # Step 1 — load upstream contract
-    intent = load_grounded_intent()
+    if intent_dict is not None:
+        intent = intent_dict
+        log.info("using passed intent_dict instead of reading from file")
+    else:
+        intent = load_grounded_intent()
     allergens = intent.get("allergens_pruned", [])
 
     # We never drop allergens because it's a safety constraint!
