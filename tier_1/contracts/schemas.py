@@ -57,8 +57,26 @@ class Persona(BaseModel):
 
 
 class DecisionBlueprint(BaseModel):
+    winning_dish: Optional[Dict[str, Any]] = None
+    utility_breakdown: Optional[Dict[str, float]] = None
+    agent_weights: Optional[Dict[str, float]] = None
+    persona: str = ""
+    relaxation_rounds: int = 0
+    xai_traces: List[str] = Field(default_factory=list)
+    all_candidate_scores: List[Dict[str, Any]] = Field(default_factory=list)
     active_persona: str = ""
     top_candidates: List[Candidate] = Field(default_factory=list)
     source_context: SourceContext = Field(default_factory=SourceContext)
     personas_available: Dict[str, Persona] = Field(default_factory=dict)
     relaxation_notice: Optional[str] = None
+
+
+class Restaurant(BaseModel):
+    name: str
+    delivery_time: Optional[str] = None
+    rating: Optional[float] = None
+    delivery_fee: Optional[float] = None
+    dish_available: Optional[str] = None
+    address: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None

@@ -6,7 +6,6 @@ Run:  uvicorn orchestrator:app --host 0.0.0.0 --port 8000 --reload
 Open: http://localhost:8000/
 """
 
-import json
 import logging
 import math
 import uuid
@@ -226,14 +225,20 @@ async def submit_query(
 
 
 @app.get("/decision_blueprint")
-def get_decision_blueprint():
+def get_decision_blueprint(request: Request):
     """Returns the current decision_blueprint.json to the frontend."""
+    from tier_1.contracts.session_store import load_contract
     from tier_3.fulfillment_engine import enrich_blueprint
 
-    if not DECISION_BLUEPRINT_PATH.exists():
-        raise HTTPException(404, "decision_blueprint.json not found — run Tier 2 first")
-    with open(DECISION_BLUEPRINT_PATH, "r", encoding="utf-8") as fh:
-        blueprint = json.load(fh)
+    blueprint = load_contract(request.state.session_id, "decision_blueprint")
+    if not blueprint:
+        raise HTTPException(
+            400, "No active decision blueprint found. Please submit a new query first."
+        )
+
+    if hasattr(blueprint, "model_dump"):
+        blueprint = blueprint.model_dump()
+
     return enrich_blueprint(blueprint)
 
 
@@ -253,7 +258,7 @@ def recalculate(request: Request, payload: WeightUpdate):
     **without re-querying the LLM or database**. Instant.
     """
     from tier_1.contracts.schemas import Candidate, TasteProfile
-    from tier_1.contracts.session_store import load_contract
+    from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.persona_manager import DEFAULT_PERSONA, get_all_personas, get_persona
     from tier_2.agents import TasteAgent
     from tier_3.fulfillment_engine import enrich_blueprint
@@ -408,8 +413,7 @@ def recalculate(request: Request, payload: WeightUpdate):
     blueprint = enrich_blueprint(blueprint)
 
     # Persist updated blueprint
-    with open(DECISION_BLUEPRINT_PATH, "w", encoding="utf-8") as fh:
-        json.dump(blueprint, fh, indent=4, ensure_ascii=False)
+    save_contract(request.state.session_id, "decision_blueprint", blueprint)
     log.info(
         "recalculated blueprint with w_h=%.2f w_b=%.2f w_t=%.2f persona=%s → winner: %s",
         w_h,

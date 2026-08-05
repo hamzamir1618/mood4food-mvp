@@ -4,7 +4,18 @@ Bridges the gap between recommendation and action.
 Generates recipes, grocery lists, and mock restaurant order data.
 """
 
+import json
 import logging
+import os
+import random
+import time
+import urllib.parse
+from abc import ABC, abstractmethod
+
+import httpx
+
+from tier_1.contracts.schemas import Restaurant
+from tier_1.contracts.session_store import get_redis
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
@@ -173,25 +184,147 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
     if dish_name in RECIPES:
         log.info("recipe found (curated): %s", dish_name)
         recipe = RECIPES[dish_name].copy()
+        if "grocery_list" in recipe:
+            recipe["grocery_list"] = [item.copy() for item in recipe["grocery_list"]]
         recipe["source"] = "curated"
-        return recipe
+    else:
+        log.info("recipe generated (generic): %s", dish_name)
+        if not ingredients:
+            raise ValueError(f"Cannot generate recipe for '{dish_name}': empty ingredient list")
+        recipe = _generate_generic_recipe(dish_name, ingredients, price)
+        recipe["source"] = "generated"
 
-    log.info("recipe generated (generic): %s", dish_name)
-    recipe = _generate_generic_recipe(dish_name, ingredients or [], price)
-    recipe["source"] = "generated"
+    total = 0
+    for item in recipe.get("grocery_list", []):
+        cost = item.get("est_cost")
+        if cost is None:
+            item["est_cost"] = "price unavailable"
+        else:
+            try:
+                total += float(cost)
+            except (ValueError, TypeError):
+                item["est_cost"] = "price unavailable"
+
+    recipe["total_cost"] = total
     return recipe
 
 
-def get_restaurants(dish_name: str) -> list[dict]:
-    """Returns mock restaurant options that serve the dish."""
-    import random
+class RestaurantProvider(ABC):
+    @abstractmethod
+    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+        """Find nearby restaurants that serve the specified dish."""
+        pass
 
-    random.seed(hash(dish_name) % 2**32)  # Deterministic per dish
-    count = random.randint(2, len(MOCK_RESTAURANTS))
-    selected = random.sample(MOCK_RESTAURANTS, count)
-    for r in selected:
-        r["dish_available"] = dish_name
-    return selected
+
+class MockRestaurantProvider(RestaurantProvider):
+    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+        """Returns mock restaurant options that serve the dish."""
+        random.seed(hash(dish_name) % 2**32)  # Deterministic per dish
+        count = random.randint(2, len(MOCK_RESTAURANTS))
+        selected = random.sample(MOCK_RESTAURANTS, count)
+
+        restaurants = []
+        for r in selected:
+            # We copy to avoid modifying the global mock list directly
+            r_copy = r.copy()
+            r_copy["dish_available"] = dish_name
+            restaurants.append(Restaurant(**r_copy))
+        return restaurants
+
+
+class OSMRestaurantProvider(RestaurantProvider):
+    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+        """Queries Overpass API for restaurants in Islamabad."""
+        redis_client = get_redis()
+        cache_key = f"osm_cache:{dish_name}:islamabad"
+
+        cached = redis_client.get(cache_key)
+        if cached:
+            log.info("OSMRestaurantProvider: cache hit for %s", dish_name)
+            data = json.loads(cached)
+            return [Restaurant(**r) for r in data]
+
+        log.info("OSMRestaurantProvider: cache miss for %s", dish_name)
+
+        # Rate limit: keep well under 2 requests/second
+        last_req = redis_client.get("osm_last_request")
+        if last_req:
+            elapsed = time.time() - float(last_req)
+            if elapsed < 0.6:
+                time.sleep(0.6 - elapsed)
+
+        redis_client.set("osm_last_request", time.time())
+
+        # A simple Overpass query for restaurants in Islamabad.
+        # Note: Overpass does not have delivery_time, rating, or delivery_fee.
+        query = """
+        [out:json][timeout:15];
+        (
+          node["amenity"~"restaurant|fast_food|cafe"](33.5,72.9,33.8,73.2);
+        );
+        out center 15;
+        """
+
+        url = "https://overpass-api.de/api/interpreter"
+        try:
+            resp = httpx.post(
+                url, 
+                data={"data": query}, 
+                headers={"User-Agent": "Mood4Food/1.0", "Accept": "*/*"}, 
+                timeout=15.0
+            )
+            resp.raise_for_status()
+            elements = resp.json().get("elements", [])
+        except Exception as e:
+            log.error("Overpass API query failed: %s", e)
+            elements = []
+
+        # Shuffle to provide variety
+        random.seed(hash(dish_name) % 2**32)
+        random.shuffle(elements)
+
+        restaurants = []
+        for el in elements[:5]:
+            tags = el.get("tags", {})
+            name = tags.get("name", "Unknown Restaurant")
+            if name == "Unknown Restaurant":
+                continue
+
+            lat = el.get("lat")
+            lon = el.get("lon")
+            # Build approximate address
+            address_parts = [
+                tags.get("addr:housenumber", ""),
+                tags.get("addr:street", ""),
+                tags.get("addr:suburb", ""),
+                "Islamabad",
+            ]
+            address = ", ".join([p for p in address_parts if p])
+
+            restaurants.append(
+                Restaurant(
+                    name=name,
+                    delivery_time=None,  # Not available in OSM
+                    rating=None,  # Not available in OSM
+                    delivery_fee=None,  # Not available in OSM
+                    dish_available=dish_name,
+                    address=address,
+                    lat=lat,
+                    lon=lon,
+                )
+            )
+
+        # Cache the result for 10 minutes (600 seconds)
+        redis_client.set(cache_key, json.dumps([r.model_dump() for r in restaurants]), ex=600)
+
+        return restaurants
+
+
+def get_restaurant_provider() -> RestaurantProvider:
+    provider = os.environ.get("RESTAURANT_PROVIDER", "mock").lower()
+    if provider == "osm":
+        return OSMRestaurantProvider()
+    return MockRestaurantProvider()
 
 
 def enrich_blueprint(blueprint: dict) -> dict:
@@ -204,10 +337,25 @@ def enrich_blueprint(blueprint: dict) -> dict:
     ingredients = blueprint.get("winning_dish", {}).get("ingredients", [])
     price = blueprint.get("winning_dish", {}).get("price_pkr", 0)
 
+    provider = get_restaurant_provider()
+
     blueprint["fulfillment"] = {
         "recipe": get_recipe(dish_name, ingredients, price),
-        "restaurants": get_restaurants(dish_name),
+        "restaurants": [r.model_dump() for r in provider.find_nearby(dish_name)],
     }
 
     log.info("blueprint enriched with fulfillment data for: %s", dish_name)
     return blueprint
+
+
+def generate_foodpanda_link(restaurant_name: str, dish_name: str) -> str:
+    """Generates a valid URL-encoded Foodpanda search link."""
+    query = f"{restaurant_name} {dish_name}"
+    encoded_query = urllib.parse.quote(query)
+    return f"https://www.foodpanda.pk/search?q={encoded_query}"
+
+
+def generate_whatsapp_link(phone: str, message: str) -> str:
+    """Generates a valid URL-encoded WhatsApp deep link."""
+    encoded_message = urllib.parse.quote(message)
+    return f"https://wa.me/{phone}?text={encoded_message}"
