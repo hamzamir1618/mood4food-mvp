@@ -1,8 +1,3 @@
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-
-from api.rate_limit import limiter
-
 """
 FastAPI Orchestrator — serves the web UI, runs the full ingestion-to-debate
 pipeline from user queries, and handles weight recalculation.
@@ -20,12 +15,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from api.alternate import router as alternate_router
 from api.fulfillment import router as fulfillment_router
 from api.health import router as health_router
+from api.rate_limit import limiter
 from api.recalculate import router as recalculate_router
 from api.submit import router as submit_router
 from config import settings
@@ -71,7 +69,6 @@ app.add_middleware(
 
 # ── Static file serving for web UI ──────────────────────────────────────────
 app.mount("/static", StaticFiles(directory=str(WEB_UI_DIR)), name="static")
-
 
 
 app.state.limiter = limiter
