@@ -268,10 +268,10 @@ class OSMRestaurantProvider(RestaurantProvider):
         url = "https://overpass-api.de/api/interpreter"
         try:
             resp = httpx.post(
-                url, 
-                data={"data": query}, 
-                headers={"User-Agent": "Mood4Food/1.0", "Accept": "*/*"}, 
-                timeout=15.0
+                url,
+                data={"data": query},
+                headers={"User-Agent": "Mood4Food/1.0", "Accept": "*/*"},
+                timeout=15.0,
             )
             resp.raise_for_status()
             elements = resp.json().get("elements", [])
