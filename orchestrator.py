@@ -194,7 +194,7 @@ async def submit_query(
 
     # Stage 2: Neo4j Allergen Pruning
     try:
-        evaluation = run_anchoring_pipeline()
+        evaluation = run_anchoring_pipeline(intent)
         save_contract(request.state.session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)

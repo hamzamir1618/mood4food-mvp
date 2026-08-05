@@ -58,6 +58,10 @@ def test_cypher_injection(seeded_neo4j, monkeypatch):
     fake_redis = fakeredis.FakeRedis(decode_responses=True)
     monkeypatch.setattr("tier_1.contracts.session_store.get_redis", lambda: fake_redis)
 
+    # Mock enrich_blueprint because we don't care about fulfillment in this test
+    # and the seeded Neo4j mock might not have ingredients for all candidates
+    monkeypatch.setattr("orchestrator.enrich_blueprint", lambda bp: bp)
+
     # This should pass validation, hit the graph query, and not delete anything
     response = client.post("/submit", data={"query": "'; MATCH (n) DETACH DELETE n; --"})
     assert response.status_code == 200
