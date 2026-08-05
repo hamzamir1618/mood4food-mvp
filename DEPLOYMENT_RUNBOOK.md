@@ -66,6 +66,11 @@ Docker must be installed and the daemon running. Verify:
 docker --version
 ```
 
+### 1.5 Third-Party APIs (OpenStreetMap Overpass)
+
+The backend uses the OpenStreetMap Overpass API for real restaurant fulfillment data (`RESTAURANT_PROVIDER=osm`). 
+**Known Limitation:** Unlike Google Places API, Overpass does not have live delivery times, ratings, or delivery fees. These fields will be `null` when using the OSM provider. This trade-off was chosen deliberately to avoid requiring a Google Cloud billing account. In test/CI environments, the mock provider (`RESTAURANT_PROVIDER=mock`) is used to prevent external network calls.
+
 ---
 
 ## 2. Substrate Initialization
