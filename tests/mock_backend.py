@@ -92,19 +92,19 @@ def mock_anchoring(intent):
             {
                 "dish_id": "dish3",
                 "name": "Boiled Broccoli",
-                "price_pkr": 800,
+                "price_pkr": 1000.0,
                 "category": "Main",
                 "taste_profile": {
                     "spice": 0.0,
                     "sweet": 0.0,
                     "salty": 0.0,
                     "sour": 0.0,
-                    "bitter": 0.5,
+                    "bitter": 0.0,
                     "umami": 0.0,
                 },
                 "macros": {
                     "protein_g": 45.0,
-                    "calories": 150.0,
+                    "calories": 1000.0,
                 },
                 "allergens": [],
                 "ingredients": ["Broccoli"],
