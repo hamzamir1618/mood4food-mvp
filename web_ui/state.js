@@ -18,3 +18,10 @@ export function updateBlueprint(bp) {
     w_t: bp?.agent_weights?.w_t ?? 0.33,
   };
 }
+
+export function setCurrentPersona(p) { state.currentPersona = p; }
+export function setWeights(w) { state.weights = w; }
+export function setXaiOpen(o) { state.xaiOpen = o; }
+export function setFirstRenderDone(d) { state.firstRenderDone = d; }
+export function setAudioFile(f) { state.audioFile = f; }
+export function setImageFile(f) { state.imageFile = f; }
