@@ -1,5 +1,3 @@
-import pytest
-
 from tier_3.fulfillment_engine import RECIPES, get_recipe
 
 
@@ -41,8 +39,9 @@ def test_recipe_missing_price(monkeypatch):
 
 
 def test_recipe_empty_ingredient_list():
-    with pytest.raises(ValueError, match="empty ingredient list"):
-        get_recipe("Completely Unknown Dish", ingredients=[])
+    # Test graceful fallback instead of ValueError
+    recipe1 = get_recipe("Completely Unknown Dish", ingredients=[])
+    assert recipe1["grocery_list"][0]["item"] == "Completely Unknown Dish"
 
-    with pytest.raises(ValueError, match="empty ingredient list"):
-        get_recipe("Completely Unknown Dish", ingredients=None)
+    recipe2 = get_recipe("Another Unknown Dish", ingredients=None)
+    assert recipe2["grocery_list"][0]["item"] == "Another Unknown Dish"
