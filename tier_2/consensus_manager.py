@@ -121,6 +121,7 @@ def score_candidate(
         "image_url": cand_model.image_url,
         "human_tags": cand_model.human_tags,
         "taste_profile": dish_taste_profile,
+        "ingredients": candidate.get("ingredients", []),
     }
 
 
@@ -290,6 +291,7 @@ def write_decision_blueprint(debate_result: dict, intent_context: dict) -> Path:
             "category": winner.get("category", ""),
             "image_url": winner.get("image_url", ""),
             "human_tags": winner.get("human_tags", []),
+            "ingredients": winner.get("ingredients", []),
         }
         utility_breakdown = {
             "u_health": winner.get("u_health", 0.0),
@@ -394,6 +396,7 @@ def run_debate_pipeline(session_id: str = "default_session") -> dict:
             "category": winner.get("category", ""),
             "image_url": winner.get("image_url", ""),
             "human_tags": winner.get("human_tags", []),
+            "ingredients": winner.get("ingredients", []),
         }
         utility_breakdown = {
             "u_health": winner.get("u_health", 0.0),
