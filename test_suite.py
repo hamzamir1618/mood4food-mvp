@@ -106,7 +106,7 @@ def run_tests():
                 )
 
             blueprint = recalc_resp.json()
-            winner = blueprint.get("winning_dish", {})
+            winner = blueprint.get("winning_dish") or {}
             all_candidates = blueprint.get("all_candidate_scores", [])
 
             if not all_candidates:
