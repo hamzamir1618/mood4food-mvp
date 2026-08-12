@@ -130,7 +130,7 @@ async function submitQuery(queryText, customLoadingMsg) {
   try {
     rejectedIds = []; // Reset on new query
     const formData = new FormData();
-    formData.append('query', queryText || '');
+    formData.append('text', queryText || '');
     if (state.audioFile) formData.append('audio', state.audioFile);
     if (state.imageFile) formData.append('image', state.imageFile);
 
