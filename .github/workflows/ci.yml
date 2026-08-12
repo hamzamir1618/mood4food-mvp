@@ -123,6 +123,6 @@ jobs:
           NEO4J_USER: dummy
           NEO4J_PASSWORD: dummy
         run: |
-          python tests/mock_backend.py &
+          python -m tests.mock_backend &
           sleep 5
           pytest tests/test_frontend_e2e.py -v
