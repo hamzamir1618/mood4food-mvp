@@ -109,8 +109,10 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
                         "dish_id": record["dish_id"],
                         "name": record["name"],
                         "price_pkr": record["price_pkr"],
-                        "protein_g": record["protein_g"],
-                        "calories": record["calories"],
+                        "macros": {
+                            "protein_g": record["protein_g"],
+                            "calories": record["calories"],
+                        },
                         "category": record.get("category", ""),
                         "image_url": record.get("image_url", ""),
                         "human_tags": record.get("human_tags", []),

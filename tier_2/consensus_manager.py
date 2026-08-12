@@ -81,10 +81,7 @@ def score_candidate(
         taste_profile=TasteProfile(**candidate.get("taste_profile", {})),
         image_url=candidate.get("image_url", ""),
         human_tags=candidate.get("human_tags", []),
-        macros={
-            "protein_g": candidate.get("protein_g", 15.0),
-            "calories": candidate.get("calories", 500.0),
-        },
+        macros=candidate.get("macros", {}),
     )
 
     # ── Health utility ──
