@@ -22,8 +22,6 @@ class WeightUpdate(BaseModel):
     persona: Optional[str] = None
 
 
-
-
 @router.post("/recalculate", response_model=DecisionBlueprint)
 @limiter.limit("20/minute")
 def recalculate(request: Request, payload: WeightUpdate):
@@ -84,8 +82,9 @@ def recalculate(request: Request, payload: WeightUpdate):
 
     scored = []
     for cand in candidates:
-        protein = cand.get("protein_g", 15.0)
-        calories = cand.get("calories", 500.0)
+        macros = cand.get("macros", {})
+        protein = macros.get("protein_g", 15.0)
+        calories = macros.get("calories", 500.0)
         price = cand.get("price_pkr", 0.0)
 
         u_h = min(1.0, (protein / max(calories, 1)) / 0.05)
