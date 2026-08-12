@@ -13,8 +13,6 @@ UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 
-
-
 @router.post("/submit", response_model=DecisionBlueprint)
 @limiter.limit("20/minute")
 async def submit_query(
@@ -124,7 +122,10 @@ async def submit_query(
     # Enrich with fulfillment data (recipe + restaurants)
     blueprint = enrich_blueprint(blueprint)
 
-    log.info(
-        "─── /submit complete → winner: %s ───", blueprint.get("winning_dish", {}).get("name", "?")
-    )
+    winner_name = "?"
+    winning_dish = blueprint.get("winning_dish")
+    if winning_dish:
+        winner_name = winning_dish.get("name", "?")
+
+    log.info("─── /submit complete → winner: %s ───", winner_name)
     return blueprint

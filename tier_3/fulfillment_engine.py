@@ -330,13 +330,17 @@ def get_restaurant_provider() -> RestaurantProvider:
 
 def enrich_blueprint(blueprint: dict) -> dict:
     """Enriches a decision blueprint with fulfillment data (recipe + restaurants)."""
-    dish_name = blueprint.get("winning_dish", {}).get("name", "")
+    winning_dish = blueprint.get("winning_dish")
+    if not winning_dish:
+        return blueprint
+
+    dish_name = winning_dish.get("name", "")
     if not dish_name:
         return blueprint
 
     # Get ingredients from candidate scores if available
-    ingredients = blueprint.get("winning_dish", {}).get("ingredients", [])
-    price = blueprint.get("winning_dish", {}).get("price_pkr", 0)
+    ingredients = winning_dish.get("ingredients", [])
+    price = winning_dish.get("price_pkr", 0)
 
     provider = get_restaurant_provider()
 
