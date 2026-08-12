@@ -190,7 +190,8 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
     else:
         log.info("recipe generated (generic): %s", dish_name)
         if not ingredients:
-            raise ValueError(f"Cannot generate recipe for '{dish_name}': empty ingredient list")
+            log.warning("generating recipe with empty ingredient list for %s", dish_name)
+            ingredients = [dish_name]
         recipe = _generate_generic_recipe(dish_name, ingredients, price)
         recipe["source"] = "generated"
 

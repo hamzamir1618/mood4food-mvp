@@ -34,6 +34,7 @@ class Candidate(BaseModel):
     u_total: float = 0.0
     macros: Dict[str, Any] = Field(default_factory=dict)
     allergens: List[str] = Field(default_factory=list)
+    ingredients: List[str] = Field(default_factory=list)
 
 
 class CandidateEvaluation(BaseModel):

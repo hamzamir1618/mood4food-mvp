@@ -51,6 +51,8 @@ WHERE d.synthesized_calories <= 1000
     MATCH (d)-[:CONTAINS*1..5]->(i:Ingredient)
     WHERE toLower(i.name) IN $pruned_list
   }
+OPTIONAL MATCH (d)-[:CONTAINS]->(ing:Ingredient)
+WITH d, collect(ing.name) AS ingredients
 RETURN d.dish_id AS dish_id, d.name AS name,
        d.price_pkr AS price_pkr, d.protein_g AS protein_g,
        d.calories AS calories,
@@ -58,7 +60,8 @@ RETURN d.dish_id AS dish_id, d.name AS name,
        d.human_tags AS human_tags,
        d.taste_sweet AS taste_sweet, d.taste_salty AS taste_salty,
        d.taste_sour AS taste_sour, d.taste_bitter AS taste_bitter,
-       d.taste_umami AS taste_umami, d.taste_spice AS taste_spice
+       d.taste_umami AS taste_umami, d.taste_spice AS taste_spice,
+       ingredients
 """
 
 
@@ -119,6 +122,7 @@ def query_safe_candidates(allergens: list[str], budget_max: int) -> list[dict]:
                             "umami": record.get("taste_umami", 0.0) or 0.0,
                             "spice": record.get("taste_spice", 0.0) or 0.0,
                         },
+                        "ingredients": record.get("ingredients", []),
                     }
                 )
         log.info("neo4j returned %d safe candidates", len(candidates))
