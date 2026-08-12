@@ -40,7 +40,6 @@
                  aria-label="Describe what you want to eat">
           <button type="button" class="upload-btn" id="audio-btn" title="Attach audio">🎤</button>
           <button type="button" class="upload-btn" id="image-btn" title="Attach image">📷</button>
-          <input type="file" id="audio-file" accept=".wav,.mp3,.m4a,.flac,.ogg,.webm" hidden>
           <input type="file" id="image-file" accept=".jpg,.jpeg,.png,.webp" hidden>
           <button type="submit" class="query-submit" id="query-submit">
             Find Food
@@ -83,6 +82,12 @@
     </div>
   </div>
 
-  <script src="/static/app.js"></script>
+  <!-- ── Toasts & Global Loading ─────────────────────────────────────── -->
+  <div id="toast-container" class="toast-container"></div>
+  <div id="recalc-loading" class="recalc-loading" style="display:none;">
+    <div class="spinner"></div> Recalculating...
+  </div>
+
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>
