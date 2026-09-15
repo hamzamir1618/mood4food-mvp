@@ -19,7 +19,17 @@ TOP_N = 5
 WINNER_FIELDS = (
     "dish_id",
     "name",
+    "restaurant_name",
+    "restaurant_area",
+    "location_precision",
+    "restaurant_lat",
+    "restaurant_lng",
+    "distance_km",
     "price_pkr",
+    "price_status",
+    "serves_min",
+    "serves_max",
+    "serves_source",
     "category",
     "image_url",
     "is_rep_image",
@@ -29,9 +39,22 @@ WINNER_FIELDS = (
     "allergens",
     "macros",
     "reasons",
+    "summary",
     "confidence",
     "coverage",
 )
+# How a category reads in "Something different: an Afghan dish."
+CATEGORY_NAMES = {
+    "desi_traditional": "desi",
+    "afghan": "Afghan",
+    "middle_eastern": "Middle Eastern",
+    "chinese_asian": "Chinese or Asian",
+    "continental_upscale": "continental",
+    "fast_food": "fast food",
+    "pizza": "pizza",
+    "sandwich": "sandwich",
+    "cafe_bakery": "café",
+}
 UTILITIES = ("u_health", "u_budget", "u_taste", "u_context", "u_total")
 
 
@@ -85,12 +108,13 @@ def shortlist(ranked: list[dict]) -> list[dict]:
     )
     if stretch is None:
         return ranked[:TOP_N]
-    kind = (stretch.get("category") or "different").replace("_", " ")
-    article = "an" if kind[0] in "aeiou" else "a"
-    reasons = {
-        **stretch.get("reasons", {}),
-        "exploration": f"Something different: {article} {kind} dish.",
-    }
+    kind = CATEGORY_NAMES.get(stretch.get("category") or "")
+    if kind:
+        article = "an" if kind[0].lower() in "aeiou" else "a"
+        note = f"Something different: {article} {kind} dish."
+    else:
+        note = "Something different to try."
+    reasons = {**stretch.get("reasons", {}), "exploration": note}
     return [*ranked[: TOP_N - 1], {**stretch, "exploration": True, "reasons": reasons}]
 
 

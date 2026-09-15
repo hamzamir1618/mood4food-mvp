@@ -125,6 +125,20 @@ def case(cid, query, intent, expect=(), persona="balanced", goal=None):
 
 
 CASES = [
+    # Written as the intent extractor really returned it: the dish came back only in the
+    # craving, with the food group "chicken" as the category.
+    case(
+        "karahi",
+        "spicy chicken karahi under 1500",
+        {
+            "budget_max_pkr": 1500.0,
+            "mood_vector": {"spice": 1.0},
+            "craving": "spicy chicken karahi",
+            "preferred_category": "chicken",
+            "preferred_category_raw_phrase": "chicken",
+        },
+        [name_has("karahi"), taste_at_least("spice", 0.5)],
+    ),
     case(
         "sweet",
         "something sweet",

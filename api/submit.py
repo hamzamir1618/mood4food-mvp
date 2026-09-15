@@ -2,7 +2,9 @@ import logging
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from pydantic import ValidationError
 
+from api.location import Location
 from api.rate_limit import limiter
 from tier_1.contracts.schemas import DecisionBlueprint
 
@@ -20,11 +22,15 @@ async def submit_query(
     text: str = Form(default=""),
     audio: UploadFile | None = File(default=None),
     image: UploadFile | None = File(default=None),
+    lat: float | None = Form(default=None),
+    lng: float | None = Form(default=None),
+    location_label: str | None = Form(default=None),
 ):
     """
     Accepts a natural language food query (text), or an audio or image file upload,
     and returns one recommendation from the full pipeline (api/pipeline.py). For a
-    conversation that can ask a question or be refined, use /chat.
+    conversation that can ask a question or be refined, use /chat. An optional location
+    (lat, lng, and a label to show) adds a straight-line distance to each dish.
     """
     from api.pipeline import recommend
     from config import settings
@@ -42,6 +48,15 @@ async def submit_query(
 
     if len(text) > 500:
         raise HTTPException(400, "Text query exceeds 500 characters.")
+
+    location = None
+    if (lat is None) != (lng is None):
+        raise HTTPException(400, "Send both lat and lng, or neither.")
+    if lat is not None:
+        try:
+            location = Location(lat=lat, lng=lng, label=location_label or None).model_dump()
+        except ValidationError as exc:
+            raise HTTPException(422, f"Invalid location: {exc.errors()[0]['msg']}")
 
     audio_path = None
     image_path = None
@@ -78,4 +93,4 @@ async def submit_query(
         audio.filename if has_audio else "(none)",
         image.filename if has_image else "(none)",
     )
-    return recommend(request, text or None, audio_path, image_path)
+    return recommend(request, text or None, audio_path, image_path, location=location)

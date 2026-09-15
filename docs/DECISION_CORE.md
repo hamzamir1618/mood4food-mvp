@@ -22,6 +22,7 @@ Each of these forced a result instead of explaining one:
 **A requested category, dish or food group** (`requested_match`):
 - A cuisine request (afghan, chinese, desi, fast food and the other categories) matches the dish's category only. An "Afghan Burger" at a burger shop is not Afghan food.
 - A dish request ("biryani", "salad") matches dish names.
+- A dish the query names narrows the pool to dishes with that name (`narrow_to_named_dish`), even when the extractor filed the request under something broader. "Spicy chicken karahi" came back as the food group "chicken", and a Thai dumpling bowl won. Negated dishes ("anything but pizza") don't count. When no dish has the name, the pool is left as it was and the relaxation says so.
 - A food group or ingredient request matches dishes containing it: "seafood" means fish, prawns, crab, lobster or squid, and "chicken" means chicken.
 - An allergen group ("dairy") matches by allergen.
 - If fewer than 3 dishes match, the request is relaxed as before, and the notice says so.
@@ -88,7 +89,9 @@ The goal comes from the profile, or from the persona: Gym Bro means muscle gain,
 | Light | 60% calories (full at 400 kcal or less, 0 at 800), 40% share of energy from fat (full at 30% or less) |
 | Balanced | 80% how close protein, carbohydrate and fat are to the Acceptable Macronutrient Distribution Ranges (10–35%, 45–65%, 20–35% of energy), 20% a 300–900 kcal serving |
 
-- **Estimates are labelled.** Every sentence starts "Estimated…", because all nutrition here is estimated.
+- **Estimates are worded as estimates.** Every sentence says "About…", because all nutrition here is estimated, and the app says so beside the numbers.
+- **The main problem is named.** In the balanced goal, a macro over its range is named before one under it. A karahi with 70% of its energy from fat and 3% from carbs is "heavy on fat", not "light on carbs" (which it said before, from a tie).
+- **A Double for one counts in full.** One person ordering a Double eats both servings (the owner's rule), so health scores the calories and macros of both, and says so. For a party of two or more, each person eats one. Other dishes that serve several are shared, one serving each.
 - **Implausible estimates count half.** A dish whose estimate failed the Phase 1 plausibility check has its health confidence halved.
 
 ### Context
@@ -141,7 +144,17 @@ The blueprint's `top_candidates` is the best five, with one exception. The fifth
 
 ## Explanations
 
-The traces keep the shape the current frontend reads: the winner's "Candidate Breakdown" line, then Health, Budget and Taste lines. Context, coverage and novelty lines follow them. The winning dish and every runner-up also carry a `reasons` map and a per-term `confidence`, ready for the Phase 6 "why this" panel.
+The traces keep the shape the current frontend reads: the winner's "Candidate Breakdown" line, then Health, Budget and Taste lines. Context, coverage and novelty lines follow them. The winning dish and every runner-up also carry a `reasons` map and a per-term `confidence`, for the "How it scored" screen.
+
+Each dish also carries a `summary`: its reasons in one short paragraph, for the recommendation screen.
+- It names up to two points in the dish's favour: terms scoring at least 0.7, the two that count most, told in the order taste, budget, health.
+- Then its most serious caveat: the weakest term below 0.5.
+- A term is mentioned only when its confidence is at least 0.5, so the summary never repeats a guess.
+- For the karahi: "It's properly spicy, as you asked, and comes in Rs 100 under your limit. It's also rich, at around 890 kcal and mostly fat."
+
+The sentences read as plain speech: no semicolons, and no chains of colons.
+
+Each dish also carries its restaurant (`restaurant_name`, `restaurant_area`, `location_precision`) and, when the request sent a location, `distance_km`. See `PHASE1_DATA_DECISIONS.md` (Locations).
 
 ## Golden set
 

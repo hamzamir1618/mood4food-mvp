@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field, model_validator
 
+from api.location import Location
 from api.rate_limit import limiter
 from dialogue.critiques import CRITIQUES
 
@@ -19,12 +20,14 @@ class Answer(BaseModel):
 
 
 class ChatTurn(BaseModel):
-    """One turn: exactly one of text, answer, critique or skip."""
+    """One turn: exactly one of text, answer, critique or skip, and optionally a location."""
 
     text: Optional[str] = Field(default=None, min_length=1, max_length=500)
     answer: Optional[Answer] = None
     critique: Optional[str] = None
     skip: bool = False
+    # Kept with the session; distances are measured from it from the next new request.
+    location: Optional[Location] = None
 
     @model_validator(mode="after")
     def exactly_one(self) -> "ChatTurn":

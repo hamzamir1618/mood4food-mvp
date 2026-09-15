@@ -35,6 +35,7 @@ TASTE_SOURCE_CONFIDENCE = {
     "original": 1.0,
     "keyword": 0.8,
     "neutral": 0.8,
+    "name_rule": 0.8,  # the spice level corrected from the dish's name (pipeline)
     "category_prior": 0.5,
     "restaurant_average": 0.4,
     "global_prior": 0.25,
@@ -62,6 +63,11 @@ NOVELTY_WITHIN_3_DAYS = 0.8
 NOVELTY_WITHIN_7_DAYS = 0.9
 PEER_PULL = 0.15  # similar users' approvals close up to 15% of the gap to a perfect score
 PEER_SATURATION = 3  # ...fully once three of them approved the dish
+DOUBLE_SERVINGS = 2  # a "Double" is two servings (the owner's rule)
+SUMMARY_GOOD = 0.7  # a term at least this strong is a point in the dish's favour
+SUMMARY_CAVEAT = 0.5  # ...and one below this is its caveat
+SUMMARY_MIN_CONFIDENCE = 0.5  # the summary only repeats what the data can support
+SUMMARY_ORDER = ("taste", "budget", "health")
 
 PERSONA_GOALS = {"gym_bro": "muscle_gain", "health_nut": "light"}
 MEALS = ("breakfast", "brunch", "lunch", "dinner")
@@ -74,6 +80,7 @@ TASTE_WORDS = {
     "umami": "savoury",
     "spice": "spicy",
 }
+TASTE_ADVERB = {"strongly": "properly", "fairly": "fairly", "mildly": "only mildly"}
 
 
 @dataclass(frozen=True)
@@ -82,6 +89,7 @@ class Term:
     confidence: float
     sentence: str
     applies: bool = True  # False when the user has no preference this term could judge
+    phrase: str = ""  # the point as a verb phrase for the summary: "is properly spicy"
 
 
 @dataclass
@@ -166,7 +174,12 @@ def taste_term(dish: dict, prefs: Preferences) -> Term:
         asked = sorted(prefs.craved, key=prefs.craved.get, reverse=True)[:2]
         wanted = " and ".join(TASTE_WORDS[d] for d in asked)
         found = " and ".join(f"{_level(x[d])} {TASTE_WORDS[d]}" for d in asked)
-        sentence = f"You asked for {wanted}; this is {found}."
+        sentence = f"You asked for {wanted}, and this is {found}."
+        plain = " and ".join(
+            f"{TASTE_ADVERB.get(_level(x[d]), 'barely')} {TASTE_WORDS[d]}" for d in asked
+        )
+        matched = all(_level(x[d]) in ("strongly", "fairly") for d in asked)
+        phrase = f"is {plain}, as you asked" if matched else f"is {plain}, though you asked for it"
     else:
         fit = "close to" if utility >= 0.8 else "partly like" if utility >= 0.6 else "not much like"
         usual = (
@@ -175,11 +188,12 @@ def taste_term(dish: dict, prefs: Preferences) -> Term:
             else "your usual taste"
         )
         sentence = f"Its flavour is {fit} {usual}."
+        phrase = f"is {fit} your usual taste"
     confidence = TASTE_SOURCE_CONFIDENCE.get(dish.get("taste_source") or "", 0.5)
     confidence *= _review_factor(dish)
     if confidence < 0.6:
         sentence += " Its flavour is estimated from similar dishes."
-    return Term(utility, confidence, sentence)
+    return Term(utility, confidence, sentence, phrase=phrase)
 
 
 def _serves(dish: dict) -> float:
@@ -216,6 +230,7 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
         else:
             verdict = f"cheaper than {utility:.0%} of the options"
         sentence = f"{_rs(price)}{each}, {verdict}."
+        phrase = f"is {verdict}"
     elif not (ceiling or usual):
         # No budget: anything up to a typical option's price is fine, so cheap sides
         # gain nothing; only dearer dishes lose, reaching 0 at the dearest 5%.
@@ -223,9 +238,11 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
         dear = pool[int(0.95 * (len(pool) - 1))]
         if cost <= typical:
             utility, verdict = 1.0, f"no more than a typical option here ({_rs(typical)})"
+            phrase = "is no pricier than a typical option here"
         else:
             utility = _clamp(1.0 - (cost - typical) / max(dear - typical, typical))
             verdict = f"pricier than a typical option here ({_rs(typical)})"
+            phrase = "is pricier than a typical option here"
         confidence *= NO_BUDGET_CONFIDENCE
         sentence = f"{_rs(price)}{each}, {verdict}. No budget was given, so price counts little."
     else:
@@ -234,44 +251,62 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
             if ceiling:
                 high = min(high, ceiling)
             band = f"the Rs {low:,.0f}–{high:,.0f} you usually spend"
+            short = "what you usually spend"
         else:
             low, high = LIMIT_BAND[0] * ceiling, ceiling
             band = f"your {_rs(ceiling)} limit"
+            short = "your limit"
         if cost > high:
             utility, verdict = _clamp(1.0 - (cost - high) / high), f"above {band}"
+            phrase = f"costs {_rs(cost - high)} more than {short}"
         elif cost < low:
             utility = CHEAP_FLOOR + (1.0 - CHEAP_FLOOR) * cost / low
             verdict = f"well under {band}"
+            phrase = f"is well under {short}"
         else:
             utility, verdict = 1.0, f"within {band}"
+            spare = high - cost
+            phrase = f"comes in {_rs(spare)} under {short}" if spare >= 50 else f"fits {short}"
         sentence = f"{_rs(price)}{each}, {verdict}."
     if status == "unverified":
         sentence += " The price couldn't be checked against the menu."
-    return Term(utility, confidence, sentence)
+    return Term(utility, confidence, sentence, phrase=phrase)
 
 
-def health_term(dish: dict, goal: str) -> Term:
+def portions(dish: dict, party_size: int) -> float:
+    """
+    Servings one person eats. One person ordering a Double eats both servings (the
+    owner's rule), so a Double ordered for fewer people than it serves counts in full.
+    Other dishes that serve several are shared, and each person eats one serving.
+    """
+    if dish.get("serves_source") != "double":
+        return 1.0
+    return max(1.0, DOUBLE_SERVINGS / max(1, party_size))
+
+
+def health_term(dish: dict, goal: str, servings: float = 1.0) -> Term:
     macros = dish.get("macros") or {}
     kcal, protein = macros.get("calories"), macros.get("protein_g")
     if not kcal or kcal <= 0 or protein is None:
         return Term(0.0, 0.0, "No nutrition estimate for this dish, so health didn't count.")
     carbs, fat = macros.get("carbs_g") or 0.0, macros.get("fat_g") or 0.0
+    kcal, protein, carbs, fat = (v * servings for v in (kcal, protein, carbs, fat))
     density = 100 * protein / kcal
     shares = {"protein": 4 * protein / kcal, "carbs": 4 * carbs / kcal, "fat": 9 * fat / kcal}
+    around = f"around {kcal:,.0f} kcal"
 
     if goal == "muscle_gain":
         protein_fit = _clamp(density / PROTEIN_TARGET["muscle_gain"])
         utility = 0.75 * protein_fit + 0.25 * _range_score(kcal, 400, 900, 400)
-        verdict = (
-            "strong for muscle gain"
-            if protein_fit >= 0.8
-            else "some protein, not a lot"
-            if protein_fit >= 0.5
-            else "low in protein for muscle gain"
-        )
+        if protein_fit >= 0.8:
+            verdict, phrase = "Strong for muscle gain.", f"is high in protein, {protein:.0f} g"
+        elif protein_fit >= 0.5:
+            verdict, phrase = "Some protein, but not a lot.", f"has some protein, {protein:.0f} g"
+        else:
+            verdict, phrase = "Low in protein for muscle gain.", "is low in protein for you"
         sentence = (
-            f"Estimated {protein:.0f} g protein in {kcal:.0f} kcal "
-            f"({density:.1f} g per 100 kcal): {verdict}."
+            f"About {protein:.0f} g of protein in {kcal:,.0f} kcal "
+            f"({density:.1f} g per 100 kcal). {verdict}"
         )
     elif goal == "weight_loss":
         calorie_fit = 1.0 if kcal <= 450 else _clamp(1.0 - (kcal - 450) / 450)
@@ -283,7 +318,10 @@ def health_term(dish: dict, goal: str) -> Term:
             if utility >= 0.5
             else "heavy for weight loss"
         )
-        sentence = f"Estimated {kcal:.0f} kcal with {protein:.0f} g protein: {verdict}."
+        sentence = (
+            f"About {kcal:,.0f} kcal with {protein:.0f} g of protein. {verdict.capitalize()}."
+        )
+        phrase = f"is {verdict}, at {around}"
     elif goal == "light":
         calorie_fit = 1.0 if kcal <= 400 else _clamp(1.0 - (kcal - 400) / 400)
         fat_fit = _range_score(shares["fat"], 0.0, 0.30, 0.30)
@@ -295,26 +333,41 @@ def health_term(dish: dict, goal: str) -> Term:
             if utility >= 0.5
             else "on the heavy side"
         )
-        sentence = f"Estimated {kcal:.0f} kcal, {shares['fat']:.0%} of it from fat: {verdict}."
+        fat_share = f"{shares['fat']:.0%} of it from fat"
+        sentence = f"About {kcal:,.0f} kcal, {fat_share}. {verdict.capitalize()}."
+        phrase = f"is {verdict}, at {around}"
     else:  # balanced
         fits = {m: _range_score(shares[m], lo, hi, 0.20) for m, (lo, hi) in AMDR.items()}
         utility = 0.8 * sum(fits.values()) / 3 + 0.2 * _range_score(kcal, 300, 900, 400)
-        worst = min(fits, key=fits.get)
-        if fits[worst] >= 0.8:
-            verdict = "a balanced split"
-        elif shares[worst] > AMDR[worst][1]:
-            verdict = f"heavy on {worst}"
+        misses = [m for m in fits if fits[m] < 0.8]
+        # A macro over its range explains an unbalanced split better than one under it:
+        # a karahi is heavy on fat, not light on carbs.
+        over = [m for m in misses if shares[m] > AMDR[m][1]]
+        if not misses:
+            verdict, phrase = "A balanced split.", f"is a balanced meal, at {around}"
+        elif over:
+            worst = min(over, key=fits.get)
+            verdict = f"Heavy on {worst}."
+            if worst == "fat" and shares["fat"] > 0.5:
+                phrase = f"is rich, at {around} and mostly fat"
+            else:
+                phrase = f"is heavy on {worst}, at {around}"
         else:
-            verdict = f"light on {worst}"
-        sentence = (
-            f"Estimated {kcal:.0f} kcal: {shares['protein']:.0%} protein, "
-            f"{shares['carbs']:.0%} carbs, {shares['fat']:.0%} fat, {verdict}."
+            worst = min(misses, key=fits.get)
+            verdict, phrase = f"Light on {worst}.", f"is light on {worst}"
+        big, mid, small = sorted(shares, key=shares.get, reverse=True)
+        split = (
+            f"{shares[big]:.0%} of it from {big}, {shares[mid]:.0%} from {mid} "
+            f"and {shares[small]:.0%} from {small}"
         )
+        sentence = f"About {kcal:,.0f} kcal, with {split}. {verdict}"
 
+    if servings > 1:
+        sentence += " That counts both servings, because a Double for one is eaten by one."
     confidence = NUTRITION_CONFIDENCE.get(dish.get("nutrition_confidence") or "", 0.0)
     if dish.get("nutrition_flag"):
         confidence *= IMPLAUSIBLE_NUTRITION_FACTOR
-    return Term(_clamp(utility), confidence * _review_factor(dish), sentence)
+    return Term(_clamp(utility), confidence * _review_factor(dish), sentence, phrase=phrase)
 
 
 def context_term(dish: dict, prefs: Preferences) -> Term:
@@ -376,9 +429,45 @@ def _utility(term: Term) -> float | None:
     return round(term.utility, 6) if term.applies and term.confidence > 0 else None
 
 
+def _it(fragment: str, also: bool = False) -> str:
+    """ "is rich" -> "It's rich.", "comes in Rs 100 under" -> "It comes in Rs 100 under." """
+    extra = "also " if also else ""
+    if fragment.startswith("is "):
+        return f"It's {extra}{fragment[3:]}."
+    return f"It {extra}{fragment}."
+
+
+def summary(terms: dict[str, Term], weights: dict[str, float]) -> str:
+    """
+    The reasons in one short paragraph for the recommendation screen: up to two points in
+    the dish's favour, the two that count most, then its most serious caveat. A term is
+    mentioned only when its data can be trusted. The full sentences stay in `reasons`.
+    """
+    said = {
+        k: t
+        for k, t in terms.items()
+        if k in SUMMARY_ORDER and t.applies and t.phrase and t.confidence >= SUMMARY_MIN_CONFIDENCE
+    }
+    good = [k for k, t in said.items() if t.utility >= SUMMARY_GOOD]
+    good = sorted(good, key=lambda k: weights.get(k, 0.0) * said[k].utility, reverse=True)[:2]
+    good = [k for k in SUMMARY_ORDER if k in good]
+    weak = [k for k, t in said.items() if t.utility < SUMMARY_CAVEAT]
+    caveat = min(weak, key=lambda k: said[k].utility) if weak else None
+
+    parts = []
+    if good:
+        parts.append(_it(", and ".join(said[k].phrase for k in good)))
+    if caveat and good:
+        parts.append(_it(said[caveat].phrase, also=True))
+    elif caveat:
+        plain = _it(said[caveat].phrase)
+        parts.append(f"It's the closest fit here, but {plain[0].lower()}{plain[1:]}")
+    return " ".join(parts)
+
+
 def score_dish(dish: dict, prefs: Preferences) -> dict:
     terms = {
-        "health": health_term(dish, prefs.goal),
+        "health": health_term(dish, prefs.goal, portions(dish, prefs.party_size)),
         "budget": budget_term(dish, prefs),
         "taste": taste_term(dish, prefs),
         "context": context_term(dish, prefs),
@@ -424,7 +513,17 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
     return {
         "dish_id": dish.get("dish_id", "unknown"),
         "name": dish.get("name", "unnamed"),
+        "restaurant_name": dish.get("restaurant_name"),
+        "restaurant_area": dish.get("restaurant_area"),
+        "location_precision": dish.get("location_precision"),
+        "restaurant_lat": dish.get("restaurant_lat"),
+        "restaurant_lng": dish.get("restaurant_lng"),
+        "distance_km": dish.get("distance_km"),
         "price_pkr": float(dish.get("price_pkr") or 0.0),
+        "price_status": dish.get("price_status"),
+        "serves_min": dish.get("serves_min"),
+        "serves_max": dish.get("serves_max"),
+        "serves_source": dish.get("serves_source"),
         "category": dish.get("category", ""),
         "image_url": dish.get("image_url", ""),
         "is_rep_image": dish.get("is_rep_image", False),
@@ -443,6 +542,7 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "novelty": factor,
         "peers": peers,
         "reasons": reasons,
+        "summary": summary(terms, weights),
     }
 
 

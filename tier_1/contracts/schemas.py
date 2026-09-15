@@ -37,9 +37,15 @@ class Candidate(BaseModel):
     # Provenance the decision core weighs (tier_2/scoring.py). Candidates pass through
     # the session store as this model, so a field missing here never reaches scoring.
     restaurant_name: Optional[str] = None
+    restaurant_area: Optional[str] = None  # "F-7", "Blue Area"; None when not known
+    location_precision: Optional[str] = None  # place, area (the sector's centre) or unknown
+    restaurant_lat: Optional[float] = None
+    restaurant_lng: Optional[float] = None
+    distance_km: Optional[float] = None  # straight line from the user's location, if sent
     price_status: Optional[str] = None
     serves_min: Optional[int] = None
     serves_max: Optional[int] = None
+    serves_source: Optional[str] = None
     nutrition_confidence: Optional[str] = None
     nutrition_flag: Optional[str] = None
     review_status: Optional[str] = None
@@ -56,6 +62,7 @@ class Candidate(BaseModel):
     peers: int = 0  # users with a similar taste who approved this recently
     exploration: bool = False  # the shortlist's deliberate "something different"
     reasons: Dict[str, str] = Field(default_factory=dict)
+    summary: str = ""  # the reasons in one short paragraph (tier_2/scoring.py summary)
     macros: Dict[str, Any] = Field(default_factory=dict)
     allergens: Optional[List[str]] = Field(default_factory=list)  # None: not known
     ingredients: List[str] = Field(default_factory=list)

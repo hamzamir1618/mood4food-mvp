@@ -6,6 +6,7 @@ candidate_evaluation.json with the surviving safe dish nodes.
 
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -76,9 +77,11 @@ WHERE (d.price_rs IS NULL OR d.price_rs <= $budget_max)
 // dish_uid is stable across re-seeds; the internal id is only a fallback for old graphs.
 RETURN coalesce(d.dish_uid, elementId(d)) AS dish_id, d.name AS name,
        d.restaurant_name AS restaurant_name, d.category AS category,
+       d.restaurant_area AS restaurant_area, d.location_precision AS location_precision,
+       d.restaurant_lat AS restaurant_lat, d.restaurant_lng AS restaurant_lng,
        d.ingredients AS ingredients, d.allergens AS allergens,
        d.price_rs AS price_pkr, d.price_status AS price_status,
-       d.serves_min AS serves_min, d.serves_max AS serves_max,
+       d.serves_min AS serves_min, d.serves_max AS serves_max, d.serves_source AS serves_source,
        d.calories AS calories, d.protein_g AS protein_g,
        d.carbs_g AS carbs_g, d.fat_g AS fat_g,
        d.nutrition_confidence AS nutrition_confidence, d.nutrition_flag AS nutrition_flag,
@@ -139,6 +142,84 @@ EXCLUSION_ALLERGENS = {
     "prawns": "shellfish",
     "shrimp": "shellfish",
 }
+
+
+# Dishes a query can name, with their common spellings. A named dish narrows the pool to
+# dishes with that name even when the extractor filed the request under something broader:
+# "spicy chicken karahi" came back as the food group "chicken", and a Thai dumpling bowl won.
+DISH_NAMES = {
+    "karahi": ("karahi", "karahai", "kadai"),
+    "biryani": ("biryani", "biriyani"),
+    "pulao": ("pulao", "pilaf"),
+    "nihari": ("nihari",),
+    "haleem": ("haleem",),
+    "handi": ("handi",),
+    "korma": ("korma", "qorma"),
+    "qeema": ("qeema", "keema"),
+    "daal": ("daal", "dal"),
+    "paye": ("paye", "paya"),
+    "sajji": ("sajji",),
+    "tikka": ("tikka",),
+    "kebab": ("kebab", "kabab", "kebap"),
+    "shawarma": ("shawarma",),
+    "paratha": ("paratha",),
+    "burger": ("burger",),
+    "pizza": ("pizza",),
+    "pasta": ("pasta",),
+    "sandwich": ("sandwich",),
+    "wrap": ("wrap",),
+    "wings": ("wings",),
+    "steak": ("steak",),
+    "sushi": ("sushi",),
+    "ramen": ("ramen",),
+    "chow mein": ("chow mein", "chowmein"),
+    "fried rice": ("fried rice",),
+    "dumpling": ("dumpling", "momo", "momos"),
+    "soup": ("soup",),
+    "salad": ("salad",),
+}
+# "anything but pizza", "no more burgers", "don't want biryani": the dish is not wanted.
+_NEGATED = (
+    r"(?:\bno|\bnot|\bwithout|\bexcept|\bbut|\bavoid|\bskip|\bdon'?t\s+want|\binstead\s+of)"
+    r"\s+(?:(?:a|an|the|any|some|more)\s+)?"
+)
+
+
+def named_dishes(intent: dict) -> list[str]:
+    """Dishes the query names and doesn't negate, from the text and the extracted fields."""
+    text = " ".join(
+        str(intent.get(k) or "") for k in ("raw_input", "craving", "preferred_category")
+    ).lower()
+    found = []
+    for dish, spellings in DISH_NAMES.items():
+        for s in spellings:
+            word = re.escape(s)
+            if re.search(rf"\b{word}s?\b", text) and not re.search(rf"{_NEGATED}{word}s?\b", text):
+                found.append(dish)
+                break
+    return found
+
+
+def narrow_to_named_dish(candidates: list[dict], intent: dict) -> tuple[list[dict], dict | None]:
+    """
+    The candidates whose name has a dish the query names. When none has it, the pool is
+    left as it was and the relaxation says so, rather than returning nothing.
+    """
+    named = named_dishes(intent)
+    if not named or not candidates:
+        return candidates, None
+    spellings = [re.escape(s) for d in named for s in DISH_NAMES[d]]
+    pattern = re.compile(rf"\b(?:{'|'.join(spellings)})", re.I)
+    kept = [c for c in candidates if pattern.search(c.get("name") or "")]
+    if kept:
+        return kept, None
+    relaxation = {
+        "constraint": "named_dish",
+        "old_value": ", ".join(named),
+        "new_value": None,
+        "reason": "no_dish_with_that_name",
+    }
+    return candidates, relaxation
 
 
 def requested_match(term: str | None) -> dict:
@@ -234,8 +315,8 @@ def query_safe_candidates(
             "chinese_asian": "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80",
             "desi_traditional": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80",
             "afghan": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80",
-            "continental_upscale": "https://images.unsplash.com/photo-1544025162-8315ea07525b?auto=format&fit=crop&w=800&q=80",
-            "middle_eastern": "https://images.unsplash.com/photo-1628198759560-6c97a5522731?auto=format&fit=crop&w=800&q=80",
+            "continental_upscale": "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=800&q=80",
+            "middle_eastern": "https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=800&q=80",
             "fast_food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
             "cafe_bakery": "https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=800&q=80",
             "pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80",
@@ -287,9 +368,15 @@ def query_safe_candidates(
             ): "https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?auto=format&fit=crop&w=800&q=80",
             ("burger", "cheeseburger", "hamburger"): CATEGORY_REP_IMAGES["fast_food"],
             ("pizza",): CATEGORY_REP_IMAGES["pizza"],
-            ("karahi", "masala", "handi", "makhni", "tikka", "boti", "kebab"): CATEGORY_REP_IMAGES[
-                "desi_traditional"
-            ],
+            ("karahi", "masala", "handi", "makhni"): CATEGORY_REP_IMAGES["desi_traditional"],
+            (
+                "kebab",
+                "kabab",
+                "seekh",
+                "tikka",
+                "boti",
+                "skewer",
+            ): "https://images.unsplash.com/photo-1603360946369-dc9bb6258143?auto=format&fit=crop&w=800&q=80",
             (
                 "juice",
                 "lemonade",
@@ -331,6 +418,7 @@ def query_safe_candidates(
             for record in result:
                 cat = record.get("category", "")
                 db_img = record.get("image_url")
+                located = record.get("location_precision") in ("place", "area")
 
                 if not db_img:
                     dish_name = record["name"].lower()
@@ -351,10 +439,17 @@ def query_safe_candidates(
                         "dish_id": record["dish_id"],
                         "name": record["name"],
                         "restaurant_name": record.get("restaurant_name"),
+                        "restaurant_area": record.get("restaurant_area"),
+                        "location_precision": record.get("location_precision"),
+                        # Unknown coordinates (missing, or geocoded outside the city) are
+                        # never used for a distance.
+                        "restaurant_lat": record.get("restaurant_lat") if located else None,
+                        "restaurant_lng": record.get("restaurant_lng") if located else None,
                         "price_pkr": float(record["price_pkr"] or 0),
                         "price_status": record.get("price_status"),
                         "serves_min": record.get("serves_min"),
                         "serves_max": record.get("serves_max"),
+                        "serves_source": record.get("serves_source"),
                         # None stays None: a missing estimate is unknown, never zero.
                         "macros": {
                             "calories": _float_or_none(record.get("calories")),
@@ -639,6 +734,17 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
         candidates = query_safe_candidates(
             allergens, budget, preferred_category, is_vegan, is_vegetarian, is_halal=is_halal
         )
+
+    # A dish the query names ("karahi", "biryani") narrows the pool to dishes with that name
+    before = len(candidates)
+    candidates, named_relaxation = narrow_to_named_dish(candidates, intent)
+    if named_relaxation:
+        log.warning(
+            "no dish named %s fits, so the name isn't required", named_relaxation["old_value"]
+        )
+        relaxations.append(named_relaxation)
+    elif len(candidates) < before:
+        log.info("the named dish narrowed the candidates from %d to %d", before, len(candidates))
 
     # Second constraint: Minimum Relevance Filter for Dominant Moods
     mood_vector = intent.get("mood_vector", {})

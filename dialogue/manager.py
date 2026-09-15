@@ -22,6 +22,10 @@ SKIP_LABEL = "Just pick for me"
 def handle(request: Request, turn) -> dict:
     session_id = request.state.session_id
     conversation = state.load(session_id)
+    if getattr(turn, "location", None) is not None:
+        from api.location import save_location
+
+        save_location(session_id, turn.location.model_dump())
 
     if turn.text is not None:
         text = turn.text.strip()

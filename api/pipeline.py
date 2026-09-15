@@ -16,12 +16,17 @@ def recommend(
     text: str | None = None,
     audio_path: str | None = None,
     image_path: str | None = None,
+    location: dict | None = None,
 ) -> dict:
-    """Runs the whole pipeline for one query and returns the enriched blueprint."""
+    """
+    Runs the whole pipeline for one query and returns the enriched blueprint. A location
+    ({lat, lng, label}) is kept with the session; without one, the session's last is used.
+    """
     from accounts import events, learning
     from accounts.constraints import apply_dietary_profile
     from accounts.deps import current_user_id
     from accounts.store import get_profile, list_events
+    from api.location import load_location, save_location, with_distances
     from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.persona_manager import DEFAULT_PERSONA
@@ -80,13 +85,20 @@ def recommend(
         save_contract(session_id, "grounded_intent", intent)
         save_contract(session_id, "scoring_context", context)
         save_contract(session_id, "approved", [])  # approvals belong to one recommendation
+        if location is not None:
+            save_location(session_id, location)
+        else:
+            location = load_location(session_id)
     except Exception as exc:
         log.error("Tier 1a failed: %s", exc)
         raise HTTPException(500, f"Intent parsing failed: {exc}")
 
-    # Stage 2: Neo4j hard constraints
+    # Stage 2: Neo4j hard constraints, then each dish's distance from the user
     try:
         evaluation = run_anchoring_pipeline(intent)
+        if hasattr(evaluation, "model_dump"):
+            evaluation = evaluation.model_dump()
+        with_distances(evaluation.get("safe_candidates") or [], location)
         save_contract(session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)

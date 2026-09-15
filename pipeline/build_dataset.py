@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from statistics import median
 
 from pipeline import paths, prices, servings
+from pipeline.areas import restaurant_locations
 from pipeline.classify_categories import PROMPT_VERSION, load_cache
 from pipeline.ingredients import (
     SPELLING_TO_NAMES,
@@ -60,6 +61,8 @@ COLUMNS = [
     "restaurant_address",
     "restaurant_lat",
     "restaurant_lng",
+    "restaurant_area",
+    "location_precision",
     "dish_name",
     "raw_dish_name",
     "name_status",
@@ -100,6 +103,34 @@ COLUMNS = [
     "quarantined",
     "quarantine_reason",
 ]
+
+# Names that state the spice level outright. The source's taste values sometimes contradict
+# them ("Chicken Pepperoni (Non Spicy)" at 0.8), and the name is the better evidence. A
+# karahi is cooked with green chilli, so an unspiced one is a data error, except a Shinwari
+# karahi, which is traditionally made with salt and tomato. "Hot" is left out: a hot gulab
+# jamun is served hot, not spiced.
+MILD_NAME = re.compile(r"\b(non[- ]?spicy|not spicy|no spice|mild)\b", re.I)
+SPICED_NAME = re.compile(
+    r"\b(spicy|chilli|chili|mirchi|jalapeno|jalapeño|peri[- ]?peri|sriracha|szechuan|"
+    r"sichuan|schezwan)\b",
+    re.I,
+)
+KARAHI_NAME = re.compile(r"\bkarahi\b", re.I)
+SHINWARI_NAME = re.compile(r"\bshinwari\b", re.I)
+MILD_SPICE_CAP = 0.1
+SPICED_FLOOR = 0.5
+
+
+def spice_from_name(name: str, spice) -> float | None:
+    """A corrected spice value when the dish's name contradicts the recorded one, else None."""
+    value = float(spice or 0)
+    if MILD_NAME.search(name):
+        return MILD_SPICE_CAP if value > MILD_SPICE_CAP else None
+    spiced = SPICED_NAME.search(name) or (
+        KARAHI_NAME.search(name) and not SHINWARI_NAME.search(name)
+    )
+    return SPICED_FLOOR if spiced and value < SPICED_FLOOR else None
+
 
 PLATTER_SHEETS = ("Platters & combos", "Half & full (optional)")
 KEY_COL = "Dish key (don't edit)"
@@ -261,6 +292,7 @@ def build() -> tuple[list[dict], dict]:
     medians = prices.restaurant_medians(rows)
     typical_price = servings.typical_single_prices(rows)
     menu = menu_index(rows, master)
+    places = restaurant_locations(rows)
 
     # Taste: the existing seed-time enrichment, run on copies so it cannot alter anything else.
     taste_rows = [dict(r) for r in rows]
@@ -385,6 +417,13 @@ def build() -> tuple[list[dict], dict]:
             answer.get("serves"), name, desc, raw, price, typical_price.get(r["restaurant_name"])
         )
 
+        # Taste, with the spice level corrected where the dish's name states it
+        taste = {t: tr.get(t, "") for t in TASTE}
+        taste_source = tr.get("taste_source", "")
+        spice = spice_from_name(name, taste["taste_spice"])
+        if spice is not None:
+            taste["taste_spice"], taste_source = spice, "name_rule"
+
         # Quarantine: kept on file, never recommended
         reasons = []
         if gross:
@@ -401,6 +440,8 @@ def build() -> tuple[list[dict], dict]:
                 "restaurant_address": r["restaurant_address"],
                 "restaurant_lat": r["restaurant_lat"],
                 "restaurant_lng": r["restaurant_lng"],
+                "restaurant_area": places[r["restaurant_name"]]["area"] or "",
+                "location_precision": places[r["restaurant_name"]]["precision"],
                 "dish_name": name,
                 "raw_dish_name": r["dish_name"],
                 "name_status": name_status,
@@ -432,8 +473,8 @@ def build() -> tuple[list[dict], dict]:
                 "nutrition_confidence": confidence,
                 "nutrition_defaults": json.dumps(est["defaults_used"]) if est else "[]",
                 "nutrition_flag": implausible(est),
-                **{t: tr.get(t, "") for t in TASTE},
-                "taste_source": tr.get("taste_source", ""),
+                **taste,
+                "taste_source": taste_source,
                 "review_status": review_status,
                 "entry_method": m.get("entry_method", ""),
                 "source": r["source"],
@@ -445,6 +486,7 @@ def build() -> tuple[list[dict], dict]:
                 "_llm_answered": llm is not None,
                 "_ignored_haram": ignored_haram,
                 "_coating": bool(coating),
+                "_spice_rule": spice is not None,
             }
         )
 
@@ -488,6 +530,12 @@ def _first_ingredients(o: dict, n: int) -> str:
 
 def write_report(out: list[dict], ctx: dict) -> None:
     n = len(out)
+    places = {o["restaurant_name"]: (o["restaurant_area"], o["location_precision"]) for o in out}
+    precision = Counter(p for _, p in places.values())
+    unknown = sorted(name for name, (_, p) in places.items() if p == "unknown")
+    no_area = sorted(name for name, (a, p) in places.items() if not a and p != "unknown")
+    area_counts = Counter(a for a, _ in places.values() if a)
+    spice_fixed = [o for o in out if o["_spice_rule"]]
     L = [
         "# Dataset build report",
         "",
@@ -502,6 +550,9 @@ def write_report(out: list[dict], ctx: dict) -> None:
         f"{ctx['platter_removed']} of them marked remove.",
         f"- OCR worksheet: {ctx['ocr_decisions']} of {ctx['ocr_listed']} rows decided.",
         f"- Taste enrichment: {dict(ctx['taste_stats'])}",
+        f"- Spice corrected from the dish's name: {len(spice_fixed)} dishes, e.g. "
+        + ", ".join(f"{o['dish_name']} ({o['taste_spice']})" for o in spice_fixed[:8])
+        + ".",
         "",
         "## Review status",
         "",
@@ -635,6 +686,16 @@ def write_report(out: list[dict], ctx: dict) -> None:
         f"Gross errors ({len(gross)}): "
         + (", ".join(f"{o['raw_dish_name']} (Rs {o['price_rs']:.0f})" for o in gross) or "none")
         + ".",
+        "",
+        "## Locations",
+        "",
+        f"- {len(places)} restaurants. Coordinates of their own: {precision['place']}. "
+        f"The centre of their sector, so distances are approximate: {precision['area']}. "
+        f"Unknown, so never used for a distance: {precision['unknown']}"
+        + (f" ({', '.join(unknown)})" if unknown else "")
+        + ".",
+        "- Areas: " + ", ".join(f"{a} {k}" for a, k in area_counts.most_common()) + ".",
+        *([f"- No area in the address: {', '.join(no_area)}."] if no_area else []),
         "",
         "## Servings",
         "",
