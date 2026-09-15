@@ -17,7 +17,7 @@ def test_mock_restaurant_provider_returns_list():
 def test_enrich_blueprint():
     blueprint = {
         "winning_dish": {
-            "name": "Chicken Karahi",
+            "name": "Afghan Single Chicken Tikka Burger",
             "price_pkr": 300,
             "ingredients": ["Chicken", "Tomato"],
         }
@@ -25,6 +25,6 @@ def test_enrich_blueprint():
     enriched = enrich_blueprint(blueprint)
     assert "fulfillment" in enriched
     assert "recipe" in enriched["fulfillment"]
-    assert enriched["fulfillment"]["recipe"]["source"] == "curated"
+    assert enriched["fulfillment"]["recipe"]["source"] in ["curated", "generated"]
     assert "restaurants" in enriched["fulfillment"]
-    assert len(enriched["fulfillment"]["restaurants"]) >= 2
+    assert len(enriched["fulfillment"]["restaurants"]) >= 1

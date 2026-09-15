@@ -4,6 +4,7 @@ import { state } from './state.js';
 export const $main    = document.getElementById('main-content');
 export const $loading = document.getElementById('loading-state');
 export const $error   = document.getElementById('error-state');
+export const $empty   = document.getElementById('empty-state');
 export const $errorMsg = document.getElementById('error-message');
 export const $chips   = document.getElementById('file-chips');
 
@@ -11,19 +12,29 @@ export const $chips   = document.getElementById('file-chips');
 export function showLoading() {
   $loading.style.display = 'flex';
   $error.style.display = 'none';
+  $empty.style.display = 'none';
   $main.style.display = 'none';
 }
 
 export function showError(msg) {
   $loading.style.display = 'none';
   $error.style.display = 'flex';
+  $empty.style.display = 'none';
   $main.style.display = 'none';
   $errorMsg.textContent = msg || 'Something went wrong.';
+}
+
+export function showEmptyState() {
+  $loading.style.display = 'none';
+  $error.style.display = 'none';
+  $empty.style.display = 'flex';
+  $main.style.display = 'none';
 }
 
 export function showContent() {
   $loading.style.display = 'none';
   $error.style.display = 'none';
+  $empty.style.display = 'none';
   $main.style.display = 'flex';
 }
 
@@ -76,7 +87,6 @@ export function render() {
         </div>
       </div>
       ${renderRestaurants(fulfillment)}
-      ${renderCandidates(candidates, dish.dish_id)}
     ` : `
       <div class="empty-state-container">
         <div class="empty-state-icon">🍽️</div>
@@ -115,7 +125,7 @@ export function updateDynamic() {
   const $wPrice = document.getElementById('winner-price');
   const $wScore = document.getElementById('winner-score');
   const $wCat = document.getElementById('winner-category');
-  const $wTags = document.getElementById('winner-tags');
+  const $wReasons = document.getElementById('winner-reasons-container');
   if ($wName) $wName.textContent = dish.name || 'No dish';
   if ($wPrice) $wPrice.textContent = `Rs. ${dish.price_pkr ?? '—'}`;
   if ($wScore) {
@@ -123,7 +133,7 @@ export function updateDynamic() {
     $wScore.textContent = `⚡ ${pct}% Match`;
   }
   if ($wCat) $wCat.textContent = dish.category || '';
-  if ($wTags) $wTags.innerHTML = (dish.human_tags || []).map(t => `<span class="tag-pill">${t}</span>`).join('');
+  if ($wReasons) $wReasons.innerHTML = renderReasonsHtml(dish, traces);
 
   // Pulse winner card
   if ($wCard) { $wCard.classList.remove('pulse'); void $wCard.offsetWidth; $wCard.classList.add('pulse'); }
@@ -146,11 +156,7 @@ export function updateDynamic() {
   updateScoreBar('budget', scores.u_budget, budgetLabel, reasons.budget);
   updateScoreBar('taste', scores.u_taste, tasteLabel, reasons.taste);
 
-  // Candidates
-  const $grid = document.getElementById('candidates-grid');
-  const $count = document.getElementById('candidates-count');
-  if ($grid) $grid.innerHTML = renderCandidateCards(candidates, dish.dish_id);
-  if ($count) $count.textContent = `${candidates.length} dishes`;
+  // Candidates section removed
 
   // XAI
   const $xaiInner = document.getElementById('xai-inner');
@@ -186,7 +192,7 @@ export function renderRecipeModalContent(recipe) {
   return `
     <div class="recipe-header">
       <div class="recipe-header-top">
-        <h2>🍳 ${dish.name || 'Recipe'}</h2>
+        <h2>🍽️ ${dish.name || 'Recipe'}</h2>
         <button class="recipe-close" id="recipe-close-btn" aria-label="Close recipe">✕</button>
       </div>
       <div class="recipe-meta-row">
@@ -251,6 +257,43 @@ function renderPersonaBar(personas) {
   return `<div class="persona-bar"><div class="persona-scroll">${chips}</div></div>`;
 }
 
+function extractWinnerReasons(dishName, traces) {
+  let agentReasons = [];
+  const startIdx = traces.findIndex(t => t.includes(`${dishName} Candidate Breakdown:`));
+  if (startIdx !== -1) {
+    for (let i = startIdx + 1; i < traces.length; i++) {
+      if (traces[i].includes('=> Final U_total') || traces[i].includes('Candidate Breakdown:')) {
+        break;
+      }
+      const match = traces[i].match(/-\s+([^:]+):\s+(.*?)\s+\(raw:/);
+      if (match) {
+        agentReasons.push({ agent: match[1].trim(), reason: match[2].trim() });
+      }
+    }
+  }
+  return agentReasons;
+}
+
+function renderReasonsHtml(dish, traces) {
+  const agentReasons = extractWinnerReasons(dish.name || '', traces);
+  const agentIcons = { 'Health Agent': '💪', 'Budget Agent': '💰', 'Taste Agent': '😋' };
+  
+  if (agentReasons.length > 0) {
+    return `
+      <div class="winner-reasons">
+        <div class="reasons-title">🤔 Why this?</div>
+        ${agentReasons.map(r => {
+          const icon = agentIcons[r.agent] || '🤖';
+          return `<div class="reason-line"><span class="reason-icon">${icon}</span> <strong>${escapeHtml(r.agent)}:</strong> ${escapeHtml(r.reason)}</div>`;
+        }).join('')}
+      </div>
+    `;
+  } else {
+    const tags = (dish.human_tags || []).map(t => `<span class="tag-pill">${t}</span>`).join('');
+    return `<div class="winner-tags" id="winner-tags">${tags}</div>`;
+  }
+}
+
 function renderWinnerCard(dish, scores) {
   const name = dish.name || 'No dish selected';
   const price = dish.price_pkr ?? '—';
@@ -259,17 +302,20 @@ function renderWinnerCard(dish, scores) {
   const bgStyle = imgUrl
     ? `background-image: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.15) 50%, transparent 100%), url('${imgUrl}');`
     : '';
-  const tags = (dish.human_tags || []).map(t => `<span class="tag-pill">${t}</span>`).join('');
+  
+  const traces = state.blueprint.xai_traces || [];
+  const reasonsHtml = renderReasonsHtml(dish, traces);
 
   return `
     <div class="winner-card" id="winner-card" style="${bgStyle}">
       <div class="winner-card-content">
+        ${dish.is_rep_image ? `<div class="rep-img-label" style="position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 11px;">Representative image</div>` : ''}
         <div class="winner-label">🏆 Best Pick For You</div>
-        <div class="winner-dish-name" id="winner-name">${name}</div>
-        <div class="winner-tags" id="winner-tags">${tags}</div>
+        <div class="winner-dish-name" id="winner-name">${escapeHtml(name)}</div>
+        <div id="winner-reasons-container">${reasonsHtml}</div>
         <div class="winner-meta">
           <span class="winner-meta-item" id="winner-price">🏷️ Rs. ${price}</span>
-          <span class="winner-meta-item winner-category" id="winner-category">${dish.category || ''}</span>
+          <span class="winner-meta-item winner-category" id="winner-category">${escapeHtml(dish.category || '')}</span>
         </div>
         <div class="winner-score-badge" id="winner-score">⚡ ${pct}% Match</div>
         <button id="btn-alternate" class="btn-alternate">Not quite — show me something else</button>
@@ -294,11 +340,12 @@ function renderRunnersUp(candidates, winnerId) {
       <div class="runner-card">
         <div class="runner-card-header">
           <div class="runner-img" style="${imgStyle}"></div>
+            ${c.is_rep_image ? `<div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 9px;">Representative image</div>` : ''}
           <div class="runner-info">
             <div class="runner-name">${escapeHtml(c.name)}</div>
             <div class="runner-score">⚡ ${totalScore}% Match</div>
           </div>
-          <button class="runner-expand-btn" aria-label="Expand breakdown">▼</button>
+          <button class="runner-expand-btn" aria-label="Expand breakdown" title="Click to view score breakdown">▼</button>
         </div>
         <div class="runner-breakdown">
           <div class="runner-bd-row"><span class="bd-label">💪 Health</span><div class="bd-bar-bg"><div class="bd-bar-fill health" style="width: ${health}%"></div></div></div>
@@ -320,7 +367,7 @@ function renderRunnersUp(candidates, winnerId) {
 function renderCtaRow(fulfillment) {
   return `
     <div class="cta-row">
-      <button class="cta-btn cta-recipe" id="cta-recipe">🍳 View Recipe</button>
+      <button class="cta-btn cta-recipe" id="cta-recipe">🍽️ View Recipe</button>
       <button class="cta-btn cta-order" id="cta-order">🛵 Order Nearby</button>
     </div>
   `;
@@ -397,31 +444,39 @@ function renderSliderGroup(wts) {
 function renderRestaurants(fulfillment) {
   const restaurants = fulfillment.restaurants || [];
   if (!restaurants.length) return '';
+  const winningDish = state.blueprint?.winning_dish || {};
   return `
     <div class="restaurants-section" id="restaurants-section" style="display:none;">
       <h2><span>🛵</span> Order Nearby</h2>
       <div class="restaurants-grid" id="restaurants-container">
-        ${restaurants.map(r => renderRestaurantCard(r)).join('')}
+        ${restaurants.map(r => renderRestaurantCard(r, winningDish)).join('')}
       </div>
     </div>
   `;
 }
 
-function renderRestaurantCard(r) {
-  const stars = '⭐'.repeat(Math.round(r.rating || 0));
+function renderRestaurantCard(r, dish) {
+  const dishName = dish?.name ? escapeHtml(dish.name) : 'Dish';
+  const dishPrice = dish?.price_pkr || 0;
+  const distanceStr = r.distance_km !== null && r.distance_km !== undefined ? ` • ${r.distance_km.toFixed(1)} km away` : '';
+  
   return `
     <div class="restaurant-card">
       <div class="restaurant-name">${escapeHtml(r.name)}</div>
-      <div class="restaurant-meta">
-        <span>🕐 ${r.delivery_time || '—'}</span>
-        <span>💰 +Rs. ${r.delivery_fee || 0}</span>
+      <div class="restaurant-address" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">
+        ${escapeHtml(r.address || '')}${distanceStr}
       </div>
-      <div class="restaurant-rating">${stars} ${(r.rating || 0).toFixed(1)}</div>
+      <div class="restaurant-dish-offer" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+        ${dishName}, Rs. ${dishPrice}
+      </div>
+      <div class="restaurant-meta">
+        <span>⏱️ ${r.delivery_time || '-'}</span>
+        <span>🛵 +Rs. ${r.delivery_fee || 0} delivery fee</span>
+      </div>
       <button class="restaurant-order-btn">Place Order</button>
     </div>
   `;
 }
-
 function renderCandidates(candidates, winnerId) {
   if (!candidates.length) return '';
   return `
@@ -448,6 +503,7 @@ function renderCandidateCards(candidates, winnerId) {
     return `
       <div class="candidate-card ${isWinner ? 'is-winner' : ''}">
         <div class="candidate-img" style="${imgStyle}"></div>
+            ${c.is_rep_image ? `<div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; padding: 2px 4px; border-radius: 4px; font-size: 9px;">Representative image</div>` : ''}
         <div class="candidate-body">
           <div class="candidate-rank">#${i + 1}</div>
           <div class="candidate-name">${c.name || 'Unknown'}</div>
@@ -500,7 +556,9 @@ export function showToast(message, type = 'error') {
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  const icon = type === 'error' ? '⚠️' : '✅';
+  let icon = '✅';
+  if (type === 'error') icon = '⚠️';
+  if (type === 'info') icon = 'ℹ️';
   toast.innerHTML = `<span class="toast-icon">${icon}</span> <span>${escapeHtml(message)}</span>`;
   
   container.appendChild(toast);
@@ -521,4 +579,22 @@ export function setUIEnabled(enabled) {
 export function setRecalcLoading(loading) {
   const loader = document.getElementById('recalc-loading');
   if (loader) loader.style.display = loading ? 'flex' : 'none';
+}
+
+export function renderRecentSearches(recents) {
+  const container = document.getElementById('recent-searches-container');
+  const list = document.getElementById('recent-searches-list');
+  if (!container || !list) return;
+
+  if (!recents || recents.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  list.innerHTML = recents.map(text => `
+    <button class="recent-search-btn" style="background: var(--surface-light); border: 1px solid var(--border-color); color: var(--text-color); padding: 0.5rem 1rem; border-radius: 9999px; cursor: pointer; font-family: inherit; font-size: 0.875rem; transition: background 0.2s;" onclick="document.getElementById('query-input').value = this.innerText; document.getElementById('query-form').dispatchEvent(new Event('submit'))">
+      ${escapeHtml(text)}
+    </button>
+  `).join('');
 }

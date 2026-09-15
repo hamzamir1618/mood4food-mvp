@@ -13,9 +13,9 @@ def mock_blueprint(monkeypatch):
         return DecisionBlueprint(
             active_persona="balanced",
             top_candidates=[
-                Candidate(dish_id="D001", name="Rank 1 Dish"),
-                Candidate(dish_id="D002", name="Rank 2 Dish"),
-                Candidate(dish_id="D003", name="Rank 3 Dish"),
+                Candidate(dish_id="D001", name="Afghan Single Chicken Tikka Burger"),
+                Candidate(dish_id="D002", name="Cheese Sauce"),
+                Candidate(dish_id="D003", name="Chocolate (Small)"),
             ],
         )
 
@@ -27,7 +27,7 @@ def test_alternate_first_call_returns_rank_2(mock_blueprint):
     alt = get_alternate("test_session", ["D001"])
     assert isinstance(alt, Candidate)
     assert alt.dish_id == "D002"
-    assert alt.name == "Rank 2 Dish"
+    assert alt.name == "Cheese Sauce"
 
 
 def test_alternate_second_call_returns_rank_3(mock_blueprint):
@@ -35,7 +35,7 @@ def test_alternate_second_call_returns_rank_3(mock_blueprint):
     alt = get_alternate("test_session", ["D001", "D002"])
     assert isinstance(alt, Candidate)
     assert alt.dish_id == "D003"
-    assert alt.name == "Rank 3 Dish"
+    assert alt.name == "Chocolate (Small)"
 
 
 def test_alternate_exhausted_returns_signal(mock_blueprint):

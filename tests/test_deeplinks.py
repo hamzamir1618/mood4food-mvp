@@ -7,10 +7,12 @@ def test_generate_foodpanda_link_basic():
 
 
 def test_generate_foodpanda_link_special_chars():
-    link = generate_foodpanda_link("Biryani & Kebab House", "Spicy Chicken + Rice!")
+    link = generate_foodpanda_link(
+        "Biryani & Kebab House", "Afghan Single Chicken Tikka Burger + Rice!"
+    )
     assert (
         link
-        == "https://www.foodpanda.pk/search?q=Biryani%20%26%20Kebab%20House%20Spicy%20Chicken%20%2B%20Rice%21"
+        == "https://www.foodpanda.pk/search?q=Biryani%20%26%20Kebab%20House%20Afghan%20Single%20Chicken%20Tikka%20Burger%20%2B%20Rice%21"
     )
 
 

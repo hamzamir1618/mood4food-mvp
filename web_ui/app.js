@@ -17,11 +17,48 @@ window.removeFile = removeFile;
 // ── Boot ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('refresh-btn').addEventListener('click', fetchBlueprint);
+  
+  try {
+    const recents = JSON.parse(localStorage.getItem('mood4food_recents') || '[]');
+    ui.renderRecentSearches(recents);
+  } catch(e) {}
 
   const form = document.getElementById('query-form');
+  let lastWarnedQuery = null;
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = document.getElementById('query-input').value.trim();
+    
+    const budgetMatch = text.match(/(?:under|budget|max|below|for)\s*[a-z\s]*?(?:rs\.?\s*|rupees\s*)?(\d+)/i) || text.match(/(\d+)\s*(?:rs|rupees|pkr)/i);
+    if (budgetMatch && !state.audioFile && !state.imageFile) {
+      const parsedBudget = parseInt(budgetMatch[1], 10);
+      if (parsedBudget > 0 && parsedBudget < 50 && text !== lastWarnedQuery) {
+        let warningEl = document.getElementById('budget-warning');
+        if (!warningEl) {
+          warningEl = document.createElement('div');
+          warningEl.id = 'budget-warning';
+          warningEl.className = 'budget-warning';
+          document.getElementById('query-bar').appendChild(warningEl);
+        }
+        warningEl.innerHTML = `⚠️ That budget (Rs. ${parsedBudget}) is very low — you may not get results. <a href="#" id="search-anyway-btn" style="color: var(--accent-budget); text-decoration: underline; margin-left: 8px;">Search anyway</a>`;
+        
+        document.getElementById('search-anyway-btn').addEventListener('click', (ev) => {
+          ev.preventDefault();
+          lastWarnedQuery = text;
+          warningEl.remove();
+          submitQuery(text);
+        });
+
+        lastWarnedQuery = text;
+        return;
+      }
+    }
+
+    const warningEl = document.getElementById('budget-warning');
+    if (warningEl) warningEl.remove();
+    lastWarnedQuery = null;
+
     if (text || state.audioFile || state.imageFile) submitQuery(text);
   });
 
@@ -78,12 +115,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function removeFile(type) {
   if (type === 'audio') {
     setAudioFile(null);
-    document.getElementById('audio-file').value = '';
-    document.getElementById('audio-btn').classList.remove('has-file');
+    const input = document.getElementById('audio-file');
+    if (input) input.value = '';
+    const btn = document.getElementById('audio-btn');
+    if (btn) btn.classList.remove('has-file');
   } else {
     setImageFile(null);
-    document.getElementById('image-file').value = '';
-    document.getElementById('image-btn').classList.remove('has-file');
+    const input = document.getElementById('image-file');
+    if (input) input.value = '';
+    const btn = document.getElementById('image-btn');
+    if (btn) btn.classList.remove('has-file');
   }
   ui.updateFileChips();
 }
@@ -108,7 +149,11 @@ async function fetchBlueprint() {
     updateBlueprint(bp);
     renderApp();
   } catch (err) {
-    ui.showError(getErrorMessage(err));
+    if (err.status === 404 || (err.message && err.message.toLowerCase().includes("decision blueprint"))) {
+      ui.showEmptyState();
+    } else {
+      ui.showError(getErrorMessage(err));
+    }
   }
 }
 
@@ -135,6 +180,18 @@ async function submitQuery(queryText, customLoadingMsg) {
     if (state.imageFile) formData.append('image', state.imageFile);
 
     const bp = await api.submitQuery(formData);
+    
+    // Save to recent searches if it's a text query
+    if (queryText && queryText.trim()) {
+      let recents = [];
+      try { recents = JSON.parse(localStorage.getItem('mood4food_recents') || '[]'); } catch(e) {}
+      recents = recents.filter(r => r !== queryText.trim());
+      recents.unshift(queryText.trim());
+      if (recents.length > 5) recents.pop();
+      localStorage.setItem('mood4food_recents', JSON.stringify(recents));
+      ui.renderRecentSearches(recents);
+    }
+
     updateBlueprint(bp);
     setFirstRenderDone(false);
     renderApp();
@@ -143,13 +200,13 @@ async function submitQuery(queryText, customLoadingMsg) {
     removeFile('image');
 
     $status.className = 'query-status success';
-    $status.textContent = `✓ Found ${bp.all_candidate_scores?.length ?? 0} options — recommending ${bp.winning_dish?.name || 'a dish'}`;
+    $status.textContent = `✓ Found ${bp.candidate_count ?? 0} options — recommending ${bp.winning_dish?.name || 'a dish'}`;
     setTimeout(() => { $status.textContent = ''; $status.className = 'query-status'; }, 4000);
   } catch (err) {
     const msg = getErrorMessage(err);
     ui.showToast(msg, 'error');
-    $status.className = 'query-status error';
-    $status.textContent = `✗ ${msg}`;
+    $status.textContent = '';
+    $status.className = 'query-status';
     if (!state.blueprint) {
       ui.showError(msg);
     }
@@ -199,6 +256,33 @@ function renderApp() {
   });
 }
 
+function animateSlider(sliderId, targetValue) {
+  const slider = document.getElementById(sliderId);
+  const valDisplay = document.getElementById(sliderId + '-val');
+  if (!slider) return;
+  const startValue = parseFloat(slider.value) || 0;
+  const duration = 400; // 400ms for a visible smooth slide
+  const startTime = performance.now();
+
+  function step(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // Ease-out cubic
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
+    const currentVal = startValue + (targetValue - startValue) * easeProgress;
+    slider.value = currentVal;
+    if (valDisplay) valDisplay.textContent = (currentVal * 100).toFixed(0) + '%';
+    
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    } else {
+      slider.value = targetValue;
+      if (valDisplay) valDisplay.textContent = (targetValue * 100).toFixed(0) + '%';
+    }
+  }
+  requestAnimationFrame(step);
+}
+
 function bindPersonaChips() {
   document.querySelectorAll('.persona-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -207,13 +291,25 @@ function bindPersonaChips() {
       document.querySelectorAll('.persona-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
 
-      // Temporary weights before response
-      setWeights({ w_h: 0.34, w_b: 0.33, w_t: 0.33 });
+      const personasAvailable = state.blueprint?.personas_available || {};
+      const personaData = personasAvailable[key];
+
+      if (personaData) {
+        ui.showToast(personaData.description || `Switched to ${personaData.display_name}`, 'info');
+        const targetWts = personaData.weights || { w_health: 0.34, w_budget: 0.33, w_taste: 0.33 };
+        
+        // Visibly animate sliders to the new weights immediately
+        animateSlider('slider-health', targetWts.w_health);
+        animateSlider('slider-budget', targetWts.w_budget);
+        animateSlider('slider-taste', targetWts.w_taste);
+      }
       
       recalculate().then(() => {
         if (state.blueprint) {
           const wts = state.blueprint.agent_weights || {};
           setWeights({ w_h: wts.w_h ?? 0.34, w_b: wts.w_b ?? 0.33, w_t: wts.w_t ?? 0.33 });
+          // Ensure they are synced to the backend's final values, snapping is fine here 
+          // because they should match the animated targets very closely
           const sh = document.getElementById('slider-health');
           const sb = document.getElementById('slider-budget');
           const st = document.getElementById('slider-taste');

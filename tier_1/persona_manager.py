@@ -37,7 +37,7 @@ PERSONAS = {
         "display_name": "The Gym Bro",
         "description": "Protein-obsessed, health-first",
         "icon": "💪",
-        "weights": {"w_health": 0.65, "w_budget": 0.15, "w_taste": 0.20},
+        "weights": {"w_health": 0.80, "w_budget": 0.0, "w_taste": 0.20},
         "taste_preference": {
             "sweet": 0.2,
             "salty": 0.6,
@@ -51,7 +51,7 @@ PERSONAS = {
         "display_name": "The Comfort Seeker",
         "description": "Rich, warm, soul-satisfying meals",
         "icon": "🛋️",
-        "weights": {"w_health": 0.15, "w_budget": 0.25, "w_taste": 0.60},
+        "weights": {"w_health": 0.0, "w_budget": 0.25, "w_taste": 0.75},
         "taste_preference": {
             "sweet": 0.5,
             "salty": 0.7,
@@ -65,7 +65,7 @@ PERSONAS = {
         "display_name": "The Adventurous Foodie",
         "description": "Bold flavours, spicy adventures",
         "icon": "🌶️",
-        "weights": {"w_health": 0.20, "w_budget": 0.20, "w_taste": 0.60},
+        "weights": {"w_health": 0.10, "w_budget": 0.10, "w_taste": 0.80},
         "taste_preference": {
             "sweet": 0.3,
             "salty": 0.5,
@@ -79,7 +79,7 @@ PERSONAS = {
         "display_name": "The Frugal Student",
         "description": "Maximum food, minimum spend",
         "icon": "🎓",
-        "weights": {"w_health": 0.15, "w_budget": 0.65, "w_taste": 0.20},
+        "weights": {"w_health": 0.0, "w_budget": 0.80, "w_taste": 0.20},
         "taste_preference": {
             "sweet": 0.4,
             "salty": 0.5,
@@ -93,7 +93,7 @@ PERSONAS = {
         "display_name": "The Health Nut",
         "description": "Clean eating, light and fresh",
         "icon": "🥗",
-        "weights": {"w_health": 0.60, "w_budget": 0.15, "w_taste": 0.25},
+        "weights": {"w_health": 0.80, "w_budget": 0.10, "w_taste": 0.10},
         "taste_preference": {
             "sweet": 0.3,
             "salty": 0.3,

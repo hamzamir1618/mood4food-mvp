@@ -2,7 +2,7 @@
 
 > **Topology**: 3-Tier Local-First Offline Stack  
 > **Backend**: FastAPI + Neo4j + ChromaDB  
-> **Frontend**: Flutter SDUI Engine  
+> **Frontend**: React + Vite (`frontend/`)  
 > **JSON Contracts**: `grounded_intent.json` → `candidate_evaluation.json` → `decision_blueprint.json`
 
 ---
@@ -37,28 +37,35 @@ Verify critical packages:
 python -c "import fastapi, neo4j, chromadb; print('All dependencies OK')"
 ```
 
-### 1.3 Flutter SDK
+### 1.3 Groq API Key (Semantic Intent Extraction)
 
-Ensure the Flutter SDK is installed and on `PATH`. Verify:
+The Tier 1a natural language intent parser uses Groq's API (`llama-3.3-70b-versatile`) to extract constraints and flavor profiles. No local GPU or LLM downloads are needed.
+
+1. Sign up for a free account at [console.groq.com](https://console.groq.com/) (No credit card required).
+2. Create an API key.
+3. In the root directory, copy `.env.example` to `.env` and add the key:
+   ```env
+   GROQ_API_KEY=gsk_your_key_here
+   ```
+*(Note: If the key is missing or the Groq API rate limits, the system safely falls back to a regex keyword extractor.)*
+
+### 1.4 Node.js (Frontend)
+
+The React frontend needs Node.js 18 or newer. Verify:
 
 ```bash
-flutter doctor
+node --version
 ```
 
-Required checks (must show `[✓]`):
-- Flutter SDK
-- Chrome (for `-d chrome` target)
-- Connected device or desktop toolchain
-
-Install Flutter frontend dependencies:
+Install the frontend dependencies:
 
 ```bash
-cd fipe_flutter
-flutter pub get
+cd frontend
+npm install
 cd ..
 ```
 
-### 1.4 Docker
+### 1.5 Docker
 
 Docker must be installed and the daemon running. Verify:
 
@@ -66,7 +73,7 @@ Docker must be installed and the daemon running. Verify:
 docker --version
 ```
 
-### 1.5 Third-Party APIs (OpenStreetMap Overpass)
+### 1.6 Third-Party APIs (OpenStreetMap Overpass)
 
 The backend uses the OpenStreetMap Overpass API for real restaurant fulfillment data (`RESTAURANT_PROVIDER=osm`). 
 **Known Limitation:** Unlike Google Places API, Overpass does not have live delivery times, ratings, or delivery fees. These fields will be `null` when using the OSM provider. This trade-off was chosen deliberately to avoid requiring a Google Cloud billing account. In test/CI environments, the mock provider (`RESTAURANT_PROVIDER=mock`) is used to prevent external network calls.
@@ -80,12 +87,12 @@ The backend uses the OpenStreetMap Overpass API for real restaurant fulfillment 
 Spin up the local Neo4j instance:
 
 ```bash
-docker run --name neo4j_mood4food -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/Mood4Food -d neo4j:latest
+docker run --name neo4j_mood4food -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/Mood4Food -d neo4j:2026.07.1
 ```
 
 **Windows (single-line):**
 ```powershell
-docker run --name neo4j_mood4food -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/Mood4Food -d neo4j:latest
+docker run --name neo4j_mood4food -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/Mood4Food -d neo4j:2026.07.1
 ```
 
 Verify Neo4j is healthy:
@@ -96,7 +103,15 @@ docker logs neo4j_mood4food --tail 5
 
 Wait until you see `Started.` in the output. The Neo4j Browser is accessible at `http://localhost:7474` (credentials: `neo4j` / `Mood4Food`).
 
-### 2.2 ChromaDB (Vector Store — Tier 2a)
+### 2.2 Redis (State Store)
+
+Spin up a local Redis instance:
+
+```bash
+docker run --name redis_mood4food -p 6379:6379 -d redis:latest
+```
+
+### 2.3 ChromaDB (Vector Store - Tier 2a)
 
 No manual setup required. ChromaDB runs as an embedded persistent client. The directory `tier_2/chroma_store/` is auto-created on first execution of the backend.
 
@@ -147,7 +162,7 @@ This reads `grounded_intent.json`, queries Neo4j, and writes `candidate_evaluati
 python tier_1/symbolic_anchoring.py
 ```
 
-> **Note**: This requires Neo4j to be running and seeded with `:Dish` and `:Ingredient` nodes. If the graph is empty, `candidate_evaluation.json` will contain `"candidate_count": 0`.
+> **Note**: This requires Neo4j to be running and seeded: `python -m pipeline.build_dataset`, then `python seed_real_data.py --reset` (see `docs/DATA_PIPELINE.md`). If the graph is empty, `candidate_evaluation.json` will contain `"candidate_count": 0`.
 
 ### 3.3 Run the Tier 2 Debate Pipeline (One-Shot)
 
@@ -159,7 +174,7 @@ python -m tier_2.consensus_manager
 
 ### 3.4 Launch the FastAPI Orchestrator (Persistent)
 
-This is the long-running backend process that serves the Flutter frontend:
+This is the long-running backend process that the frontend talks to:
 
 ```bash
 uvicorn orchestrator:app --host 0.0.0.0 --port 8000 --reload
@@ -190,26 +205,18 @@ curl http://localhost:8000/decision_blueprint
 
 ## 4. Frontend Execution
 
-### 4.1 Launch the Flutter SDUI Engine
+### 4.1 Launch the React Frontend
 
 Open a **new terminal** (keep the FastAPI terminal running):
 
 ```bash
-cd fipe_flutter
-flutter run -d chrome
+cd frontend
+npm run dev
 ```
 
-**Alternative targets:**
+Open http://localhost:5173. The Vite dev server proxies API calls (`/submit`, `/recalculate`, `/decision_blueprint` and others) to the backend on port 8000, and the app requests `GET /decision_blueprint` as soon as it loads.
 
-| Target     | Command                        |
-|------------|--------------------------------|
-| Chrome     | `flutter run -d chrome`        |
-| Windows    | `flutter run -d windows`       |
-| macOS      | `flutter run -d macos`         |
-| Linux      | `flutter run -d linux`         |
-| Edge       | `flutter run -d edge`          |
-
-The app will launch and immediately issue `GET /decision_blueprint` to the FastAPI backend.
+The legacy vanilla-JS UI is still served by the backend at http://localhost:8000/.
 
 ---
 
@@ -274,7 +281,7 @@ The app will launch and immediately issue `GET /decision_blueprint` to the FastA
 
 1. Ensure the FastAPI orchestrator is running (`uvicorn orchestrator:app --reload`).
 
-2. In the Flutter app, locate the **Budget Priority** slider at the bottom of the dashboard.
+2. In the web app, locate the **Budget** weight slider.
 
 3. Slide the **Budget Priority** to **maximum** (`w_b = 1.00`).
 
@@ -307,11 +314,13 @@ The app will launch and immediately issue `GET /decision_blueprint` to the FastA
 
 ### TEST 3: Pillar 3 — Compiler Design (SDUI AST Live Mapping)
 
-**Objective:** Verify that the Flutter frontend deterministically maps the newly generated `decision_blueprint.json` into the Equilibrium Card widget tree without requiring a manual page refresh.
+> **Note (2026-09-14):** This test was written for the Flutter frontend, which has been removed. The React frontend re-renders from the `/recalculate` response in the same way, but the component names below (Equilibrium Card, the `w_b` badge) are Flutter-era — update them when the Phase 6 frontend lands.
+
+**Objective:** Verify that the frontend deterministically maps the newly generated `decision_blueprint.json` into the Equilibrium Card widget tree without requiring a manual page refresh.
 
 **Steps:**
 
-1. With the Flutter app open, note the current values displayed on the **Equilibrium Card**:
+1. With the web app open, note the current values displayed on the **Equilibrium Card**:
    - Dish name
    - `U = X.XXXX` total score
    - Utility bar values (U_h, U_b, U_t)
@@ -319,7 +328,7 @@ The app will launch and immediately issue `GET /decision_blueprint` to the FastA
 
 2. Move the **Budget Priority** slider to a new position (e.g., from `0.30` to `0.80`).
 
-3. **Immediately observe the Flutter UI** (no page refresh, no app restart):
+3. **Immediately observe the UI** (no page refresh, no app restart):
 
    | Component             | Expected Behaviour                                         |
    |-----------------------|------------------------------------------------------------|
@@ -341,7 +350,7 @@ The app will launch and immediately issue `GET /decision_blueprint` to the FastA
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
-│                        TIER 3 — FLUTTER                           │
+│                        TIER 3 — REACT                             │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐    │
 │   │ Equilibrium  │  │ Utility Bars │  │ Budget Slider        │    │
 │   │ Card         │  │ U_h, U_b, U_t│  │ POST /recalculate    │    │
@@ -371,15 +380,15 @@ JSON Contract Flow:
 
 ## 7. Teardown
 
-Stop the Flutter app: `Ctrl+C` in the Flutter terminal.
+Stop the frontend dev server: `Ctrl+C` in the Vite terminal.
 
 Stop the FastAPI server: `Ctrl+C` in the Uvicorn terminal.
 
-Stop and remove the Neo4j container:
+Stop and remove the Docker containers:
 
 ```bash
-docker stop neo4j_mood4food
-docker rm neo4j_mood4food
+docker stop neo4j_mood4food redis_mood4food
+docker rm neo4j_mood4food redis_mood4food
 ```
 
 Deactivate the virtual environment:

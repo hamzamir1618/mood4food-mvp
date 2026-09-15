@@ -35,7 +35,18 @@ export async function recalculate(weights) {
 }
 
 export async function getFulfillment() {
-  const resp = await fetch(`${API_BASE}/decision_blueprint`);
+  let query = '';
+  if (navigator.geolocation) {
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 2000 });
+      });
+      query = `?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
+    } catch (e) {
+      console.warn("Could not get user location:", e);
+    }
+  }
+  const resp = await fetch(`${API_BASE}/decision_blueprint${query}`);
   return handleResponse(resp);
 }
 

@@ -22,11 +22,11 @@ def save_contract(
     session_id: str,
     contract_name: str,
     data: Union[BaseModel, dict, list, Any],
-    ttl_seconds: int = 900,
+    ttl_seconds: int = 7200,
 ) -> None:
     """
     Saves a contract to Redis under the key '{session_id}:{contract_name}'.
-    TTL defaults to 15 minutes (900 seconds).
+    TTL defaults to 2 hours (7200 seconds).
     """
     client = get_redis()
     key = f"{session_id}:{contract_name}"

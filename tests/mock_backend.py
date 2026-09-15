@@ -39,10 +39,7 @@ def mock_anchoring(intent):
         }
 
     message = (
-        (
-            "Nothing matched exactly, so we widened your budget slightly \u2014 "
-            "here's the closest match"
-        )
+        ("Nothing matched exactly, so we widened your budget slightly — here's the closest match")
         if budget < 500
         else ""
     )
@@ -50,64 +47,55 @@ def mock_anchoring(intent):
         "source_intent": intent,
         "safe_candidates": [
             {
-                "dish_id": "dish1",
-                "name": "Spicy Chicken",
-                "price_pkr": 500,
-                "category": "Main",
+                "dish_id": "fixture_1",
+                "name": "Afghan Single Chicken Tikka Burger",
+                "price_pkr": 330.0,
+                "category": "fast_food",
                 "taste_profile": {
-                    "spice": 1.0,
                     "sweet": 0.0,
-                    "salty": 0.0,
+                    "salty": 0.5,
                     "sour": 0.0,
                     "bitter": 0.0,
-                    "umami": 0.0,
+                    "umami": 0.7,
+                    "spice": 0.5,
                 },
-                "macros": {
-                    "protein_g": 15.0,
-                    "calories": 500.0,
-                },
+                "macros": {"protein_g": 34.3, "calories": 491.7},
                 "allergens": [],
                 "ingredients": ["Chicken"],
             },
             {
-                "dish_id": "dish2",
-                "name": "Sweet Dessert",
-                "price_pkr": 600,
-                "category": "Dessert",
+                "dish_id": "fixture_2",
+                "name": "Spicy & Sour Chicken Tom Yum Gai",
+                "price_pkr": 1075.0,
+                "category": "chinese_asian",
                 "taste_profile": {
-                    "spice": 0.0,
-                    "sweet": 1.0,
-                    "salty": 0.0,
-                    "sour": 0.0,
-                    "bitter": 0.0,
-                    "umami": 0.0,
-                },
-                "macros": {
-                    "protein_g": 5.0,
-                    "calories": 300.0,
-                },
-                "allergens": [],
-                "ingredients": ["Sugar"],
-            },
-            {
-                "dish_id": "dish3",
-                "name": "Boiled Broccoli",
-                "price_pkr": 1000.0,
-                "category": "Main",
-                "taste_profile": {
-                    "spice": 0.0,
                     "sweet": 0.0,
                     "salty": 0.0,
+                    "sour": 0.8,
+                    "bitter": 0.0,
+                    "umami": 0.6,
+                    "spice": 0.8,
+                },
+                "macros": {"protein_g": 60.0, "calories": 860.5},
+                "allergens": [],
+                "ingredients": ["Chocolate"],
+            },
+            {
+                "dish_id": "fixture_3",
+                "name": "Cheese Sauce",
+                "price_pkr": 95.0,
+                "category": "other",
+                "taste_profile": {
+                    "sweet": 0.0,
+                    "salty": 0.3,
                     "sour": 0.0,
                     "bitter": 0.0,
-                    "umami": 0.0,
+                    "umami": 0.5,
+                    "spice": 0.0,
                 },
-                "macros": {
-                    "protein_g": 45.0,
-                    "calories": 1000.0,
-                },
-                "allergens": [],
-                "ingredients": ["Broccoli"],
+                "macros": {"protein_g": 19.1, "calories": 551.0},
+                "allergens": ["dairy"],
+                "ingredients": ["Chicken"],
             },
         ],
         "soft_constraints": intent.get("soft_constraints", {}),

@@ -1,0 +1,115 @@
+"""
+The recommendation pipeline for one query, shared by /submit (one shot) and /chat (a
+conversation): Tier 1a intent, the signed-in user's saved constraints, the scoring
+context, Tier 1b hard constraints, Tier 2 ranking and Tier 3 fulfillment.
+"""
+
+import logging
+
+from fastapi import HTTPException, Request
+
+log = logging.getLogger(__name__)
+
+
+def recommend(
+    request: Request,
+    text: str | None = None,
+    audio_path: str | None = None,
+    image_path: str | None = None,
+) -> dict:
+    """Runs the whole pipeline for one query and returns the enriched blueprint."""
+    from accounts import events, learning
+    from accounts.constraints import apply_dietary_profile
+    from accounts.deps import current_user_id
+    from accounts.store import get_profile, list_events
+    from tier_1.contracts.session_store import load_contract, save_contract
+    from tier_1.multi_modal_ingestion import run_ingestion_pipeline
+    from tier_1.persona_manager import DEFAULT_PERSONA
+    from tier_1.symbolic_anchoring import run_anchoring_pipeline
+    from tier_2.consensus_manager import run_debate_pipeline
+    from tier_2.context import scoring_context
+    from tier_3.fulfillment_engine import enrich_blueprint
+
+    # Stage 1: Multimodal Intent Parsing
+    try:
+        intent = run_ingestion_pipeline(
+            raw_input=text or None,
+            audio_path=audio_path,
+            image_path=image_path,
+        )
+    except Exception as exc:
+        log.error("Tier 1a failed: %s", exc)
+        raise HTTPException(500, f"Intent parsing failed: {exc}")
+
+    # Stage 1b: a signed-in user's saved dietary constraints join the query. If they
+    # can't be loaded, stop: recommending without a saved allergy is not a fallback.
+    profile = None
+    try:
+        user_id = current_user_id(request)
+        if user_id:
+            profile = get_profile(user_id)
+            if profile is None:
+                raise RuntimeError("account not found")
+            intent = apply_dietary_profile(intent, profile.dietary)
+    except Exception as exc:
+        log.error("saved profile could not be loaded: %s", exc)
+        raise HTTPException(
+            503,
+            "Your saved dietary profile couldn't be loaded, so no recommendation was made. "
+            "Please try again.",
+        )
+
+    # Stage 1c: the scoring context. A signed-in user's goal, usual spend and learned
+    # model; recent history, for variety; dishes similar users approved; the hour and
+    # the weather. Saved with the session so later re-ranking uses the same inputs.
+    session_id = request.state.session_id
+    try:
+        history = list_events(user_id, 50) if user_id else events.guest_events(session_id)
+    except Exception as exc:
+        log.warning("recent history unavailable, so variety is left out: %s", exc)
+        history = []
+    peers = {}
+    if profile is not None and profile.taste.has_evidence():
+        try:
+            peers = learning.peer_approvals(user_id, profile.taste)
+        except Exception as exc:
+            log.warning("similar tastes unavailable, so left out: %s", exc)
+    context = scoring_context(DEFAULT_PERSONA, profile, history, peers)
+
+    try:
+        save_contract(session_id, "grounded_intent", intent)
+        save_contract(session_id, "scoring_context", context)
+        save_contract(session_id, "approved", [])  # approvals belong to one recommendation
+    except Exception as exc:
+        log.error("Tier 1a failed: %s", exc)
+        raise HTTPException(500, f"Intent parsing failed: {exc}")
+
+    # Stage 2: Neo4j hard constraints
+    try:
+        evaluation = run_anchoring_pipeline(intent)
+        save_contract(session_id, "candidate_evaluation", evaluation)
+    except Exception as exc:
+        log.error("Tier 1b failed: %s", exc)
+        raise HTTPException(503, f"Neo4j query failed — is the database running? ({exc})")
+
+    # Stage 3: ranking
+    try:
+        run_debate_pipeline(session_id)
+    except Exception as exc:
+        log.error("Tier 2 failed: %s", exc)
+        raise HTTPException(500, f"Debate pipeline failed: {exc}")
+
+    blueprint = load_contract(session_id, "decision_blueprint")
+    if not blueprint:
+        raise HTTPException(500, "Pipeline completed but decision_blueprint was not created.")
+    if hasattr(blueprint, "model_dump"):
+        blueprint = blueprint.model_dump()
+
+    # Enrich with fulfillment data (recipe + restaurants)
+    blueprint = enrich_blueprint(blueprint)
+
+    winner = blueprint.get("winning_dish") or {}
+    log.info("─── recommendation complete → winner: %s ───", winner.get("name", "?"))
+    events.record(session_id, user_id, events.query_event(session_id, intent, blueprint))
+    blueprint.pop("all_candidate_scores", None)  # never sent; candidate_count carries the size
+    return blueprint

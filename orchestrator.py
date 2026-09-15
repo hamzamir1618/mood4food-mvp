@@ -21,8 +21,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from api.alternate import router as alternate_router
+from api.approve import router as approve_router
+from api.auth import router as auth_router
+from api.chat import router as chat_router
 from api.fulfillment import router as fulfillment_router
 from api.health import router as health_router
+from api.profile import router as profile_router
 from api.rate_limit import limiter
 from api.recalculate import router as recalculate_router
 from api.submit import router as submit_router
@@ -43,6 +47,75 @@ WEB_UI_DIR = Path(__file__).resolve().parent / "web_ui"
 app = FastAPI(title="FIPE Orchestrator", version="0.2.0")
 
 
+@app.on_event("startup")
+async def startup_event():
+    import os
+
+    import groq
+
+    from config import DEV_AUTH_SECRET, DEV_SESSION_SECRET, settings
+    from tier_1.groq_extractor import GROQ_MODEL
+
+    if settings.SESSION_SECRET == DEV_SESSION_SECRET:
+        log.warning(
+            "STARTUP: SESSION_SECRET is the built-in dev placeholder. "
+            "Set SESSION_SECRET in the environment before deploying."
+        )
+    if settings.AUTH_SECRET == DEV_AUTH_SECRET:
+        log.warning(
+            "STARTUP: AUTH_SECRET is the built-in dev placeholder. "
+            "Set AUTH_SECRET in the environment before deploying."
+        )
+
+    # Accounts: Neo4j constraints, then the similar-tastes index rebuilt from Neo4j
+    # (it lives in memory, because free hosts have no persistent disk).
+    try:
+        from accounts import store, taste_index
+
+        store.ensure_schema()
+        indexed = taste_index.rebuild(store.all_taste_models())
+        log.info(f"STARTUP: accounts ready; {indexed} users in the similar-tastes index.")
+        cap = store.account_capacity()
+        log.info(
+            f"STARTUP: Neo4j holds {cap['nodes']} nodes and {cap['relationships']} "
+            f"relationships; {cap['users']} of {cap['max_users']} accounts in use."
+        )
+    except Exception as e:
+        log.warning(
+            f"STARTUP: accounts setup failed ({e}). Sign-in needs Neo4j; the similar-tastes "
+            "index stays empty until the next restart."
+        )
+
+    provider = os.environ.get("RESTAURANT_PROVIDER", "neo4j").upper()
+    log.info(f"STARTUP: Active restaurant data source is: {provider}")
+
+    if settings.INTENT_EXTRACTOR == "groq":
+        log.info(f"STARTUP: Performing health check for Groq API using model {GROQ_MODEL}...")
+        if not settings.GROQ_API_KEY:
+            log.warning(
+                "STARTUP: INTENT_EXTRACTOR is 'groq' but GROQ_API_KEY is not set. "
+                "Intent extraction will use the keyword fallback."
+            )
+            return
+
+        try:
+            client = groq.Groq(api_key=settings.GROQ_API_KEY)
+            client.chat.completions.create(
+                messages=[{"role": "user", "content": "ping"}],
+                model=GROQ_MODEL,
+                max_tokens=5,
+            )
+            log.info("STARTUP: Groq API health check passed.")
+        except Exception as e:
+            # Degrade rather than exit: GroqExtractorImpl already falls back to the
+            # keyword extractor per request, and a cold-start blip on a free tier
+            # should not permanently kill the instance.
+            log.warning(
+                f"STARTUP: Groq health check failed for model {GROQ_MODEL} ({e}). "
+                "Continuing with the keyword extractor as fallback."
+            )
+
+
 class SessionIDMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if "session_id" not in request.session:
@@ -53,7 +126,7 @@ class SessionIDMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SessionIDMiddleware)
-app.add_middleware(SessionMiddleware, secret_key="fipe-secret-key-change-in-prod")
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
 frontend_origins = [
     origin.strip() for origin in settings.FRONTEND_ORIGIN.split(",") if origin.strip()
@@ -96,3 +169,7 @@ app.include_router(submit_router)
 app.include_router(recalculate_router)
 app.include_router(fulfillment_router)
 app.include_router(alternate_router)
+app.include_router(auth_router)
+app.include_router(profile_router)
+app.include_router(approve_router)
+app.include_router(chat_router)

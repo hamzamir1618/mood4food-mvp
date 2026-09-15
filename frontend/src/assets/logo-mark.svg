@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="currentColor" role="img" aria-label="Mood4Food emblem">
+  <!--
+    Mood4Food Mark — Wax-Seal Compass/Fork Crest
+    Uses currentColor for fill/stroke — inherits from parent CSS `color`.
+    Dark on light by default; set parent color to light for dark backgrounds.
+  -->
+  <defs>
+    <mask id="center-void">
+      <rect width="200" height="200" fill="white"/>
+      <circle cx="100" cy="100" r="14" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- ═══ OUTER SEAL RING ═══ -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" stroke-width="4"/>
+  <!-- Inner decorative ring -->
+  <circle cx="100" cy="100" r="76" fill="none" stroke="currentColor" stroke-width="1.5"/>
+
+  <!-- ═══ SEAL STUDS ═══ -->
+  <!-- Cardinal (larger) -->
+  <circle cx="100" cy="7" r="6"/>
+  <circle cx="193" cy="100" r="6"/>
+  <circle cx="100" cy="193" r="6"/>
+  <circle cx="7" cy="100" r="6"/>
+  <!-- Intercardinal (smaller) -->
+  <circle cx="165.8" cy="34.2" r="4"/>
+  <circle cx="165.8" cy="165.8" r="4"/>
+  <circle cx="34.2" cy="165.8" r="4"/>
+  <circle cx="34.2" cy="34.2" r="4"/>
+
+  <!-- ═══ COMPASS ROSE (with center void mask) ═══ -->
+  <g mask="url(#center-void)">
+    <!-- Main 4-point star body (E, S, W arms) -->
+    <path d="M107,93 L166,100 L107,107 L100,166 L93,107 L34,100 L93,93Z"/>
+    <!-- North arm: Fork with 3 tines (discovery + curation motif) -->
+    <rect x="93" y="38" width="4.5" height="62" rx="2.25"/>
+    <rect x="97.75" y="28" width="4.5" height="72" rx="2.25"/>
+    <rect x="102.5" y="38" width="4.5" height="62" rx="2.25"/>
+    <!-- Secondary 4-point star (45° rotation, shorter arms) -->
+    <path d="M125,75 L114,100 L125,125 L100,114 L75,125 L86,100 L75,75 L100,86Z"/>
+  </g>
+
+  <!-- ═══ CENTER PIVOT ═══ -->
+  <circle cx="100" cy="100" r="3.5"/>
+</svg>

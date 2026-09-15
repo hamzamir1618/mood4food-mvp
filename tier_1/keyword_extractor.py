@@ -20,6 +20,8 @@ class KeywordExtractorImpl(IntentExtractor):
 
         # ── Allergen / exclusion extraction ──
         exclusion_keywords = {
+            "vegan": "vegan",
+            "vegetarian": "vegetarian",
             "meat": "meat",
             "chicken": "meat",
             "beef": "meat",
@@ -30,6 +32,10 @@ class KeywordExtractorImpl(IntentExtractor):
             "cheese": "dairy",
             "gluten": "gluten",
             "wheat": "gluten",
+            "bread": "gluten",
+            "naan": "gluten",
+            "roti": "gluten",
+            "pasta": "gluten",
             "nuts": "nuts",
             "peanut": "nuts",
             "peanuts": "nuts",
@@ -72,6 +78,7 @@ class KeywordExtractorImpl(IntentExtractor):
         }
 
         allergens_found = set()
+        negated_words = set()
         negated_state = False
 
         words = text_lower.split()
@@ -85,15 +92,24 @@ class KeywordExtractorImpl(IntentExtractor):
             # Turn on negation
             if w_clean in negation_words:
                 negated_state = True
+            elif negated_state:
+                negated_words.add(w_clean)
 
             if w_clean in exclusion_keywords:
                 lookahead = words[i + 1].strip(".,!?;:") if i + 1 < len(words) else ""
-                if negated_state or lookahead in {"free", "allergy", "intolerant", "intolerance"}:
+                if (
+                    w_clean in ("vegan", "vegetarian")
+                    or negated_state
+                    or lookahead in {"free", "allergy", "intolerant", "intolerance"}
+                ):
                     allergens_found.add(exclusion_keywords[w_clean])
 
             # Reset state on sentence boundaries
             if word.endswith((".", "!", "?", ";")):
                 negated_state = False
+
+        # ── Halal ──
+        is_halal = bool(re.search(r"\bhalal\b", text_lower))
 
         # ── Mood vector seed ──
         mood_map = {
@@ -117,9 +133,48 @@ class KeywordExtractorImpl(IntentExtractor):
                 mood_profile = profile
                 break
 
+        # ── Requested cuisine, dish or food: the first one named and not negated ──
+        # Cuisines come first, so "desi biryani" asks for desi food.
+        requests = (
+            "fast food",
+            "middle eastern",
+            "afghan",
+            "chinese",
+            "desi",
+            "pakistani",
+            "pizza",
+            "burger",
+            "biryani",
+            "karahi",
+            "shawarma",
+            "sandwich",
+            "dessert",
+            "cake",
+            "salad",
+            "soup",
+            "seafood",
+            "chicken",
+            "beef",
+            "mutton",
+            "fish",
+        )
+        preferred = next(
+            (
+                r
+                for r in requests
+                if re.search(rf"\b{r}\b", text_lower) and r.split()[-1] not in negated_words
+            ),
+            None,
+        )
+        if preferred == "pakistani":
+            preferred = "desi"
+
         return GroundedIntent(
             raw_input=raw_input,
             budget_max_pkr=budget,
             allergens_pruned=sorted(allergens_found),
             mood_vector=mood_profile,
+            is_halal=is_halal,
+            preferred_category=preferred,
+            preferred_category_raw_phrase=preferred,
         )

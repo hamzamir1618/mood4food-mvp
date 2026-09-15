@@ -51,7 +51,6 @@ def test_full_session_isolation(monkeypatch):
     monkeypatch.setattr("tier_1.symbolic_anchoring.run_anchoring_pipeline", mock_anchor)
     monkeypatch.setattr("tier_2.consensus_manager.run_debate_pipeline", mock_debate)
     monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda x: x)
-    monkeypatch.setattr("tier_2.agents.TasteAgent.score", lambda self, x: 0.5)
 
     # Ensure the dummy blueprint file exists so orchestrator doesn't crash reading it in /submit
     DECISION_BLUEPRINT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -81,14 +80,16 @@ def test_full_session_isolation(monkeypatch):
     assert res1_recalc.status_code == 200
     assert res2_recalc.status_code == 200
 
-    # Assert isolation! Client 1 should only see pizza
+    # Assert isolation. Observed via top_candidates: all_candidate_scores is
+    # deliberately stripped from API responses so the full scored pool never
+    # leaks to the client.
     data1 = res1_recalc.json()
-    candidates1 = [c["name"] for c in data1.get("all_candidate_scores", [])]
+    candidates1 = [c["name"] for c in data1.get("top_candidates", [])]
     assert "pizza margherita" in candidates1
     assert "caesar salad" not in candidates1
 
     # Client 2 should only see salad
     data2 = res2_recalc.json()
-    candidates2 = [c["name"] for c in data2.get("all_candidate_scores", [])]
+    candidates2 = [c["name"] for c in data2.get("top_candidates", [])]
     assert "caesar salad" in candidates2
     assert "pizza margherita" not in candidates2

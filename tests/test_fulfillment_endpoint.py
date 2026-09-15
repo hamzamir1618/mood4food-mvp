@@ -19,7 +19,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
 
     monkeypatch.setitem(
         RECIPES,
-        "First Dish",
+        "Afghan Single Chicken Tikka Burger",
         {
             "prep_time": "10 min",
             "cook_time": "20 min",
@@ -47,7 +47,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
         "safe_candidates": [
             {
                 "dish_id": "dish1",
-                "name": "First Dish",
+                "name": "Afghan Single Chicken Tikka Burger",
                 "price_pkr": 500,
                 "category": "Main Course",
                 "taste_profile": {
@@ -65,7 +65,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
             },
             {
                 "dish_id": "dish2",
-                "name": "Second Dish",
+                "name": "Spicy & Sour Chicken Tom Yum Gai",
                 "price_pkr": 600,
                 "category": "Main Course",
                 "taste_profile": {
@@ -106,7 +106,7 @@ def test_fulfillment_endpoint_e2e(mock_ingest, mock_query, monkeypatch):
 
     # 5. Assert fulfillment dish matches /recalculate winner
     assert winner_fulfill == winner_recalc
-    assert winner_fulfill == "First Dish"
+    assert winner_fulfill == "Afghan Single Chicken Tikka Burger"
 
     # Also assert fulfillment data was enriched
     assert "fulfillment" in fulfillment_json
