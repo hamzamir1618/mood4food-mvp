@@ -69,6 +69,64 @@ def test_a_much_cheaper_dish_is_fine_but_not_preferred():
     assert "well under your Rs 1,000 limit" in t.sentence
 
 
+# ── Wording, the Double rule and the summary ─────────────────────────────────
+
+KARAHI = {"calories": 890.3, "protein_g": 59.7, "carbs_g": 7.1, "fat_g": 69.2}
+SPICY_UNDER_1500 = {"mood_vector": {"spice": 0.8}, "budget_max_pkr": 1500}
+
+
+def test_reason_sentences_use_no_semicolons_or_colon_chains():
+    for goal in ("balanced", "muscle_gain", "weight_loss", "light"):
+        sentence = scoring.health_term(dish(macros=KARAHI), goal).sentence
+        assert ";" not in sentence and ":" not in sentence, sentence
+    scored = score_dish(dish(macros=KARAHI, price_pkr=1400), build_preferences(SPICY_UNDER_1500))
+    for term in ("taste", "budget", "health"):
+        assert ";" not in scored["reasons"][term] and ":" not in scored["reasons"][term]
+
+
+def test_a_split_mostly_from_fat_is_heavy_on_fat_not_light_on_carbs():
+    assert scoring.health_term(dish(macros=KARAHI), "balanced").sentence == (
+        "About 890 kcal, with 70% of it from fat, 27% from protein and 3% from carbs. Heavy on fat."
+    )
+
+
+def test_a_double_for_one_counts_both_servings():
+    double = dish(
+        serves_source="double",
+        serves_min=2,
+        serves_max=2,
+        macros={"calories": 315.4, "protein_g": 19.6, "carbs_g": 30.0, "fat_g": 12.0},
+    )
+    alone = build_preferences({})
+    pair = replace(alone, party_size=2)
+    assert scoring.portions(double, 1) == 2.0 and scoring.portions(double, 2) == 1.0
+    assert scoring.portions(dish(serves_min=4, serves_max=4), 1) == 1.0  # a platter is shared
+    assert "About 631 kcal" in score_dish(double, alone)["reasons"]["health"]
+    assert "both servings" in score_dish(double, alone)["reasons"]["health"]
+    assert "About 315 kcal" in score_dish(double, pair)["reasons"]["health"]
+    diet = replace(alone, goal="weight_loss")
+    alone_score = score_dish(double, diet)["u_health"]
+    assert alone_score < score_dish(double, replace(diet, party_size=2))["u_health"]
+
+
+def test_the_summary_gives_the_strongest_points_then_one_caveat():
+    karahi = dish(
+        macros=KARAHI,
+        price_pkr=1400,
+        taste_profile={"sweet": 0.1, "salty": 0.5, "sour": 0.1, "umami": 0.6, "spice": 0.8},
+    )
+    assert score_dish(karahi, build_preferences(SPICY_UNDER_1500))["summary"] == (
+        "It's properly spicy, as you asked, and comes in Rs 100 under your limit. "
+        "It's also rich, at around 890 kcal and mostly fat."
+    )
+
+
+def test_the_summary_leaves_out_what_the_data_cannot_support():
+    guessed = dish(price_pkr=1400, taste_source="global_prior", macros={})
+    summary = score_dish(guessed, build_preferences({"budget_max_pkr": 1500}))["summary"]
+    assert summary == "It comes in Rs 100 under your limit."
+
+
 def test_a_usual_spend_sets_a_band_that_dearer_dishes_fall_out_of():
     p = build_preferences({}, {"typical_spend": 1000})
     assert scoring.budget_term(dish(price_pkr=1100), p).utility == 1.0

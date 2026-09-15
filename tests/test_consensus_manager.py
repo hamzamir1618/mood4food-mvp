@@ -39,6 +39,8 @@ def test_the_blueprint_carries_the_winners_reasons_and_not_the_full_pool():
     debate = run_debate([CANDIDATE], build_preferences({"budget_max_pkr": 500}))
     blueprint = build_blueprint(debate, evaluation)
     assert blueprint["winning_dish"]["reasons"]["budget"] == "Rs 350, within your Rs 500 limit."
+    assert blueprint["winning_dish"]["summary"]  # the reasons in one short paragraph
+    assert "restaurant_name" in blueprint["winning_dish"]  # where to order it
     assert blueprint["candidate_count"] == 1 and "all_candidate_scores" not in blueprint
     assert blueprint["utility_breakdown"]["u_total"] == blueprint["top_candidates"][0]["u_total"]
     assert blueprint["relaxation_notice"] is None
@@ -60,7 +62,7 @@ def test_the_last_shortlist_place_goes_to_something_different():
     top = shortlist([*ranked, different])
     assert [c["dish_id"] for c in top] == ["d0", "d1", "d2", "d3", "x"]
     assert top[-1]["exploration"] is True
-    assert top[-1]["reasons"]["exploration"] == "Something different: an afghan dish."
+    assert top[-1]["reasons"]["exploration"] == "Something different: an Afghan dish."
     # nothing different scores close enough to the winner: the plain top five
     too_weak = {**different, "u_total": 0.3}
     assert [c["dish_id"] for c in shortlist([*ranked, too_weak])] == ["d0", "d1", "d2", "d3", "d4"]

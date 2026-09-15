@@ -22,6 +22,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from api.alternate import router as alternate_router
 from api.approve import router as approve_router
+from api.areas import router as areas_router
 from api.auth import router as auth_router
 from api.chat import router as chat_router
 from api.fulfillment import router as fulfillment_router
@@ -173,3 +174,4 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(approve_router)
 app.include_router(chat_router)
+app.include_router(areas_router)

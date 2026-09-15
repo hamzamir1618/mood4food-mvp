@@ -17,6 +17,8 @@ It adds no LLM calls. The first message of a request goes through the intent ext
 | Refinement | `{"critique": "cheaper"}` | Asks for something better than the current pick in one direction |
 | Just pick | `{"skip": true}` | Stops asking and recommends |
 
+Any turn may also carry `"location": {"lat": 33.69, "lng": 73.03, "label": "G-9 Markaz"}`. It is kept with the session, and from the next new request each dish carries a straight-line `distance_km` to its restaurant (none when the restaurant's coordinates are unknown). `/submit` takes the same as the form fields `lat`, `lng` and `location_label`. `GET /areas` lists areas to pick from.
+
 Typed text is read as the most likely of these:
 1. **While a question is open,** text that names one of its answers counts as that answer: "something hot", "around 1,200", "for 3 people".
 2. **After a recommendation,** a short message (8 words or fewer) that asks for a refinement is one: "same but cheaper", "not so spicy".

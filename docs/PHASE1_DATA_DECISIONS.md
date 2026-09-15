@@ -68,6 +68,24 @@ Two definitions worth knowing:
 
 The order of precedence is owner → menu → "Double" in the name (two servings, the owner's rule of 2026-09-15; before it, Burrito (Double) carried single-burrito calories per person and won the weight-loss query) → price-based estimate (platters, combos and half/full portions only) → default of one. `price_per_person` uses the middle of the range. Tier 1's budget filter uses the menu price. Phase 3's budget term divides the price by the number of people sharing (the party size, capped at the dish's servings); the party size itself is 1 until Phase 5's conversation asks for it. See `DECISION_CORE.md`.
 
+### Taste: spice stated in the name
+
+The source's taste values sometimes contradict the dish's own name: "Chicken Pepperoni (Non Spicy)" was recorded at spice 0.8, and several chicken karahis at 0. A name that states the level wins:
+- "non spicy", "not spicy", "no spice" or "mild" caps spice at 0.1;
+- a chilli word ("spicy", "chilli", "mirchi", "jalapeño", "peri peri", "sriracha", "Szechuan") raises it to at least 0.5;
+- so does "karahi", which is cooked with green chilli. A Shinwari karahi is left alone, because it is traditionally made with salt and tomato.
+
+"Hot" is not a chilli word: a hot gulab jamun is served hot. Corrected dishes are marked `taste_source: name_rule`, which scoring trusts at 0.8, a little below the original values, and the build report lists them.
+
+### Locations
+
+Addresses are OpenStreetMap geocodes, mostly in Urdu script. `pipeline/areas.py` turns each into a short area name: a sector from its Latin or Urdu spelling ("F-7/2" and "ایف-7" are both F-7), otherwise a named place (DHA, Bahria Town, Saidpur, Blue Area, Rawat). It also records `location_precision`:
+- `place`: the coordinates are the restaurant's own.
+- `area`: the centre of its sector, so a distance is approximate. Either several restaurants share the point (all five F-10 restaurants without a street address do), or the address names nothing below the sector.
+- `unknown`: missing, or outside Islamabad and Rawalpindi. Sakura was geocoded to Chittagong, Bangladesh. These coordinates are never used for a distance, and the dish shows no area.
+
+Distances are straight lines from the location the user sends, never by road. The location picker's areas (`GET /areas`) are the mean of their restaurants' own coordinates.
+
 ## Still open
 
 - The rest of the automated pass. It was restarted on 2026-09-14 for the last 830 dishes. Groq's free tier allows 200,000 tokens a day, refilled gradually, and the app's own intent extraction shares that allowance. If the pass stops, `python -m pipeline.classify_categories` resumes where it left off. When it finishes, `python -m pipeline.review_sheets --ocr-next` writes a third OCR worksheet for any newly flagged names, then rebuild and reseed.

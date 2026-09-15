@@ -7,6 +7,7 @@ from datetime import datetime
 import pytest
 
 from pipeline import paths, prices, servings
+from pipeline.areas import area_name, restaurant_locations
 from pipeline.build_dataset import (
     KEY_COL,
     _cell_text,
@@ -239,6 +240,51 @@ def test_serving_precedence_owner_menu_double_price_default():
     assert (
         servings.resolve("", "Chicken Karahi", "", "", 1200, typical)["serves_source"] == "default"
     )
+
+
+@pytest.mark.parametrize(
+    "address, area",
+    [
+        ("Howdy, اسٹریٹ 3, F-7/3, ایف-7, اسلام آباد", "F-7"),
+        ("ایف-10, اسلام آباد, زون 1", "F-10"),
+        ("Asian Wok, Mir Chakar Khan Road, آئ-8 مركز, آئی 8 مرکزگراؤنڈ", "I-8"),
+        ("Khyber Shinwari, Street 54, جی-9/4, اسلام آباد", "G-9"),
+        ("Tandoori, اسٹریٹ 30, ایف-10/1, ایف-10", "F-10"),
+        ("Savour Foods, PTE Expert road, Blue Area, جی-7", "G-7"),
+        ("wild wings, DHA Phase 2, ڈی ایچ اے فیز II, روات, زون ۵", "DHA"),
+        ("Ginyaki, Phase 5, بحریہ ٹاؤن فیز 4, بحریہ ٹاؤن, زون ۵", "Bahria Town"),
+        ("Des Pardes, اسٹریٹ 85, سید پور, زون ۳", "Saidpur"),
+        ("Rawat Bazaar, روات, زون ۵", "Rawat"),
+        ("Sakura Hotel & Restaurant, Chittagong Port Access Road", None),
+    ],
+)
+def test_the_area_comes_from_the_address(address, area):
+    assert area_name(address) == area
+
+
+def test_locations_mark_sector_centres_and_coordinates_outside_the_city():
+    def row(name, address, lat, lng):
+        return {
+            "restaurant_name": name,
+            "restaurant_address": address,
+            "restaurant_lat": lat,
+            "restaurant_lng": lng,
+        }
+
+    got = restaurant_locations(
+        [
+            row("A", "A Grill, ایف-10, اسلام آباد", "33.6918", "73.0067"),
+            row("B", "B Cafe, Street 1, ایف-10", "33.6918", "73.0067"),
+            row("C", "C Grill, 10th Avenue, ایف-10", "33.6933", "73.0152"),
+            row("D", "جی-9, اسلام آباد", "33.6914", "73.0307"),
+            row("Sakura", "Sakura Hotel, Chittagong", "22.3156", "91.7877"),
+            row("E", "", "", ""),
+        ]
+    )
+    assert got["A"] == got["B"] == {"area": "F-10", "precision": "area"}  # one shared point
+    assert got["C"] == {"area": "F-10", "precision": "place"}
+    assert got["D"] == {"area": "G-9", "precision": "area"}  # the address is only the sector
+    assert got["Sakura"] == got["E"] == {"area": None, "precision": "unknown"}
 
 
 def test_neighbouring_dishes_on_an_ocr_line_do_not_make_a_dish_a_platter():

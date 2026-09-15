@@ -31,6 +31,8 @@ BOOLS = ("allergens_known", "is_vegan", "is_vegetarian", "is_halal", "quarantine
 FLOATS = (
     "price_rs",
     "price_per_person",
+    "restaurant_lat",
+    "restaurant_lng",
     "calories",
     "protein_g",
     "carbs_g",
@@ -71,6 +73,8 @@ TEXT = (
     "source_date",
     "quarantine_reason",
     "restaurant_name",
+    "restaurant_area",
+    "location_precision",
 )
 
 CONSTRAINTS = (
@@ -80,7 +84,8 @@ CONSTRAINTS = (
 UPSERT = """
 UNWIND $batch AS row
 MERGE (r:Restaurant {name: row.restaurant.name})
-SET r.address = row.restaurant.address, r.lat = row.restaurant.lat, r.lng = row.restaurant.lng
+SET r.address = row.restaurant.address, r.lat = row.restaurant.lat, r.lng = row.restaurant.lng,
+    r.area = row.restaurant.area, r.location_precision = row.restaurant.precision
 MERGE (d:Dish {dish_uid: row.dish_uid})
 SET d += row.props
 MERGE (r)-[:SERVES]->(d)
@@ -111,6 +116,8 @@ def to_record(row: dict) -> dict:
             "address": row["restaurant_address"] or None,
             "lat": _float(row["restaurant_lat"]),
             "lng": _float(row["restaurant_lng"]),
+            "area": row["restaurant_area"] or None,
+            "precision": row["location_precision"] or None,
         },
         "props": props,
     }
