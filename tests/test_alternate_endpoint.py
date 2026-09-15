@@ -17,11 +17,11 @@ def test_alternate_endpoint_normal(monkeypatch):
     from tier_1.contracts.session_store import save_contract
 
     blueprint = DecisionBlueprint(
-        winning_dish={"dish_id": "dish1", "name": "First Dish"},
+        winning_dish={"dish_id": "dish1", "name": "Afghan Single Chicken Tikka Burger"},
         top_candidates=[
-            Candidate(dish_id="dish1", name="First Dish", price_pkr=500.0),
-            Candidate(dish_id="dish2", name="Second Dish", price_pkr=600.0),
-            Candidate(dish_id="dish3", name="Third Dish", price_pkr=700.0),
+            Candidate(dish_id="dish1", name="Afghan Single Chicken Tikka Burger", price_pkr=500.0),
+            Candidate(dish_id="dish2", name="Spicy & Sour Chicken Tom Yum Gai", price_pkr=600.0),
+            Candidate(dish_id="dish3", name="Cheese Sauce", price_pkr=700.0),
         ],
     )
 
@@ -52,10 +52,10 @@ def test_alternate_endpoint_exhausted(monkeypatch):
     from tier_1.contracts.session_store import save_contract
 
     blueprint = DecisionBlueprint(
-        winning_dish={"dish_id": "dish1", "name": "First Dish"},
+        winning_dish={"dish_id": "dish1", "name": "Afghan Single Chicken Tikka Burger"},
         top_candidates=[
-            Candidate(dish_id="dish1", name="First Dish", price_pkr=500.0),
-            Candidate(dish_id="dish2", name="Second Dish", price_pkr=600.0),
+            Candidate(dish_id="dish1", name="Afghan Single Chicken Tikka Burger", price_pkr=500.0),
+            Candidate(dish_id="dish2", name="Spicy & Sour Chicken Tom Yum Gai", price_pkr=600.0),
         ],
     )
 

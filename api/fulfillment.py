@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/decision_blueprint", response_model=DecisionBlueprint)
-def get_decision_blueprint(request: Request):
+def get_decision_blueprint(request: Request, lat: float = None, lon: float = None):
     """Returns the current decision_blueprint.json to the frontend."""
     from tier_1.contracts.session_store import load_contract
     from tier_3.fulfillment_engine import enrich_blueprint
@@ -25,7 +25,7 @@ def get_decision_blueprint(request: Request):
     if hasattr(blueprint, "model_dump"):
         blueprint = blueprint.model_dump()
 
-    return enrich_blueprint(blueprint)
+    return enrich_blueprint(blueprint, user_lat=lat, user_lon=lon)
 
 
 @router.get("/personas", response_model=Dict[str, Persona])

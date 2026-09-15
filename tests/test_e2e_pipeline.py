@@ -36,7 +36,7 @@ def setup_e2e_env(monkeypatch, tmp_path):
             "safe_candidates": [
                 {
                     "dish_id": "dish1",
-                    "name": "Spicy Chicken",
+                    "name": "Afghan Single Chicken Tikka Burger",
                     "price_pkr": 500,
                     "category": "Main",
                     "taste_profile": {
@@ -54,7 +54,7 @@ def setup_e2e_env(monkeypatch, tmp_path):
                 },
                 {
                     "dish_id": "dish2",
-                    "name": "Sweet Dessert",
+                    "name": "Chocolate (Small)",
                     "price_pkr": 600,
                     "category": "Dessert",
                     "taste_profile": {
@@ -68,7 +68,7 @@ def setup_e2e_env(monkeypatch, tmp_path):
                     "protein_g": 5.0,
                     "calories": 300.0,
                     "allergens": [],
-                    "ingredients": ["Sugar"],
+                    "ingredients": ["Chocolate"],
                 },
             ],
             "soft_constraints": intent.get("soft_constraints", {}),
@@ -83,7 +83,7 @@ def setup_e2e_env(monkeypatch, tmp_path):
 
     monkeypatch.setitem(
         RECIPES,
-        "Spicy Chicken",
+        "Afghan Single Chicken Tikka Burger",
         {
             "prep_time": "10 min",
             "cook_time": "20 min",
@@ -95,7 +95,7 @@ def setup_e2e_env(monkeypatch, tmp_path):
     )
     monkeypatch.setitem(
         RECIPES,
-        "Sweet Dessert",
+        "Chocolate (Small)",
         {
             "prep_time": "5 min",
             "cook_time": "0 min",
@@ -119,33 +119,34 @@ def test_e2e_flow():
     submit_data = res_submit.json()
 
     assert "winning_dish" in submit_data
-    assert submit_data["winning_dish"]["name"] == "Spicy Chicken"
+    assert submit_data["winning_dish"]["name"] == "Afghan Single Chicken Tikka Burger"
     assert len(submit_data.get("top_candidates", [])) > 0
     runners_up = submit_data["top_candidates"]
-    assert any(c["name"] == "Sweet Dessert" for c in runners_up)
+    assert any(c["name"] == "Chocolate (Small)" for c in runners_up)
 
     # 2. Recalculate with different persona (e.g. sweet_tooth)
-    # We expect Sweet Dessert to win now because persona dictates sweet taste
+    # We expect Chocolate (Small) to win now because persona dictates sweet taste
     res_recalc = client.post(
         "/recalculate",
         json={"w_health": 0.0, "w_budget": 0.0, "w_taste": 1.0, "persona": "sweet_tooth"},
     )
     assert res_recalc.status_code == 200
     recalc_data = res_recalc.json()
-    assert recalc_data["winning_dish"]["name"] == "Sweet Dessert"
+    assert recalc_data["winning_dish"]["name"] == "Chocolate (Small)"
 
     # 3. Alternate
-    # If Sweet Dessert was winner, and we reject it, it should go back to Spicy Chicken
+    # If Chocolate (Small) was the winner and we reject it, the pick should go back to
+    # Afghan Single Chicken Tikka Burger
     res_alt = client.post("/alternate", json={"already_rejected": ["dish2"]})
     assert res_alt.status_code == 200
     alt_data = res_alt.json()
-    assert alt_data["winning_dish"]["name"] == "Spicy Chicken"
+    assert alt_data["winning_dish"]["name"] == "Afghan Single Chicken Tikka Burger"
 
     # 4. Fulfillment endpoint
     res_fulfill = client.get("/decision_blueprint")
     assert res_fulfill.status_code == 200
     fulfill_data = res_fulfill.json()
-    assert fulfill_data["winning_dish"]["name"] == "Spicy Chicken"
+    assert fulfill_data["winning_dish"]["name"] == "Afghan Single Chicken Tikka Burger"
 
     # Verify deep links are present
     assert "fulfillment" in fulfill_data

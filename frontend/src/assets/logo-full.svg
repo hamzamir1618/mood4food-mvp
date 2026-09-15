@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 200" fill="currentColor" role="img" aria-label="Mood4Food — Curated Dining Discovery">
+  <!--
+    Mood4Food Full Lockup — Mark + Wordmark
+    Uses currentColor + Outfit font (must be loaded in rendering context).
+  -->
+  <defs>
+    <mask id="lockup-void">
+      <rect width="200" height="200" fill="white"/>
+      <circle cx="100" cy="100" r="14" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- ═══ MARK (left side, 200×200) ═══ -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="currentColor" stroke-width="4"/>
+  <circle cx="100" cy="100" r="76" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <!-- Seal studs -->
+  <circle cx="100" cy="7" r="6"/><circle cx="193" cy="100" r="6"/>
+  <circle cx="100" cy="193" r="6"/><circle cx="7" cy="100" r="6"/>
+  <circle cx="165.8" cy="34.2" r="4"/><circle cx="165.8" cy="165.8" r="4"/>
+  <circle cx="34.2" cy="165.8" r="4"/><circle cx="34.2" cy="34.2" r="4"/>
+  <!-- Compass rose -->
+  <g mask="url(#lockup-void)">
+    <path d="M107,93 L166,100 L107,107 L100,166 L93,107 L34,100 L93,93Z"/>
+    <rect x="93" y="38" width="4.5" height="62" rx="2.25"/>
+    <rect x="97.75" y="28" width="4.5" height="72" rx="2.25"/>
+    <rect x="102.5" y="38" width="4.5" height="62" rx="2.25"/>
+    <path d="M125,75 L114,100 L125,125 L100,114 L75,125 L86,100 L75,75 L100,86Z"/>
+  </g>
+  <circle cx="100" cy="100" r="3.5"/>
+
+  <!-- ═══ SEPARATOR ═══ -->
+  <path d="M222,94 L228,100 L222,106 L216,100Z" opacity="0.3"/>
+
+  <!-- ═══ WORDMARK ═══ -->
+  <text x="250" y="114" font-family="'Outfit Variable','Outfit',sans-serif" font-size="54" fill="currentColor">
+    <tspan font-weight="700" letter-spacing="4">MOOD</tspan>
+    <tspan font-weight="300" dx="4" letter-spacing="0">4</tspan>
+    <tspan font-weight="700" dx="4" letter-spacing="4">FOOD</tspan>
+  </text>
+
+  <!-- ═══ TAGLINE ═══ -->
+  <line x1="250" y1="132" x2="680" y2="132" stroke="currentColor" stroke-width="0.75" opacity="0.15"/>
+  <text x="250" y="152" font-family="'Outfit Variable','Outfit',sans-serif" font-size="12" font-weight="400" letter-spacing="5" fill="currentColor" opacity="0.5">
+    CURATED DINING DISCOVERY
+  </text>
+</svg>

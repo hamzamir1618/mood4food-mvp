@@ -5,3 +5,4 @@ fakeredis
 testcontainers[neo4j]
 pytest-playwright
 playwright
+openpyxl  # reads the data_review/ worksheets in the Phase 1 pipeline

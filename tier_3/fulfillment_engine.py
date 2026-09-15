@@ -136,23 +136,64 @@ RECIPES = {
 
 
 # ── Generic recipe generator for dishes not in the curated database ──────────
-def _generate_generic_recipe(dish_name: str, ingredients: list[str], price: float) -> dict:
+def _generate_generic_recipe(
+    dish_name: str, ingredients: list[str], price: float, category: str = "Dish"
+) -> dict:
     """Generates a plausible recipe structure from dish metadata."""
+    if not ingredients or ingredients == [dish_name]:
+        # Fallback if no real ingredients are listed
+        return {
+            "prep_time": "—",
+            "cook_time": "—",
+            "servings": 2,
+            "difficulty": "Unknown",
+            "steps": ["Recipe steps for this dish aren't available yet."],
+            "grocery_list": [],
+        }
+
+    main_ingredients = ", ".join(ingredients[:3])
+
+    steps = [
+        f"Gather and prepare the main ingredients for this {category.lower()}: {main_ingredients}.",
+    ]
+
+    cat_lower = category.lower()
+    if "drink" in cat_lower or "beverage" in cat_lower or "shake" in cat_lower:
+        steps.append(f"Blend or mix {ingredients[0]} until smooth.")
+        steps.append("Pour into a glass and serve chilled.")
+    elif "snack" in cat_lower or "fast food" in cat_lower:
+        steps.append("Heat oil in a pan or fryer.")
+        steps.append(
+            f"Fry or bake the main components (like {ingredients[0]}) until golden and crispy."
+        )
+        steps.append("Assemble the snack and serve hot.")
+    elif "dessert" in cat_lower or "sweet" in cat_lower:
+        steps.append(f"Prepare the sweet base using {ingredients[0]}.")
+        steps.append("Mix well and cook gently on low heat if required.")
+        steps.append("Garnish and serve as a dessert.")
+    else:
+        steps.append("Heat oil in a pan over medium heat.")
+        steps.append(f"Sauté aromatics if any, then add {ingredients[0]} and cook until browned.")
+        steps.append("Add the remaining ingredients and season to taste.")
+        steps.append("Simmer until fully cooked and flavors meld together.")
+        steps.append(f"Garnish the {dish_name} and serve hot.")
+
+    # Validation check: Ensure at least one actual ingredient is explicitly in the steps
+    valid = False
+    for ing in ingredients:
+        if ing and any(ing.lower() in step.lower() for step in steps):
+            valid = True
+            break
+
+    if not valid:
+        steps = ["Recipe steps for this dish aren't available yet."]
+
     return {
         "prep_time": "10 min",
         "cook_time": "30 min",
         "servings": 2,
         "difficulty": "Medium",
-        "steps": [
-            f"Prepare all ingredients for {dish_name}.",
-            "Wash and chop vegetables. Prepare proteins if needed.",
-            "Heat oil in a pan over medium heat.",
-            "Add aromatics (onion, garlic, ginger) and sauté until fragrant.",
-            "Add main ingredients and cook according to type.",
-            "Season with spices, salt, and any sauces.",
-            "Simmer until fully cooked and flavours meld together.",
-            "Garnish and serve hot.",
-        ],
+        "steps": steps,
         "grocery_list": [
             {"item": ing.title(), "qty": "as needed", "est_cost": max(5, int(price * 0.08))}
             for ing in ingredients[:8]  # Top 8 ingredients
@@ -179,7 +220,9 @@ MOCK_RESTAURANTS = [
 ]
 
 
-def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: float = 0) -> dict:
+def get_recipe(
+    dish_name: str, ingredients: list[str] | None = None, price: float = 0, category: str = "Dish"
+) -> dict:
     """Returns a recipe for the dish. Uses curated DB first, generic fallback."""
     if dish_name in RECIPES:
         log.info("recipe found (curated): %s", dish_name)
@@ -192,7 +235,7 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
         if not ingredients:
             log.warning("generating recipe with empty ingredient list for %s", dish_name)
             ingredients = [dish_name]
-        recipe = _generate_generic_recipe(dish_name, ingredients, price)
+        recipe = _generate_generic_recipe(dish_name, ingredients, price, category)
         recipe["source"] = "generated"
 
     total = 0
@@ -212,13 +255,17 @@ def get_recipe(dish_name: str, ingredients: list[str] | None = None, price: floa
 
 class RestaurantProvider(ABC):
     @abstractmethod
-    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+    def find_nearby(
+        self, dish_name: str, user_lat: float = None, user_lon: float = None
+    ) -> list[Restaurant]:
         """Find nearby restaurants that serve the specified dish."""
         pass
 
 
 class MockRestaurantProvider(RestaurantProvider):
-    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+    def find_nearby(
+        self, dish_name: str, user_lat: float = None, user_lon: float = None
+    ) -> list[Restaurant]:
         """Returns mock restaurant options that serve the dish."""
         random.seed(hash(dish_name) % 2**32)  # Deterministic per dish
         count = random.randint(2, len(MOCK_RESTAURANTS))
@@ -233,8 +280,76 @@ class MockRestaurantProvider(RestaurantProvider):
         return restaurants
 
 
+class Neo4jRestaurantProvider(RestaurantProvider):
+    def find_nearby(
+        self, dish_name: str, user_lat: float = None, user_lon: float = None
+    ) -> list[Restaurant]:
+        """Find real restaurants that serve this dish from Neo4j."""
+        import math
+
+        def haversine(lat1, lon1, lat2, lon2):
+            R = 6371.0  # km
+            lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+            dlat = lat2 - lat1
+            dlon = lon2 - lon1
+            a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+            c = 2 * math.asin(math.sqrt(a))
+            return R * c
+
+        from neo4j import GraphDatabase
+
+        from config import settings
+
+        driver = GraphDatabase.driver(
+            settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
+        )
+        query = """
+        MATCH (r:Restaurant)-[:SERVES]->(d:Dish {name: $dish_name})
+        RETURN r.name AS name, r.address AS address, r.lat AS lat, r.lng AS lon,
+               d.price_rs AS price_rs
+        """
+        restaurants = []
+        with driver.session() as session:
+            result = session.run(query, dish_name=dish_name)
+            for record in result:
+                dist = None
+                r_lat = record.get("lat")
+                r_lon = record.get("lon")
+                if (
+                    user_lat is not None
+                    and user_lon is not None
+                    and r_lat is not None
+                    and r_lon is not None
+                ):
+                    try:
+                        dist = haversine(user_lat, user_lon, float(r_lat), float(r_lon))
+                    except (ValueError, TypeError):
+                        pass
+
+                restaurants.append(
+                    Restaurant(
+                        name=record["name"],
+                        address=record["address"],
+                        lat=r_lat,
+                        lon=r_lon,
+                        dish_available=dish_name,
+                        distance_km=round(dist, 2) if dist is not None else None,
+                    )
+                )
+        driver.close()
+
+        if not restaurants:
+            # Fallback to OSM
+            osm = OSMRestaurantProvider()
+            return osm.find_nearby(dish_name, user_lat, user_lon)
+
+        return restaurants
+
+
 class OSMRestaurantProvider(RestaurantProvider):
-    def find_nearby(self, dish_name: str) -> list[Restaurant]:
+    def find_nearby(
+        self, dish_name: str, user_lat: float = None, user_lon: float = None
+    ) -> list[Restaurant]:
         """Queries Overpass API for restaurants in Islamabad."""
         redis_client = get_redis()
         cache_key = f"osm_cache:{dish_name}:islamabad"
@@ -322,13 +437,15 @@ class OSMRestaurantProvider(RestaurantProvider):
 
 
 def get_restaurant_provider() -> RestaurantProvider:
-    provider = os.environ.get("RESTAURANT_PROVIDER", "mock").lower()
+    provider = os.environ.get("RESTAURANT_PROVIDER", "neo4j").lower()
     if provider == "osm":
         return OSMRestaurantProvider()
-    return MockRestaurantProvider()
+    elif provider == "mock":
+        return MockRestaurantProvider()
+    return Neo4jRestaurantProvider()
 
 
-def enrich_blueprint(blueprint: dict) -> dict:
+def enrich_blueprint(blueprint: dict, user_lat: float = None, user_lon: float = None) -> dict:
     """Enriches a decision blueprint with fulfillment data (recipe + restaurants)."""
     winning_dish = blueprint.get("winning_dish")
     if not winning_dish:
@@ -341,12 +458,15 @@ def enrich_blueprint(blueprint: dict) -> dict:
     # Get ingredients from candidate scores if available
     ingredients = winning_dish.get("ingredients", [])
     price = winning_dish.get("price_pkr", 0)
+    category = winning_dish.get("category", "Dish")
 
     provider = get_restaurant_provider()
 
     blueprint["fulfillment"] = {
-        "recipe": get_recipe(dish_name, ingredients, price),
-        "restaurants": [r.model_dump() for r in provider.find_nearby(dish_name)],
+        "recipe": get_recipe(dish_name, ingredients, price, category),
+        "restaurants": [
+            r.model_dump() for r in provider.find_nearby(dish_name, user_lat, user_lon)
+        ],
     }
 
     log.info("blueprint enriched with fulfillment data for: %s", dish_name)

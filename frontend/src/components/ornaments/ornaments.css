@@ -1,0 +1,188 @@
+/*
+ * ornaments.css — Styling for SVG ornamental elements and CSS-generated textures.
+ *
+ * All textures are CSS-only or inline SVG data URIs. Zero raster images.
+ * Uses the gold accent system from the design system (--gold, --gold-muted).
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   1. LINEN / PARCHMENT BACKGROUND TEXTURE
+   
+   A subtle noise texture overlaid on surfaces via ::after pseudo-element.
+   Uses an inline SVG <feTurbulence> filter to generate organic grain.
+   The SVG itself is < 300 bytes as a data URI — zero network requests.
+   ═══════════════════════════════════════════════════════════ */
+
+.ornament-texture-linen {
+  position: relative;
+}
+
+.ornament-texture-linen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+/* Slightly stronger variant for hero / large surfaces */
+.ornament-texture-linen--strong::after {
+  opacity: 0.06;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. CROSSHATCH PATTERN
+   
+   A fine 45° crosshatch for recessed panels, giving a subtle
+   engraved / etched quality. Pure CSS repeating-linear-gradient.
+   ═══════════════════════════════════════════════════════════ */
+
+.ornament-texture-crosshatch {
+  position: relative;
+}
+
+.ornament-texture-crosshatch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  border-radius: inherit;
+  z-index: 1;
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 4px,
+      rgba(201, 168, 76, 0.3) 4px,
+      rgba(201, 168, 76, 0.3) 4.5px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 4px,
+      rgba(201, 168, 76, 0.3) 4px,
+      rgba(201, 168, 76, 0.3) 4.5px
+    );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. CARD FRAME
+   
+   Positioning for the four CornerFlourish elements and
+   the gold-bordered card styling.
+   ═══════════════════════════════════════════════════════════ */
+
+.ornament-card-frame {
+  position: relative;
+  border: 1px solid var(--gold-muted, #8A7A4A);
+  border-radius: 6px;
+  background: var(--bg-elevated, #241C17);
+  overflow: visible;
+}
+
+/* Add the linen texture automatically to framed cards */
+.ornament-card-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.025;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+.ornament-card-frame__content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Corner positioning */
+.ornament-card-frame__corner {
+  position: absolute;
+  z-index: 3;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.ornament-card-frame:hover .ornament-card-frame__corner {
+  opacity: 0.75;
+}
+
+.ornament-card-frame__corner--tl { top: -4px; left: -4px; }
+.ornament-card-frame__corner--tr { top: -4px; right: -4px; }
+.ornament-card-frame__corner--bl { bottom: -4px; left: -4px; }
+.ornament-card-frame__corner--br { bottom: -4px; right: -4px; }
+
+/* ═══════════════════════════════════════════════════════════
+   4. SECTION DIVIDERS
+   ═══════════════════════════════════════════════════════════ */
+
+.ornament-divider {
+  width: 100%;
+  padding: 8px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.ornament-divider__svg {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   5. GOLD FILIGREE BORDER (top or bottom edge of sections)
+   
+   A repeating scallop / arch pattern, pure CSS, used as a
+   decorative border-image or top/bottom edge ornament.
+   ═══════════════════════════════════════════════════════════ */
+
+.ornament-filigree-edge {
+  position: relative;
+}
+
+.ornament-filigree-edge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='6' fill='none'%3E%3Cpath d='M0,6 Q6,0 12,6 Q18,0 24,6' stroke='%23C9A84C' stroke-width='0.75' opacity='0.35'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 24px 6px;
+  pointer-events: none;
+}
+
+/* Bottom variant */
+.ornament-filigree-edge--bottom::before {
+  top: auto;
+  bottom: 0;
+  transform: scaleY(-1);
+}
+
+/* Both edges */
+.ornament-filigree-edge--both::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='6' fill='none'%3E%3Cpath d='M0,6 Q6,0 12,6 Q18,0 24,6' stroke='%23C9A84C' stroke-width='0.75' opacity='0.35'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 24px 6px;
+  transform: scaleY(-1);
+  pointer-events: none;
+}

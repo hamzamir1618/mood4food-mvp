@@ -1,0 +1,11 @@
+# Heavy local ML, needed only for audio and image ingestion (DEPLOY_MODE=full).
+# Deliberately kept out of requirements.txt: these will not build inside a
+# free-tier web host's memory and disk budget, and the base app never imports
+# them -- faster_whisper, transformers and torch are all imported lazily,
+# inside the functions that use them.
+#
+#   pip install -r requirements.txt -r requirements-ml.txt
+
+faster-whisper
+transformers
+torch

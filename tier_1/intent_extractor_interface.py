@@ -15,10 +15,10 @@ class IntentExtractor(ABC):
 def get_extractor() -> IntentExtractor:
     from config import settings
 
-    if settings.INTENT_EXTRACTOR == "slm":
-        from tier_1.slm_extractor import SLMExtractorImpl
+    if settings.INTENT_EXTRACTOR == "groq":
+        from tier_1.groq_extractor import GroqExtractorImpl
 
-        return SLMExtractorImpl()
+        return GroqExtractorImpl()
     else:
         from tier_1.keyword_extractor import KeywordExtractorImpl
 

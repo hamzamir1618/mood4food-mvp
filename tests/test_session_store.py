@@ -28,9 +28,9 @@ def test_save_and_load_contract(monkeypatch):
     loaded = load_contract(session_id, contract_name)
     assert loaded == data
 
-    # Verify TTL (should be set to 900 seconds)
+    # Verify TTL (should be set to 7200 seconds)
     ttl = fake_redis.ttl(f"{session_id}:{contract_name}")
-    assert 0 < ttl <= 900
+    assert 0 < ttl <= 7200
 
 
 def test_submit_session_isolation(monkeypatch):
@@ -87,8 +87,11 @@ def test_submit_session_isolation(monkeypatch):
     # No need, we can just inspect FakeRedis keys.
     keys = fake_redis.keys("*")
 
-    # We expect 2 session IDs, each with 3 contracts
-    assert len(keys) == 6
+    # We expect 2 session IDs, each with the 3 contracts (sessions also keep a scoring
+    # context and a guest-history list)
+    contracts = ("grounded_intent", "candidate_evaluation", "decision_blueprint")
+    assert len([k for k in keys if k.split(":", 1)[1] in contracts]) == 6
+    assert len([k for k in keys if k.endswith(":events")]) == 2
 
     pizza_intents = [
         k
@@ -161,7 +164,6 @@ def test_recalculate_after_submit_200(monkeypatch):
     monkeypatch.setattr("tier_1.symbolic_anchoring.run_anchoring_pipeline", mock_anchor)
     monkeypatch.setattr("tier_2.consensus_manager.run_debate_pipeline", mock_debate)
     monkeypatch.setattr("tier_3.fulfillment_engine.enrich_blueprint", lambda x: x)
-    monkeypatch.setattr("tier_2.agents.TasteAgent.score", lambda self, x: 0.5)
 
     from fastapi.testclient import TestClient
 

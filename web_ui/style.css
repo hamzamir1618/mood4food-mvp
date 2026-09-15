@@ -177,6 +177,18 @@ body {
 .query-status.success { color: var(--accent-health); }
 .query-status.error   { color: #EF4444; }
 
+.budget-warning {
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #B45309;
+  background-color: #FEF3C7;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid #FDE68A;
+  animation: fadeIn 0.3s ease-out;
+}
+
 .upload-btn {
   width: 36px; height: 36px; flex-shrink: 0;
   background: var(--bg-card); border: 1.5px solid var(--border-card);
@@ -815,6 +827,63 @@ body {
   display: flex; align-items: center; gap: 7px;
   margin-bottom: 12px;
 }
+
+.winner-label {
+  display: inline-block;
+  background: var(--accent-primary-light); color: var(--accent-primary-dark);
+  padding: 4px 10px; border-radius: 9999px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.winner-dish-name {
+  font-size: 26px; font-weight: 800; line-height: 1.1; margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.winner-reasons {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0,0,0,0.05);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  backdrop-filter: blur(4px);
+}
+.dark-mode .winner-reasons {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.reasons-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.reason-line {
+  font-size: 13px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.reason-line:last-child {
+  margin-bottom: 0;
+}
+.reason-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.winner-tags {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0;
+}
+
 .restaurants-section h2 span { font-size: 17px; }
 
 .restaurants-grid {
@@ -1353,10 +1422,13 @@ ol.recipe-steps li::before {
   max-width: 400px;
 }
 .toast.error {
-  border-left-color: #ff4d4d;
+  border-left: 4px solid var(--error);
 }
 .toast.success {
-  border-left-color: #4CAF50;
+  border-left: 4px solid var(--accent-health);
+}
+.toast.info {
+  border-left: 4px solid var(--accent-budget);
 }
 .toast-icon {
   font-size: 1.2rem;

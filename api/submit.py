@@ -22,17 +22,12 @@ async def submit_query(
     image: UploadFile | None = File(default=None),
 ):
     """
-    Accepts a natural language food query (text), plus optional audio and
-    image file uploads. Runs the full 3-stage multimodal pipeline:
-      Tier 1a (intent parsing) → Tier 1b (Neo4j pruning) → Tier 2 (debate)
-    Returns the resulting decision_blueprint enriched with fulfillment data.
+    Accepts a natural language food query (text), or an audio or image file upload,
+    and returns one recommendation from the full pipeline (api/pipeline.py). For a
+    conversation that can ask a question or be refined, use /chat.
     """
+    from api.pipeline import recommend
     from config import settings
-    from tier_1.contracts.session_store import load_contract, save_contract
-    from tier_1.multi_modal_ingestion import run_ingestion_pipeline
-    from tier_1.symbolic_anchoring import run_anchoring_pipeline
-    from tier_2.consensus_manager import run_debate_pipeline
-    from tier_3.fulfillment_engine import enrich_blueprint
 
     text = text.strip() if text else ""
     has_audio = bool(audio and audio.filename)
@@ -83,49 +78,4 @@ async def submit_query(
         audio.filename if has_audio else "(none)",
         image.filename if has_image else "(none)",
     )
-
-    # Stage 1: Multimodal Intent Parsing
-    try:
-        intent = run_ingestion_pipeline(  # noqa: F841
-            raw_input=text or None,
-            audio_path=audio_path,
-            image_path=image_path,
-        )
-        save_contract(request.state.session_id, "grounded_intent", intent)
-    except Exception as exc:
-        log.error("Tier 1a failed: %s", exc)
-        raise HTTPException(500, f"Intent parsing failed: {exc}")
-
-    # Stage 2: Neo4j Allergen Pruning
-    try:
-        evaluation = run_anchoring_pipeline(intent)
-        save_contract(request.state.session_id, "candidate_evaluation", evaluation)
-    except Exception as exc:
-        log.error("Tier 1b failed: %s", exc)
-        raise HTTPException(503, f"Neo4j query failed — is the database running? ({exc})")
-
-    # Stage 3: Multi-Agent Debate
-    try:
-        run_debate_pipeline(request.state.session_id)
-    except Exception as exc:
-        log.error("Tier 2 failed: %s", exc)
-        raise HTTPException(500, f"Debate pipeline failed: {exc}")
-
-    # Return the freshly written blueprint from the session store
-    blueprint = load_contract(request.state.session_id, "decision_blueprint")
-    if not blueprint:
-        raise HTTPException(500, "Pipeline completed but decision_blueprint was not created.")
-
-    if hasattr(blueprint, "model_dump"):
-        blueprint = blueprint.model_dump()
-
-    # Enrich with fulfillment data (recipe + restaurants)
-    blueprint = enrich_blueprint(blueprint)
-
-    winner_name = "?"
-    winning_dish = blueprint.get("winning_dish")
-    if winning_dish:
-        winner_name = winning_dish.get("name", "?")
-
-    log.info("─── /submit complete → winner: %s ───", winner_name)
-    return blueprint
+    return recommend(request, text or None, audio_path, image_path)

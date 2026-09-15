@@ -11,3 +11,12 @@ ignore = []
 
 [lint.per-file-ignores]
 "test_suite.py" = ["E501"]
+# Data tables and prompt text: exact USDA descriptions, alias lists and the classifier and
+# intent-extraction prompts read better unbroken than wrapped (wrapping a prompt changes it).
+"pipeline/classify_categories.py" = ["E501"]
+"pipeline/usda_reference.py" = ["E501"]
+"pipeline/ingredients.py" = ["E501"]
+"tier_1/groq_extractor.py" = ["E501"]
+# Fixture rows copied from the dataset, with escaped Urdu addresses.
+"tests/test_input_validation.py" = ["E501"]
+"tests/test_symbolic_anchoring_integration.py" = ["E501"]
