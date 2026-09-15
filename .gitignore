@@ -60,3 +60,6 @@ data_review/
 # ── Dataset (kept out of the public repository; see ATTRIBUTIONS.md) ────────
 /handoff_output/
 /data/
+
+# ── Saved design canvases (they bundle the design editor; rebuild them from the .dc.html sources) ──
+design/**/mood4food-*.html

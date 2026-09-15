@@ -1,0 +1,57 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "E revised" },
+    { "id": "page-2", "name": "Earlier drafts" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 1480, "title": "E revised · Recommendation", "page": "page-1" },
+    { "file": "WhyThisPick.dc.html", "x": 480, "y": 0, "w": 390, "h": 844, "title": "E revised · How it scored", "page": "page-1" },
+    { "file": "Buttons.dc.html", "x": 960, "y": 0, "w": 390, "h": 1540, "title": "Button options", "page": "page-1" },
+    { "file": "DirectionE.dc.html", "x": 0, "y": 0, "w": 390, "h": 1460, "title": "E · Warm Kitchen (before)", "page": "page-2" },
+    { "file": "DirectionD.dc.html", "x": 480, "y": 0, "w": 390, "h": 1560, "title": "D · Bright & Chunky", "page": "page-2" },
+    { "file": "DirectionF.dc.html", "x": 960, "y": 0, "w": 390, "h": 844, "title": "F · One Card", "page": "page-2" }
+  ],
+  "annotations": [
+    {
+      "id": "revised-brief",
+      "page": "page-1",
+      "x": 0,
+      "y": -330,
+      "w": 870,
+      "text": "E revised, fixing the AI-generated look. A stock photo replaces the empty hero, labelled \"Representative image\" as the app already does. The page is neutral so the food carries the colour, and one accent appears only on the main button and the active tab. Red Hat Display and Red Hat Text replace Bricolage and Onest. Nothing is boxed except buttons. One short paragraph replaces the tiles, bullets and ring; the full scores moved to \"How it scored\". Real details were added: area, distance and servings.\nDistances are straight-line from a sample location (G-9 Markaz). The accent switcher above the screen offers four options."
+    },
+    {
+      "id": "brief",
+      "page": "page-2",
+      "x": 0,
+      "y": -270,
+      "w": 1350,
+      "text": "Round two, after \"too childish, too busy to read, wrong colours and fonts\". Three calmer takes that borrow Duolingo's principles (flat rounded shapes, chunky pressable buttons, lots of space, one clear focus per screen) but not its look. All three show the same real recommendation as round one. E was chosen and reworked on the first page."
+    },
+    {
+      "id": "why-e",
+      "page": "page-2",
+      "x": 0,
+      "y": 1540,
+      "w": 390,
+      "text": "E · Warm Kitchen, before the rework\nCream and food colours, a big dish photo, scores as three tiles.\nKept as the \"before\" for comparison."
+    },
+    {
+      "id": "why-d",
+      "page": "page-2",
+      "x": 480,
+      "y": 1640,
+      "w": 390,
+      "text": "D · Bright & Chunky\nWhite, one accent colour, chunky buttons, everything in one scroll.\nFor: the plainest to read; every score keeps its sentence.\nAgainst: the longest scroll, so the runners-up sit well below the first screen."
+    },
+    {
+      "id": "why-f",
+      "page": "page-2",
+      "x": 960,
+      "y": 924,
+      "w": 390,
+      "text": "F · One Card\nOne dish at a time on a single screen, like a flashcard; the other picks wait in the stack behind it.\nFor: the most focused. Nothing to scroll, and both answers sit under your thumb.\nAgainst: the smallest text, and the runners-up are a tap away rather than visible."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}
