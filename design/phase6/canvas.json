@@ -1,0 +1,38 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 390, "h": 1660, "title": "A · Sticker Arcade" },
+    { "file": "DirectionB.dc.html", "x": 480, "y": 0, "w": 390, "h": 1480, "title": "B · Collectible Card" },
+    { "file": "DirectionC.dc.html", "x": 960, "y": 0, "w": 390, "h": 1540, "title": "C · Tabletop Board Game" }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -250,
+      "w": 1350,
+      "text": "Three takes on the game-style direction: busy, big friendly elements, bold colours. All three show the same real recommendation, from Mood4Food's scoring on \"spicy chicken karahi under 1500\". Pick one, or mix parts of them, and I'll build the full screen set in it: sign-in, onboarding, the conversation, this recommendation, the taste profile and history. Dish pictures are placeholders; the app has no dish photos yet, only labelled stock images."
+    },
+    {
+      "id": "why-a",
+      "x": 0,
+      "y": 1740,
+      "w": 390,
+      "text": "A · Sticker Arcade\nFlat bold colour, thick ink outlines, hard shadows and scattered stickers, like a casual mobile game.\nFor: the friendliest and most readable; chunky buttons and full score bars.\nAgainst: the least like a game world. It is playful styling more than game mechanics."
+    },
+    {
+      "id": "why-b",
+      "x": 480,
+      "y": 1740,
+      "w": 390,
+      "text": "B · Collectible Card\nEach dish is a trading card with stat pips; the runners-up are the rest of your hand, with a Wildcard for \"something different\".\nFor: the most distinctive, and scores read instantly as game stats.\nAgainst: the busiest and hardest to keep legible; the card frame costs space on small phones."
+    },
+    {
+      "id": "why-c",
+      "x": 960,
+      "y": 1740,
+      "w": 390,
+      "text": "C · Tabletop Board Game\nCardboard tiles, dice pips for scores, and the runners-up as the next spaces on the board.\nFor: warm and tactile; five pips are easier to read at a glance than percentages.\nAgainst: pips are coarser than bars (five steps), and the paper look is calmer than \"bold colours\"."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
