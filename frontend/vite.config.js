@@ -14,13 +14,21 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/submit': 'http://localhost:8000',
-      '/recalculate': 'http://localhost:8000',
-      '/decision_blueprint': 'http://localhost:8000',
-      '/alternate': 'http://localhost:8000',
-      '/health': 'http://localhost:8000',
-      '/personas': 'http://localhost:8000',
-    },
+    // 127.0.0.1, not localhost: Vite resolves localhost to ::1 here, where uvicorn isn't.
+    proxy: Object.fromEntries(
+      [
+        '/submit',
+        '/recalculate',
+        '/decision_blueprint',
+        '/alternate',
+        '/health',
+        '/personas',
+        '/chat',
+        '/approve',
+        '/areas',
+        '/auth',
+        '/profile',
+      ].map((path) => [path, 'http://127.0.0.1:8000']),
+    ),
   },
 });

@@ -1,3 +1,5 @@
+/* The backend, in one place. Cookies carry the session and the sign-in. */
+
 export class ApiError extends Error {
   constructor(message, status, details) {
     super(message);
@@ -7,54 +9,78 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = '';
+const BASE = '';
 
-async function handleResponse(resp) {
+async function handle(resp) {
   if (!resp.ok) {
     let details = {};
     try {
       details = await resp.json();
-    } catch (e) {}
-    throw new ApiError(details.detail || `Server responded ${resp.status}`, resp.status, details);
+    } catch (e) {
+      /* a non-JSON error body is fine; the status still tells us enough */
+    }
+    const detail = details.detail;
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail) && detail[0]?.msg
+          ? detail[0].msg
+          : `The server responded ${resp.status}.`;
+    throw new ApiError(message, resp.status, details);
   }
   return resp.json();
 }
 
-export async function submitQuery(input) {
-  const resp = await fetch(`${API_BASE}/submit`, { method: 'POST', body: input });
-  return handleResponse(resp);
+function get(path) {
+  return fetch(`${BASE}${path}`, { credentials: 'include' }).then(handle);
 }
 
-export async function recalculate(weights) {
-  const resp = await fetch(`${API_BASE}/recalculate`, {
-    method: 'POST',
+function send(path, body, method = 'POST') {
+  return fetch(`${BASE}${path}`, {
+    method,
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(weights),
-  });
-  return handleResponse(resp);
+    body: JSON.stringify(body ?? {}),
+  }).then(handle);
 }
 
-export async function getFulfillment() {
-  let query = '';
-  if (navigator.geolocation) {
-    try {
-      const pos = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 2000 });
-      });
-      query = `?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`;
-    } catch (e) {
-      console.warn("Could not get user location:", e);
-    }
-  }
-  const resp = await fetch(`${API_BASE}/decision_blueprint${query}`);
-  return handleResponse(resp);
+// ── The conversation ────────────────────────────────────────────────────────
+/** One turn: exactly one of text, answer, critique or skip, plus an optional location. */
+export const chat = (turn) => send('/chat', turn);
+export const approve = (dishId) => send('/approve', { dish_id: dishId });
+export const alternate = (rejected) => send('/alternate', { already_rejected: rejected });
+
+// ── Places ──────────────────────────────────────────────────────────────────
+export const areas = () => get('/areas');
+
+/** The browser's location, or null if the user says no or it takes too long. */
+export function locate(timeout = 8000) {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Where you are' }),
+      () => resolve(null),
+      { timeout },
+    );
+  });
 }
 
-export async function getAlternate(rejectedIds) {
-  const resp = await fetch(`${API_BASE}/alternate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ already_rejected: rejectedIds })
-  });
-  return handleResponse(resp);
-}
+// ── Account ─────────────────────────────────────────────────────────────────
+export const me = () => get('/auth/me');
+export const login = (email, password) => send('/auth/login', { email, password });
+export const register = (body) => send('/auth/register', body);
+export const logout = (everywhere = false) => send(`/auth/logout?everywhere=${everywhere}`);
+export const personas = () => get('/personas');
+
+// ── Profile ─────────────────────────────────────────────────────────────────
+export const profile = () => get('/profile');
+export const setDietary = (body) => send('/profile/dietary', body, 'PUT');
+export const setGoals = (body) => send('/profile/goals', body, 'PUT');
+export const setTaste = (values) => send('/profile/taste', { values }, 'PUT');
+export const setWeights = (body) => send('/profile/weights', body, 'PUT');
+export const resetTaste = (persona) => send('/profile/taste/reset', { persona: persona ?? null });
+export const learning = () => get('/profile/learning');
+export const history = (limit = 50) => get(`/profile/history?limit=${limit}`);
+export const similarTastes = (k = 5) => get(`/profile/similar-tastes?k=${k}`);
+export const deleteAccount = (password) => send('/profile/delete', { password });
+export const exportUrl = `${BASE}/profile/export`;
