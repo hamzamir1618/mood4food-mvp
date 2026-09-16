@@ -11,7 +11,7 @@ const MOODS = [
 
 const TICKER = 'Real menus · real prices · allergens in full · nothing sponsored · ';
 
-export default function Home({ onStart, busy, initialQuery }) {
+export default function Home({ onStart, busy, initialQuery, onAbout }) {
   const [picked, setPicked] = useState(initialQuery ? -1 : 0);
   const [query, setQuery] = useState(initialQuery || MOODS[0].text);
 
@@ -86,6 +86,9 @@ export default function Home({ onStart, busy, initialQuery }) {
             <span>{TICKER}</span>
           </div>
         </div>
+        <button className="lab lab-sm muted" onClick={onAbout} style={{ padding: '10px 0 0' }}>
+          Nutrition estimated · distances © OpenStreetMap · where the data comes from →
+        </button>
       </div>
     </div>
   );
