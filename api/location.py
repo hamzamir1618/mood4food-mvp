@@ -14,6 +14,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 EARTH_RADIUS_KM = 6371.0
+NEARBY_KM = 10.0  # beyond this a dish is left out, as long as something closer matches
 CONTRACT = "user_location"
 
 
@@ -38,6 +39,18 @@ def with_distances(candidates: list[dict], location: dict | None) -> list[dict]:
         c["distance_km"] = (
             round(distance_km(location["lat"], location["lng"], lat, lng), 1) if known else None
         )
+    return candidates
+
+
+def nearby(candidates: list[dict], limit_km: float = NEARBY_KM) -> list[dict]:
+    """
+    The candidates within `limit_km`, and those whose distance is unknown (not far, just not
+    known). When nothing known is that close, all of them: a far match beats no match, and
+    the distance term still ranks the nearer ones first.
+    """
+    kept = [c for c in candidates if c.get("distance_km") is None or c["distance_km"] <= limit_km]
+    if any(c.get("distance_km") is not None for c in kept):
+        return kept
     return candidates
 
 

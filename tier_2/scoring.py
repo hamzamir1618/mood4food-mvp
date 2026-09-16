@@ -9,6 +9,7 @@ the data behind it can be trusted, and a sentence explaining it.
   budget   a target band on the price, rather than "cheaper is always better"
   health   conditioned on a goal: muscle gain, weight loss, light, or balanced
   context  time of day and weather; small, and silent when no rule applies
+  distance how far the restaurant is from the location the user sent; left out without one
   novelty  a penalty for dishes recommended or passed over in the last week
 
 Aggregation shrinks each term toward a neutral 0.5 in proportion to how little its data
@@ -56,6 +57,10 @@ AMDR = {"protein": (0.10, 0.35), "carbs": (0.45, 0.65), "fat": (0.20, 0.35)}
 
 CONTEXT_WEIGHT = 0.1  # the clock, the weather, the usual expectation of a meal
 CONTEXT_WEIGHT_EXPLICIT = 0.3  # the query itself names the meal: "lunch", "dinner"...
+DISTANCE_WEIGHT = 0.3  # alongside health, budget and taste, which sum to 1
+NEAR_KM = 3.0  # this close counts as nearby: full distance utility
+FAR_KM = 12.0  # ...falling linearly to 0 here (most of Islamabad is within 8 km of G-9)
+AREA_PRECISION_CONFIDENCE = 0.7  # the restaurant is placed at its sector's centre
 NEUTRAL_UTILITY = 0.5  # what a term counts as where the data behind it is missing
 SNACK_FIT = 0.6  # context fit of a snack or dessert when a meal was expected
 NOVELTY_REJECTED = 0.7
@@ -67,7 +72,7 @@ DOUBLE_SERVINGS = 2  # a "Double" is two servings (the owner's rule)
 SUMMARY_GOOD = 0.7  # a term at least this strong is a point in the dish's favour
 SUMMARY_CAVEAT = 0.5  # ...and one below this is its caveat
 SUMMARY_MIN_CONFIDENCE = 0.5  # the summary only repeats what the data can support
-SUMMARY_ORDER = ("taste", "budget", "health")
+SUMMARY_ORDER = ("taste", "budget", "health", "distance")  # distance speaks only as a caveat
 
 PERSONA_GOALS = {"gym_bro": "muscle_gain", "health_nut": "light"}
 MEALS = ("breakfast", "brunch", "lunch", "dinner")
@@ -411,6 +416,26 @@ def context_term(dish: dict, prefs: Preferences) -> Term:
     return Term(utility, 1.0, f"{reason[0].upper()}{reason[1:]}, and this {suits} it.")
 
 
+def distance_term(dish: dict) -> Term:
+    km = dish.get("distance_km")
+    if km is None:
+        return Term(0.0, 0.0, "", False)
+    km = float(km)
+    utility = _range_score(km, 0.0, NEAR_KM, FAR_KM - NEAR_KM)
+    confidence = AREA_PRECISION_CONFIDENCE if dish.get("location_precision") == "area" else 1.0
+    about = "about " if confidence < 1 else ""
+    if utility >= SUMMARY_GOOD:
+        return Term(utility, confidence, f"It's {about}{km:.1f} km away.")
+    if utility >= SUMMARY_CAVEAT:
+        return Term(utility, confidence, f"It's {about}{km:.1f} km away, a bit of a trip.")
+    return Term(
+        utility,
+        confidence,
+        f"It's {about}{km:.0f} km away, which is a long way, so it's ranked lower.",
+        phrase=f"is {about}{km:.0f} km away",
+    )
+
+
 def novelty(dish: dict, prefs: Preferences) -> tuple[float, str]:
     uid = dish.get("dish_id")
     recent = [e for e in prefs.history if e.get("dish_uid") == uid and e.get("days_ago", 99) <= 7]
@@ -471,12 +496,14 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "budget": budget_term(dish, prefs),
         "taste": taste_term(dish, prefs),
         "context": context_term(dish, prefs),
+        "distance": distance_term(dish),
     }
     weights = {
         "health": prefs.weights["w_health"],
         "budget": prefs.weights["w_budget"],
         "taste": prefs.weights["w_taste"],
         "context": CONTEXT_WEIGHT_EXPLICIT if prefs.meal else CONTEXT_WEIGHT,
+        "distance": DISTANCE_WEIGHT,
     }
     # Each term counts in proportion to its confidence; the rest of its weight counts
     # as a neutral 0.5. Missing data is neither a zero nor a free pass.
@@ -536,6 +563,7 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "u_budget": _utility(terms["budget"]),
         "u_taste": _utility(terms["taste"]),
         "u_context": _utility(terms["context"]),
+        "u_distance": _utility(terms["distance"]),
         "u_total": round(total, 6),
         "confidence": {k: round(t.confidence, 3) for k, t in live.items()},
         "coverage": round(coverage, 3),
@@ -574,7 +602,7 @@ def traces(ranked: list[dict], prefs: Preferences, top: int = 5) -> list[str]:
                 f"    - {agent.capitalize()} Agent: {reason} "
                 f"(raw: {raw}, confidence: {confidence:.2f})"
             )
-        for extra in ("context", "coverage", "novelty", "peers"):
+        for extra in ("context", "distance", "coverage", "novelty", "peers"):
             if s["reasons"].get(extra):
                 lines.append(f"    - {extra.capitalize()}: {s['reasons'][extra]}")
         lines.append(f"    => Final U_total: {s['u_total']:.4f}")

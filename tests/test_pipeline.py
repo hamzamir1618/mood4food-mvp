@@ -14,6 +14,7 @@ from pipeline.build_dataset import (
     core_name,
     listed_items,
     nutrition_confidence,
+    plain_bread,
     read_platter_answers,
 )
 from pipeline.ingredients import (
@@ -159,6 +160,30 @@ def test_desserts_get_no_onion_default():
     est = estimate(["sugar"], "cafe_bakery", REF)
     assert "onion" not in est["defaults_used"]
     assert "butter" in est["defaults_used"]
+
+
+def test_a_prepared_bread_is_not_counted_again_as_flour():
+    ref = {"naan": {"kcal": 300.0, "protein": 9.0, "fat": 5.0, "carbs": 50.0}, **REF}
+    both = estimate(["naan", "wheat flour", "butter"], "add_ons", ref)
+    alone = estimate(["naan", "butter"], "add_ons", ref)
+    assert both["calories"] == alone["calories"]
+
+
+@pytest.mark.parametrize(
+    "name, ingredients, plain",
+    [
+        ("Sada Nan", ["naan", "wheat flour", "butter"], True),
+        ("Kalonji Naan", ["naan", "ghee", "wheat flour"], True),
+        ("Makkai Roti", ["corn", "roti", "wheat flour"], True),
+        ("Aloo Paratha", ["paratha", "potato", "ghee"], False),
+        ("Cheese Naan", ["naan", "cheese", "ghee"], False),
+        ("Lahori Halwa Puri", ["puri", "sugar", "ghee", "wheat flour"], False),
+        ("Puri + Chaney Single", ["puri", "bread", "cooking oil"], False),
+        ("Chicken Karahi", ["chicken", "tomato"], False),
+    ],
+)
+def test_a_plain_bread_filed_as_a_meal_is_an_add_on(name, ingredients, plain):
+    assert plain_bread(name, ingredients) is plain
 
 
 def test_implausible_estimates_are_flagged():

@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.areas import group_areas
-from api.location import distance_km, with_distances
+from api.location import distance_km, nearby, with_distances
 from tier_1.contracts.schemas import GroundedIntent
 
 G9 = (33.6938, 73.0302)  # G-9 Markaz
@@ -71,6 +71,25 @@ def test_a_restaurant_with_unknown_coordinates_gets_no_distance():
     assert found[1]["distance_km"] is None
     no_location = with_distances([{"restaurant_lat": 33.7, "restaurant_lng": 73.0}], None)
     assert no_location[0]["distance_km"] is None
+
+
+def test_far_restaurants_drop_out_when_closer_ones_match():
+    near, far, unknown = {"distance_km": 2.0}, {"distance_km": 22.2}, {"distance_km": None}
+    assert nearby([near, far, unknown]) == [near, unknown]
+    # nothing close: a far match beats no match
+    assert nearby([far, unknown]) == [far, unknown]
+    assert nearby([far]) == [far]
+
+
+def test_a_closer_restaurant_ranks_higher_and_a_far_one_says_why():
+    from tier_2.scoring import build_preferences, rank
+
+    close = {**POOL[0], "dish_id": "close", "distance_km": 1.5}
+    distant = {**POOL[0], "dish_id": "distant", "name": "Distant Karahi", "distance_km": 22.2}
+    ranked = rank([distant, close], build_preferences({}))
+    assert [r["dish_id"] for r in ranked] == ["close", "distant"]
+    assert "22 km away" in ranked[1]["reasons"]["distance"]
+    assert ranked[1]["u_distance"] == 0.0
 
 
 def test_areas_are_the_mean_of_their_restaurants_without_unknown_ones():

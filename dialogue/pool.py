@@ -12,6 +12,7 @@ from tier_2.scoring import Preferences, build_preferences, health_term, rank
 def allows(adj: Adjustments, dish: dict) -> bool:
     price = float(dish.get("price_pkr") or 0.0)
     kcal = (dish.get("macros") or {}).get("calories")
+    protein = (dish.get("macros") or {}).get("protein_g")
     spice = float((dish.get("taste_profile") or {}).get("spice") or 0.0)
     return all(
         (
@@ -21,6 +22,8 @@ def allows(adj: Adjustments, dish: dict) -> bool:
             dish.get("category") not in adj.exclude_categories,
             adj.calories_below is None or (kcal is not None and kcal < adj.calories_below),
             adj.calories_above is None or (kcal is not None and kcal > adj.calories_above),
+            adj.protein_at_least is None
+            or (protein is not None and protein >= adj.protein_at_least),
             adj.spice_above is None or spice > adj.spice_above,
             adj.spice_below is None or spice < adj.spice_below,
         )

@@ -35,6 +35,8 @@ Validation without human review:
 Two definitions worth knowing:
 - Desserts of every cuisine are `cafe_bakery`, because the sweet-craving filter depends on it.
 - Plain bread or rice ordered as a side is `add_ons`, and so is never recommended.
+  - The automated pass filed ten plain breads as meals (Sada Nan, Kalonji Naan, Makkai Roti). As meals they got a 400 g serving and ~1,100 kcal. A dish whose name is a bread's, names no filling, and holds only dough, fat and a topping is now `add_ons` (`plain_bread` in `pipeline/build_dataset.py`). Aloo paratha, cheese naan, halwa puri and puri chanay stay meals.
+  - For nutrition, a prepared bread is not counted again as wheat flour or generic bread.
 
 ### Ingredients, allergens and diet flags
 

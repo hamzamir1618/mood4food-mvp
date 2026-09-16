@@ -60,7 +60,7 @@ async def get_alternate_dish(request: Request, body: AlternateRequest):
 
     blueprint.utility_breakdown = {
         k: getattr(alternate_result, k)
-        for k in ("u_health", "u_budget", "u_taste", "u_context", "u_total")
+        for k in ("u_health", "u_budget", "u_taste", "u_context", "u_distance", "u_total")
     }
 
     save_contract(session_id, "decision_blueprint", blueprint)

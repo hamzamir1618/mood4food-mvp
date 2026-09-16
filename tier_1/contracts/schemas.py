@@ -55,6 +55,7 @@ class Candidate(BaseModel):
     u_budget: Optional[float] = None
     u_taste: Optional[float] = None
     u_context: Optional[float] = None
+    u_distance: Optional[float] = None  # None without a location or coordinates
     u_total: float = 0.0
     confidence: Dict[str, float] = Field(default_factory=dict)
     coverage: Optional[float] = None

@@ -50,6 +50,13 @@ ehthumbs.db
 # ── Environment / Secrets ───────────────────────────────────────────────────
 .env
 .env.local
+.env.production
+.env.*.local
+# Credential files downloaded from a provider console. Aura drops one of these into
+# the working directory, and this repository is public.
+Neo4j-*.txt
+*credentials*.txt
+*-Created-*.txt
 
 # ── Throwaway diagnostic scripts ────────────────────────────────────────────
 scratch/

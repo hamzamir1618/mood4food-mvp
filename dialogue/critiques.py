@@ -35,6 +35,7 @@ PATTERNS = (
     ("different", r"\b(something (else|different)|different|another (one|cuisine)|not this)\b"),
 )
 MAX_WORDS = 8  # longer messages are read as a new request
+FILLING_MARGIN = 1.1  # "more filling" means clearly more: 10% more energy, not a few kcal
 
 
 def parse(text: str) -> str | None:
@@ -55,7 +56,12 @@ def adjustment(critique: str, winner: dict, utilities: dict) -> dict | None:
     if critique == "lighter":
         return {"calories_below": kcal, "goal": "light"} if kcal else None
     if critique == "more_filling":
-        return {"calories_above": kcal} if kcal else None
+        # More energy alone isn't more filling: protein is what keeps a meal satisfying,
+        # and a calorie estimate can be off. Ask for both, where the protein is known.
+        protein = (winner.get("macros") or {}).get("protein_g")
+        if not kcal:
+            return None
+        return {"calories_above": kcal * FILLING_MARGIN, "protein_at_least": protein}
     if critique == "spicier":
         return {"spice_above": spice, "craved": {"spice": min(1.0, spice + 0.3)}}
     if critique == "milder":

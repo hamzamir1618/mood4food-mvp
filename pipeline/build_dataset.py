@@ -39,6 +39,32 @@ from taste_enrichment import enrich_taste_profiles
 TASTE = ("taste_sweet", "taste_salty", "taste_sour", "taste_bitter", "taste_umami", "taste_spice")
 NOT_RECOMMENDED = {"beverages", "add_ons"}
 
+# A plain bread: its name is a bread's, it names no filling or accompaniment, and nothing
+# in it but the dough, the fat and a topping. Aloo paratha, cheese naan, halwa puri and
+# puri chanay stay meals.
+BREAD_NAME = re.compile(
+    r"\b(naan|nan|roti|chapatt?i|paratha|parotta|puri|poori|kulcha|sheermal|taftan)\b", re.I
+)
+FILLED_NAME = re.compile(
+    r"\b(aloo|qeema|keema|cheese|chicken|beef|mutton|egg|anda|halwa|chan[ae]y?|chole|cholay|"
+    r"platter|thaal|combo|deal|with|\+|&)\b|[+&]",
+    re.I,
+)
+PLAIN_BREAD_INGREDIENTS = {
+    "naan", "roti", "paratha", "puri", "bread", "wheat flour", "corn",
+    "butter", "ghee", "cooking oil", "garlic", "sesame", "sugar", "water",
+}  # fmt: skip
+
+
+def plain_bread(name: str, ingredients: list[str]) -> bool:
+    return (
+        bool(BREAD_NAME.search(name or ""))
+        and not FILLED_NAME.search(name or "")
+        and bool(ingredients)
+        and set(ingredients) <= PLAIN_BREAD_INGREDIENTS
+    )
+
+
 # Facts the project owner confirmed that no data source records.
 OWNER_CONFIRMATIONS = {
     dish_uid(
@@ -358,6 +384,11 @@ def build() -> tuple[list[dict], dict]:
         if category == "add_ons" and names_meat:
             category = r["category"] if r["category"] not in NOT_RECOMMENDED else "other"
             category_source = "handoff (a dish that names meat or seafood is not an add-on)"
+        # ...and the other way round: a plain bread filed as a meal (Sada Nan as desi) is a
+        # side, and was being given a meal's 400 g serving and ~1,100 kcal.
+        elif category not in NOT_RECOMMENDED and plain_bread(name, sorted(found)):
+            category = "add_ons"
+            category_source = f"{category_source} (a plain bread is an add-on)"
         ingredients = [n for n in VOCABULARY if n in found]
         if named:
             basis = (
