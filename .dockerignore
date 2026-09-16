@@ -1,0 +1,28 @@
+# The dataset is ODbL-licensed and git-ignored; the graph is seeded separately.
+data/
+data_review/
+handoff_output/
+uploads/
+
+# Local environments and caches
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Repository furniture that the image has no use for
+.git/
+.github/
+.env
+design/
+docs/
+tests/
+scripts/
+notebooks/
+*.md
+!requirements.txt

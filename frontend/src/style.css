@@ -8,7 +8,13 @@
 :root {
   --paper: #ffffff;
   --ink: #0b0b0b;
-  --accent: #ff3b00;
+  /* The poster orange reads 3.6:1 on white — under the 4.5:1 that small text needs,
+     and white text on it fails too. This deeper orange clears 4.5:1 both ways, so it
+     carries every label, button and toast. */
+  --accent: #d93000;
+  /* The original, kept for shapes that carry no text: bars, dots, rules. Those only
+     need 3:1 as non-text UI, which it clears. */
+  --accent-bright: #ff3b00;
   --rule: #ded9d0;
   --rule-soft: #eeebe5;
   --muted: #6b6b6b;
@@ -171,7 +177,7 @@ a:hover { color: var(--accent); }
 
 .bar { height: 5px; background: var(--rule-soft); overflow: hidden; }
 .bar span { display: block; height: 100%; background: var(--ink); }
-.bar.is-accent span { background: var(--accent); }
+.bar.is-accent span { background: var(--accent-bright); }
 
 /* ── Toast ──────────────────────────────────────────────────────────────── */
 .toast-wrap { position: fixed; left: 50%; top: 12px; z-index: 60; width: 100%; max-width: 480px; transform: translateX(-50%); padding: 0 var(--gutter); pointer-events: none; }

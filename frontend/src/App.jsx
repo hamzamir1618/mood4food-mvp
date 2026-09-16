@@ -12,6 +12,7 @@ import Trouble from './screens/Trouble.jsx';
 import Areas from './screens/Areas.jsx';
 import Setup from './screens/Setup.jsx';
 import Profile from './screens/Profile.jsx';
+import About from './screens/About.jsx';
 
 const LOCATION_KEY = 'm4f.location';
 const SEEN_KEY = 'm4f.seen';
@@ -79,6 +80,7 @@ export default function App() {
   const [trouble, setTrouble] = useState(null); // {kind: 'offline' | 'nomatch', message}
   const [areasOpen, setAreasOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(!seenBefore());
   const rejected = useRef([]);
 
@@ -274,7 +276,9 @@ export default function App() {
         </div>
       )}
 
-      {phase === 'home' && <Home onStart={start} busy={busy} initialQuery={query} />}
+      {phase === 'home' && (
+        <Home onStart={start} busy={busy} initialQuery={query} onAbout={() => setAboutOpen(true)} />
+      )}
 
       {phase === 'question' && question && (
         <Question
@@ -313,6 +317,8 @@ export default function App() {
       )}
 
       {scoresOpen && blueprint && <Scores blueprint={blueprint} onClose={() => setScoresOpen(false)} />}
+
+      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
 
       {areasOpen && (
         <Areas

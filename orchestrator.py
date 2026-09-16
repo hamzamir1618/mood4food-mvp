@@ -44,6 +44,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 log = logging.getLogger(__name__)
 
 WEB_UI_DIR = Path(__file__).resolve().parent / "web_ui"
+# The Phase 6 frontend, built by Vite. Served from here so the app and the API share
+# an origin: the login cookie is SameSite=lax, so a split origin would drop it.
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend" / "dist"
+FRONTEND_BUILT = (FRONTEND_DIR / "index.html").exists()
 
 app = FastAPI(title="FIPE Orchestrator", version="0.2.0")
 
@@ -141,8 +145,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Static file serving for web UI ──────────────────────────────────────────
+# ── Static file serving ─────────────────────────────────────────────────────
+# /static keeps the Phase 1 web UI (it still backs the style guide); /assets carries
+# the built frontend's own files.
 app.mount("/static", StaticFiles(directory=str(WEB_UI_DIR)), name="static")
+if FRONTEND_BUILT:
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
+else:
+    log.warning("frontend/dist is missing — run `npm run build` in frontend/ to serve the app")
 
 
 app.state.limiter = limiter
@@ -159,7 +169,15 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/", include_in_schema=False)
 def serve_frontend():
-    """Serves the Mood4Food web UI."""
+    """The Phase 6 app when it has been built; the Phase 1 web UI until then."""
+    if FRONTEND_BUILT:
+        return FileResponse(str(FRONTEND_DIR / "index.html"))
+    return FileResponse(str(WEB_UI_DIR / "index.html"))
+
+
+@app.get("/legacy", include_in_schema=False)
+def serve_legacy_ui():
+    """The Phase 1 web UI, kept reachable for the style guide and for comparison."""
     return FileResponse(str(WEB_UI_DIR / "index.html"))
 
 
