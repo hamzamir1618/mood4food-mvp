@@ -18,6 +18,8 @@ What changes:
     dish (they fill the bulk share) rather than padded with flour.
   * Desserts, drinks and add-ons no longer get the onion default; drinks get no
     oil default, desserts default to butter.
+  * A prepared bread (naan, roti, a bun) is not counted again as wheat flour or as
+    generic bread. A plain naan was being estimated as 100 g of flour plus 100 g of naan.
 Defaults still applied to a missing group are listed in the result, so the
 build can lower its confidence accordingly.
 """
@@ -40,6 +42,19 @@ SERVING_G = {
 }
 SHARES = {"bulk": 0.50, "fat": 0.15, "veg": 0.15}
 NUTRIENTS = ("kcal", "protein", "fat", "carbs")
+# A prepared bread already is its flour (and its fat): counting "naan" and "wheat flour"
+# side by side weighs the flour twice, and "bread" beside "bun" is the same burger bun.
+PREPARED_BREADS = ("naan", "roti", "paratha", "puri", "pita", "tortilla", "bun", "pizza base")
+
+
+def _without_duplicates(ingredients: list[str]) -> list[str]:
+    """The ingredients with the flour or generic bread a prepared bread already accounts for."""
+    prepared = any(n in PREPARED_BREADS for n in ingredients)
+    if prepared:
+        drop = {"wheat flour", "bread"}
+    else:
+        drop = {"wheat flour"} if "bread" in ingredients else set()
+    return [n for n in ingredients if n not in drop] or ingredients
 
 
 def _defaults(category: str) -> dict:
@@ -57,6 +72,7 @@ def estimate(ingredients: list[str], category: str, reference: dict) -> dict | N
     if not ingredients:
         return None
     grams = SERVING_G.get(category, SERVING_G["other"])
+    ingredients = _without_duplicates(ingredients)
     groups = {role: [n for n in ingredients if VOCABULARY[n].role == role] for role in SHARES}
     if not groups["bulk"] and groups["veg"]:
         groups["bulk"] = list(groups["veg"])

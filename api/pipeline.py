@@ -26,7 +26,7 @@ def recommend(
     from accounts.constraints import apply_dietary_profile
     from accounts.deps import current_user_id
     from accounts.store import get_profile, list_events
-    from api.location import load_location, save_location, with_distances
+    from api.location import load_location, nearby, save_location, with_distances
     from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.persona_manager import DEFAULT_PERSONA
@@ -93,12 +93,14 @@ def recommend(
         log.error("Tier 1a failed: %s", exc)
         raise HTTPException(500, f"Intent parsing failed: {exc}")
 
-    # Stage 2: Neo4j hard constraints, then each dish's distance from the user
+    # Stage 2: Neo4j hard constraints, then each dish's distance from the user; far-off
+    # restaurants drop out when closer ones match
     try:
         evaluation = run_anchoring_pipeline(intent)
         if hasattr(evaluation, "model_dump"):
             evaluation = evaluation.model_dump()
-        with_distances(evaluation.get("safe_candidates") or [], location)
+        candidates = with_distances(evaluation.get("safe_candidates") or [], location)
+        evaluation["safe_candidates"] = nearby(candidates)
         save_contract(session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)

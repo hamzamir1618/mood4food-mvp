@@ -12,7 +12,8 @@ from tier_1.contracts import session_store
 
 CONTRACT = "conversation"
 LOWEST = ("ceiling", "price_below", "calories_below", "spice_below")  # tighter means lower
-HIGHEST = ("calories_above", "spice_above", "health_above")  # tighter means higher
+# tighter means higher
+HIGHEST = ("calories_above", "protein_at_least", "spice_above", "health_above")
 
 
 class Adjustments(BaseModel):
@@ -33,6 +34,7 @@ class Adjustments(BaseModel):
     goal: Optional[str] = None
     calories_below: Optional[float] = None
     calories_above: Optional[float] = None
+    protein_at_least: Optional[float] = None
     spice_above: Optional[float] = None
     spice_below: Optional[float] = None
     health_above: Optional[float] = None

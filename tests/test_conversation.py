@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dialogue import critiques, questions
-from dialogue.pool import winner_under
+from dialogue.pool import allows, winner_under
 from dialogue.state import Adjustments, Question
 from tier_1.contracts.schemas import GroundedIntent
 
@@ -174,6 +174,16 @@ def test_milder_and_different_move_the_way_asked(chat):
 
 
 # ── Reading free text ────────────────────────────────────────────────────────
+
+
+def test_more_filling_is_not_just_more_calories():
+    # Found on the live app: "more filling" than a tikka picked a Rs 35 naan at 1,109 kcal.
+    tikka = {"name": "Tikka", "macros": {"calories": 830.0, "protein_g": 34.0}}
+    adj = Adjustments().merged(critiques.adjustment("more_filling", tikka, {}))
+    naan = {"price_pkr": 35.0, "macros": {"calories": 1109.0, "protein_g": 21.0}}
+    biryani = {"price_pkr": 800.0, "macros": {"calories": 950.0, "protein_g": 38.0}}
+    assert not allows(adj, naan)
+    assert allows(adj, biryani)
 
 
 def test_adjustments_only_ever_tighten():

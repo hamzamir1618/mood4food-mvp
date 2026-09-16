@@ -47,6 +47,7 @@ Every term returns a utility (0–1), a confidence (0–1) and a sentence.
 | Budget | Price against a target band | The dish's `price_status` (trusted 1.0, verified 0.9, unverified 0.6) |
 | Health | A goal-specific nutrition score | The dish's `nutrition_confidence` (high 1.0, medium 0.7, low 0.4, none 0) |
 | Context | Meal fit, time of day, weather | 1.0 when a rule applies; otherwise the term is left out |
+| Distance | How far the restaurant is from the location the user sent | 1.0 for the restaurant's own coordinates, 0.7 for its sector's centre; left out without a location |
 | Novelty | A multiplier for dishes recommended or passed over in the last 7 days | — |
 
 Dishes no person reviewed (`review_status = auto_imported`) have their taste and health confidence multiplied by 0.85. Their names and prices came straight from OCR.
@@ -106,6 +107,14 @@ Context usually has weight 0.1. When the query names a meal it has 0.3, because 
   - at 32°C or more, lighter dishes (550 kcal or less, or a salad);
   - at 12°C or less, soups and desi or Afghan dishes.
 
+### Distance
+
+Distance has weight 0.3 (`DISTANCE_WEIGHT`), beside health, budget and taste, which sum to 1. It scores 1 up to 3 km and falls linearly to 0 at 12 km. Most of the dataset's restaurants are within 8 km of G-9; Bahria Town, DHA and Rawat are 18–27 km out. A dish more than 7.5 km away (a distance score under 0.5) names it as a caveat in its summary: "It's also 22 km away."
+
+Before ranking, restaurants more than 10 km away are left out when anything closer matches (`api/location.py`, `nearby`). When nothing does, every match stays: a far match beats none. A restaurant with no known coordinates is never left out for distance.
+
+Distance used to be shown but never scored, so a dish 22 km away could win outright.
+
 ### Novelty
 
 A dish multiplies its total by:
@@ -136,7 +145,7 @@ u_total = Σ_t w_t · (c_t · u_t + (1 − c_t) · 0.5) / Σ_t w_t      × novel
   3. the user's learned weights;
   4. the persona's weights.
 
-  Context adds 0.1 or 0.3.
+  Context adds 0.1 or 0.3, and distance 0.3 when the request sent a location.
 
 ## Shortlist
 

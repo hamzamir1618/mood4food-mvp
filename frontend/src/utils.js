@@ -43,7 +43,7 @@ export function joinList(items) {
   return list.length ? `${list.join(', ')} and ${last}` : last;
 }
 
-/** The three scored terms, in the order the screens show them. */
+/** The scored terms, in the order the screens show them. Distance needs a location. */
 export function scoreRows(blueprint) {
   const u = blueprint?.utility_breakdown || {};
   const reasons = blueprint?.winning_dish?.reasons || {};
@@ -51,6 +51,7 @@ export function scoreRows(blueprint) {
     ['Taste', u.u_taste, reasons.taste],
     ['Budget', u.u_budget, reasons.budget],
     ['Health', u.u_health, reasons.health],
+    ['Distance', u.u_distance, reasons.distance],
   ]
     .filter(([, value]) => value !== null && value !== undefined)
     .map(([label, value, text]) => ({ label, value: pct(value), text: text || '' }));

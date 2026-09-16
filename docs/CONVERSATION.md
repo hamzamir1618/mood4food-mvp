@@ -63,7 +63,7 @@ Each refinement asks for a dish better than the current pick in one direction, a
 | Cheaper | priced below the current pick | |
 | Lighter | lower in calories than it | scores health for a light meal |
 | Healthier | better on health, for the user's goal | |
-| More filling | higher in calories | |
+| More filling | at least 10% higher in calories, with at least as much protein | |
 | Spicier | spicier | asks for spice 0.3 above the current pick |
 | Milder | milder | asks for spice 0.3 below it |
 | Something different | from another category | |
