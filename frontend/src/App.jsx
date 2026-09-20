@@ -179,6 +179,14 @@ export default function App() {
     [apply, run],
   );
 
+  const setWeights = useCallback(
+    async (weights) => {
+      const next = await run(() => api.recalculate(weights));
+      if (next) setBlueprint(withPlace(next));
+    },
+    [run],
+  );
+
   const nextDish = useCallback(async () => {
     const current = blueprint?.winning_dish?.dish_id;
     if (current) rejected.current = [...rejected.current, current];
@@ -295,6 +303,7 @@ export default function App() {
           onNext={nextDish}
           onChoose={choose}
           onScores={() => setScoresOpen(true)}
+          onWeights={setWeights}
           busy={busy}
         />
       )}

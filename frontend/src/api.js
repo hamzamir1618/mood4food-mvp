@@ -66,6 +66,8 @@ function send(path, body, method = 'POST') {
 // ── The conversation ────────────────────────────────────────────────────────
 /** One turn: exactly one of text, answer, critique or skip, plus an optional location. */
 export const chat = (turn) => send('/chat', turn);
+/** Re-ranks the dishes the query already found under new weights. No new search, no LLM. */
+export const recalculate = (weights) => send('/recalculate', weights);
 export const approve = (dishId) => send('/approve', { dish_id: dishId });
 export const alternate = (rejected) => send('/alternate', { already_rejected: rejected });
 

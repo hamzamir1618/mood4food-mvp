@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { allergenLine, matchOf, placeLine, rupees, scoreRows, serves } from '../utils.js';
+import Runners from '../components/Runners.jsx';
+import Weights from '../components/Weights.jsx';
 
 const SWIPE = 110;
 
@@ -20,7 +22,17 @@ function useCountUp(target, ms = 900) {
   return shown;
 }
 
-export default function Pick({ blueprint, refinements, onRefine, onNext, onChoose, onScores, busy, rank }) {
+export default function Pick({
+  blueprint,
+  refinements,
+  onRefine,
+  onNext,
+  onChoose,
+  onScores,
+  onWeights,
+  busy,
+  rank,
+}) {
   const dish = blueprint?.winning_dish || {};
   const match = matchOf(blueprint);
   const shown = useCountUp(match);
@@ -128,6 +140,12 @@ export default function Pick({ blueprint, refinements, onRefine, onNext, onChoos
           <div className="pt-12 o-7">
             <span className="tag-box">{allergenLine(dish.allergens)}</span>
           </div>
+
+          {blueprint?.agent_weights && onWeights && (
+            <div className="o-9" data-nodrag="1">
+              <Weights weights={blueprint.agent_weights} onChange={onWeights} busy={busy} />
+            </div>
+          )}
         </div>
 
         <div className="pick-side">
@@ -158,6 +176,11 @@ export default function Pick({ blueprint, refinements, onRefine, onNext, onChoos
               ))}
             </div>
           )}
+
+        </div>
+
+        <div className="pick-runners o-10" data-nodrag="1">
+          <Runners candidates={blueprint?.top_candidates} winnerId={dish.dish_id} />
         </div>
       </div>
 
