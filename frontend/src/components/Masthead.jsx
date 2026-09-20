@@ -1,4 +1,7 @@
-/** The masthead: a rule, the wordmark between two small labels, another rule. */
+const today = () =>
+  new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+/** The masthead: a rule, the wordmark between two small labels, another rule. Wide screens add a dateline. */
 export default function Masthead({ left, right, onBack, onProfile }) {
   return (
     <div className="masthead">
@@ -25,6 +28,10 @@ export default function Masthead({ left, right, onBack, onProfile }) {
         </div>
       </div>
       <div className="rule-ink draw" style={{ animationDelay: '120ms' }} />
+      <div className="masthead-dateline wide-only lab lab-sm muted">
+        <span>{today()}</span>
+        <span>Islamabad · real menus, real prices</span>
+      </div>
     </div>
   );
 }

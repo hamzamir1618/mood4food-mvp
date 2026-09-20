@@ -81,6 +81,35 @@ OWNER_CONFIRMATIONS = {
     ),
 }
 
+# A name that announces meat cannot be vegetarian, whatever the ingredient list says.
+# The ingredient lists behind "Duck Roast" and "Meat Doner Burger" name no meat, so the
+# derived flags called them vegan. A diet claim is a safety claim: the name overrules.
+# Only animals, never dish types: a karahi, a biryani or a seekh kebab can legitimately be
+# made of vegetables, and stripping their flag would hide real food from vegetarians.
+MEAT_NAME = re.compile(
+    r"\b(?:duck|meat|chicken|murgh|beef|veal|mutton|lamb|goat|dumba|fish|prawns?|shrimp|"
+    r"squid|crab|lobster|qeema|keema|bacon|sausage|doner|shawarma|nihari|paya|sajji)\b",
+    re.I,
+)
+
+# Names the OCR cut mid-word. Withheld rather than guessed: restoring them needs the
+# source photograph, and inventing the missing words would be fabricating menu data.
+DAMAGED_NAMES = {
+    ("Taksim Restoran", "Taksim Fusion Platter For"),
+    ("Arz Lebanon", "Fattoush Sold"),
+    ("Khabbay Ki Sajji", "Tandoori Tikka Piece (\\eg/chest"),
+    ("Des Pardes Restaurant", "Tawa Karahi Qeema)"),
+    ("Kim Mun Chinese", "Chicken Chillies Dry (Szechuan Style) (Bone"),
+    ("Kim Mun Chinese", "Deep Fried Chicken With Red Chilies (Bone"),
+    ("Kim Mun Chinese", "Hot Chilies Chicken (Bone"),
+    ("Kim Mun Chinese", "Village Chicken (Bone"),
+    ("Zaviya Fine Dine", "Chicken Corn Soup (Serving"),
+    ("Zaviya Fine Dine", "Chicken Corn Soup / Family Bowl (Serving"),
+    ("Zaviya Fine Dine", "Chicken Corn Soup Family Bowl (Serving"),
+    ("Zaviya Fine Dine", "Chicken Corn Soup Serving"),
+    ("Zaviya Fine Dine", "Hot & Sour Soup (Serving"),
+}
+
 COLUMNS = [
     "dish_uid",
     "restaurant_name",
@@ -417,6 +446,10 @@ def build() -> tuple[list[dict], dict]:
             whole_dish = bool(typical) or (bool(answer.get("items")) and items_known)
             is_vegan = flags["is_vegan"] and whole_dish
             is_vegetarian = flags["is_vegetarian"] and whole_dish
+            # The name is the last word on meat. An incomplete ingredient list must never
+            # promote a dish into a diet it plainly doesn't belong to.
+            if MEAT_NAME.search(name):
+                is_vegan = is_vegetarian = False
         else:
             allergens, allergens_known, is_vegan, is_vegetarian, is_halal = (
                 sorted(legacy_allergens),
@@ -463,6 +496,8 @@ def build() -> tuple[list[dict], dict]:
             reasons.append("owner discarded the name as OCR damage")
         if answer.get("remove"):
             reasons.append("owner removed the dish (platter worksheet)")
+        if (r["restaurant_name"], name) in DAMAGED_NAMES:
+            reasons.append("name truncated by OCR; withheld rather than guessed")
 
         out.append(
             {

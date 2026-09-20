@@ -28,6 +28,7 @@ export default function Pick({ blueprint, refinements, onRefine, onNext, onChoos
   const [dx, setDx] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
   const drag = useRef({ on: false, x: 0, moved: false });
+  const hasPhoto = Boolean(dish.image_url) && !imageFailed;
 
   const down = (e) => {
     if (e.target.closest('[data-nodrag]')) return;
@@ -51,14 +52,26 @@ export default function Pick({ blueprint, refinements, onRefine, onNext, onChoos
   };
 
   return (
-    <div className="screen">
-      <div className="between pt-12">
-        <div className="lab accent">The pick · {rank}</div>
-        <div className="lab lab-sm muted">Swipe for the next dish</div>
+    <div className="screen pick">
+      <div className="pick-bar">
+        <div className="between pt-12">
+          <div className="lab accent">The pick · {rank}</div>
+          <div className="lab lab-sm muted">
+            <span className="touch-only">Swipe for the next dish</span>
+            <span className="wide-only">Drag the card, or choose below</span>
+          </div>
+        </div>
+        <div className="rule-thick draw" style={{ marginTop: 8 }} />
+        {/* Said out loud when the search had to widen, so a substitute never reads as a match. */}
+        {blueprint?.relaxation_notice && (
+          <p className="pick-notice small rise" role="status">
+            {blueprint.relaxation_notice}
+          </p>
+        )}
       </div>
-      <div className="rule-thick draw" style={{ marginTop: 8 }} />
 
       <div
+        className={`pick-card${hasPhoto ? '' : ' no-photo'}`}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
@@ -70,58 +83,85 @@ export default function Pick({ blueprint, refinements, onRefine, onNext, onChoos
           transition: drag.current.on ? 'none' : 'transform 300ms var(--ease)',
         }}
       >
-        <div className="match-row">
-          <div className="match-num">{shown}</div>
-          <div style={{ paddingTop: 8 }}>
-            <div className="lab">Match</div>
-            <div className="lab lab-sm muted">Out of 100</div>
-          </div>
-          <div className="grow" />
-          <button className="lab accent" data-nodrag="1" onClick={onScores} style={{ paddingTop: 8, textAlign: 'right' }}>
-            The scores
-            <br />
-            <span className="bod" style={{ fontSize: 16 }}>↓</span>
-          </button>
-        </div>
-
-        <h2 className="h2 mask pt-8">{dish.name}</h2>
-        <div className="lab rise pt-12">{placeLine(dish)}</div>
-
-        <div className="rule draw" style={{ marginTop: 10 }} />
-        <div className="between" style={{ padding: '8px 0' }}>
-          <div className="bod-b" style={{ fontSize: 32 }}>{rupees(dish.price_pkr)}</div>
-          <div className="lab lab-sm muted">{serves(dish.serves_min, dish.serves_max)}</div>
-        </div>
-        <div className="rule draw" />
-
-        {dish.image_url && !imageFailed && (
-          <>
-            <div className="photo wipe" style={{ height: 150, marginTop: 12 }}>
-              <img src={dish.image_url} alt={dish.name} draggable="false" onError={() => setImageFailed(true)} />
+        <div className="pick-main">
+          <div className="match-row o-1">
+            <div className="match-num">{shown}</div>
+            <div style={{ paddingTop: 8 }}>
+              <div className="lab">Match</div>
+              <div className="lab lab-sm muted">Out of 100</div>
             </div>
-            {dish.is_rep_image && <div className="lab lab-sm muted pt-8">Representative image</div>}
-          </>
-        )}
+            <div className="grow" />
+            <button
+              className="lab accent"
+              data-nodrag="1"
+              onClick={onScores}
+              style={{ paddingTop: 8, textAlign: 'right' }}
+            >
+              The scores
+              <br />
+              <span className="bod" style={{ fontSize: 16 }}>
+                ↓
+              </span>
+            </button>
+          </div>
 
-        {dish.summary && <p className="body-serif clamp3 pt-12" style={{ margin: 0 }}>{dish.summary}</p>}
+          <h2 className="h2 pick-name mask pt-8 o-2">{dish.name}</h2>
+          <div className="lab rise pt-12 o-3">{placeLine(dish)}</div>
 
-        <div className="pt-12">
-          <span className="tag-box">{allergenLine(dish.allergens)}</span>
+          <div className="o-4">
+            <div className="rule draw" style={{ marginTop: 10 }} />
+            <div className="between" style={{ padding: '8px 0' }}>
+              <div className="bod-b pick-price" style={{ fontSize: 32 }}>
+                {rupees(dish.price_pkr)}
+              </div>
+              <div className="lab lab-sm muted">{serves(dish.serves_min, dish.serves_max)}</div>
+            </div>
+            <div className="rule draw" />
+          </div>
+
+          {dish.summary && (
+            <p className="body-serif clamp3 pt-12 o-6" style={{ margin: 0 }}>
+              {dish.summary}
+            </p>
+          )}
+
+          <div className="pt-12 o-7">
+            <span className="tag-box">{allergenLine(dish.allergens)}</span>
+          </div>
         </div>
 
-        {reasons.length > 0 && (
-          <div className="pt-16">
-            {reasons.map((r) => (
-              <div className="reason" key={r.label}>
-                <div className="lab lab-sm reason-label">{r.label}</div>
-                <div className="small">{r.text}</div>
+        <div className="pick-side">
+          {hasPhoto && (
+            <div className="o-5">
+              <div className="photo pick-photo wipe" style={{ marginTop: 12 }}>
+                <img src={dish.image_url} alt={dish.name} draggable="false" onError={() => setImageFailed(true)} />
               </div>
-            ))}
-          </div>
-        )}
+              {dish.is_rep_image && <div className="lab lab-sm muted pt-8">Representative image</div>}
+            </div>
+          )}
+
+          {reasons.length > 0 && (
+            <div className="pt-16 o-8">
+              {reasons.map((r, i) => (
+                <div className="reason" key={r.label}>
+                  <div className="lab lab-sm reason-label">{r.label}</div>
+                  <div className="grow">
+                    <div className="reason-score wide-only">
+                      <div className="bar is-accent">
+                        <span style={{ width: `${r.value}%`, animationDelay: `${300 + i * 120}ms` }} />
+                      </div>
+                      <span className="bod-b">{r.value}</span>
+                    </div>
+                    <div className="small">{r.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="mt-auto">
+      <div className="pick-actions mt-auto">
         <div className="chip-row lab" style={{ borderTop: '1px solid var(--rule)' }}>
           {(refinements || []).map((r) => (
             <button key={r.value} className="chip lab" onClick={() => onRefine(r.value)} disabled={busy}>

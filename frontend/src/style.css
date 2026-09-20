@@ -126,6 +126,8 @@ a:hover { color: var(--accent); }
 .btn-line { border: 2px solid var(--ink); background: var(--paper); }
 .btn-text { min-height: 46px; color: var(--muted); }
 .btn-wide { justify-content: space-between; }
+a.btn { text-decoration: none; }
+a.btn-accent:hover { color: #ffffff; }
 .btn .lab { white-space: nowrap; }
 .btn-pair { display: flex; gap: 10px; }
 .btn-pair .btn { flex: 1; min-width: 0; padding: 0 12px; }
@@ -228,6 +230,302 @@ a:hover { color: var(--accent); }
 /* ── Spinner ────────────────────────────────────────────────────────────── */
 .spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 700ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Layout hooks (phone first) ────────────────────────────────────────────
+   Each screen is one column on a phone and a two-column spread on a wide screen.
+   On a phone the pick's two columns dissolve, and `o-*` keeps the reading order. */
+.wide-only { display: none; }
+.pick-card { display: flex; flex-direction: column; }
+.pick-main, .pick-side { display: contents; }
+.o-1 { order: 1; } .o-2 { order: 2; } .o-3 { order: 3; } .o-4 { order: 4; }
+.o-5 { order: 5; } .o-6 { order: 6; } .o-7 { order: 7; } .o-8 { order: 8; }
+.pick-photo { height: 150px; }
+.done-photo { height: 190px; }
+.setup-welcome, .setup-welcome-side { display: flex; flex-direction: column; flex: 1; }
+.stamp { display: none; }
+.btn-arrow { display: inline-block; transition: transform 260ms var(--ease); }
+.home-tagline { margin: 10px 0 0; max-width: 34ch; }
+.q-working { display: flex; align-items: center; gap: 10px; }
+/* The widened-search notice: plain, accented, never mistaken for the dish's own copy. */
+.pick-notice {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--tint);
+  font-style: italic;
+}
+.row-label { transition: transform 320ms var(--ease); }
+
+/* ── Hover, where the pointer can hover ─────────────────────────────────── */
+@media (hover: hover) {
+  .row:not(.is-on):not([disabled]):hover .row-label { transform: translateX(10px); }
+  .row:not(.is-on):not([disabled]):hover .row-fill { transform: scaleX(0.012); }
+  .btn-ink:not([disabled]):hover { background: var(--accent); }
+  .btn-accent:not([disabled]):hover { background: var(--ink); }
+  .btn-line:not([disabled]):hover { background: var(--ink); color: var(--paper); }
+  .btn-text:not([disabled]):hover { color: var(--ink); }
+  .btn:not([disabled]):hover .btn-arrow { transform: translateX(6px); }
+  .chip:not([disabled]):hover { color: var(--accent); border-color: var(--accent); }
+}
+
+/* ── Tablet: a wider column and larger type ─────────────────────────────── */
+@media (min-width: 700px) {
+  :root { --gutter: 32px; }
+  .app { max-width: 760px; }
+  .h1 { font-size: 68px; }
+  .h2 { font-size: 52px; }
+  .masthead-word { font-size: 30px; }
+  .masthead-side { width: 170px; }
+  .row { min-height: 72px; }
+  .row-label { font-size: 30px; }
+  .pick-photo { height: 240px; }
+  .done-photo { height: 280px; }
+  .sheet, .toast-wrap { max-width: 620px; }
+}
+
+/* ── Wide: the broadsheet spread ────────────────────────────────────────── */
+@media (min-width: 1024px) {
+  :root { --gutter: clamp(40px, 4vw, 64px); --spread-gap: clamp(48px, 6vw, 104px); }
+  .app { max-width: 1600px; }
+  .screen { padding-bottom: 40px; }
+  .wide-only { display: revert; }
+  .touch-only { display: none; }
+
+  .h1 { font-size: clamp(76px, 7.2vw, 128px); line-height: 0.9; letter-spacing: -2px; }
+  .h2 { font-size: clamp(48px, 4.4vw, 76px); letter-spacing: -1px; }
+  .body-serif { font-size: 23px; }
+  .row { min-height: 80px; }
+  .row-num { width: 44px; font-size: 22px; }
+  .row-label { font-size: clamp(30px, 2.6vw, 40px); }
+
+  /* Masthead */
+  .masthead { padding-top: 18px; }
+  .masthead-word { font-size: clamp(40px, 4vw, 60px); letter-spacing: 2px; }
+  .masthead-side { width: 260px; }
+  .masthead-side .lab-sm { font-size: 11px; }
+  .masthead-dateline {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* Home */
+  .home {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas:
+      "title moods"
+      "tag moods"
+      "query moods"
+      "cta moods"
+      "steps steps"
+      "foot foot";
+    column-gap: var(--spread-gap);
+    padding-top: 20px;
+  }
+  .home-title { grid-area: title; position: relative; }
+  .home-title .h1 { font-size: clamp(76px, 6.6vw, 116px); white-space: nowrap; }
+  .home-moods { grid-area: moods; padding-top: 28px; }
+  .home-tagline { grid-area: tag; max-width: 30ch; padding-top: 18px; font-size: 26px; }
+  .home-query { grid-area: query; max-width: 580px; padding-top: 30px; }
+  .home-query .field { font-size: 22px; padding: 12px 0; }
+  .home-cta { grid-area: cta; margin-top: 0; max-width: 580px; }
+  .home-cta .btn { min-height: 68px; }
+  .home-foot { grid-area: foot; }
+  /* Pressed onto the headline beside its short last line, like a stamp on a page. */
+  .stamp {
+    display: block;
+    position: absolute;
+    right: 0;
+    bottom: -12px;
+    width: clamp(116px, 10vw, 168px);
+    animation: pop 700ms 400ms cubic-bezier(0.2, 1.1, 0.3, 1) both;
+  }
+  .stamp-ring { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .stamp-ring.thin { stroke: var(--rule); stroke-width: 1; }
+  .stamp-text { font-family: var(--ui); font-weight: 700; font-size: 13px; letter-spacing: 2.4px; fill: var(--ink); }
+  .stamp-spin { transform-box: view-box; transform-origin: 50% 50%; animation: spin 36s linear infinite; }
+  .stamp-core { font-family: var(--poster); font-size: 76px; fill: var(--accent); }
+  .home-steps {
+    grid-area: steps;
+    align-self: end;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+    list-style: none;
+    margin: 56px 0 0;
+    padding: 18px 0 0;
+    border-top: 3px solid var(--ink);
+  }
+  .home-steps li { display: flex; flex-direction: column; gap: 6px; }
+  .home-step-num { font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--accent); }
+  .home-step-title { font-family: var(--display); font-size: 28px; line-height: 1.05; }
+
+  /* Question */
+  .question {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "bar bar"
+      "head body";
+    column-gap: var(--spread-gap);
+  }
+  .q-bar { grid-area: bar; }
+  .q-head { grid-area: head; display: flex; flex-direction: column; padding-top: 28px; }
+  .q-head .h2 { font-size: clamp(56px, 5.2vw, 88px); }
+  .q-body { grid-area: body; padding-top: 28px; }
+  .q-numeral {
+    margin-top: auto;
+    padding-top: 32px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: clamp(170px, 17vw, 280px);
+    line-height: 0.8;
+    letter-spacing: -8px;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--accent-bright);
+    animation: rise 900ms 200ms var(--ease) both;
+  }
+
+  /* The pick */
+  .pick-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+    column-gap: var(--spread-gap);
+    align-items: start;
+    padding-top: 12px;
+  }
+  .pick-main, .pick-side { display: flex; flex-direction: column; }
+  .match-num { font-size: clamp(140px, 13vw, 220px); letter-spacing: -8px; }
+  .pick-name { font-size: clamp(52px, 4.8vw, 84px); }
+  .pick-price { font-size: 46px !important; }
+  .pick-photo { height: clamp(280px, 28vw, 420px); }
+  .pick-card.no-photo .pick-side { padding-top: 16px; }
+  .reason { padding: 14px 0; }
+  .reason-label { width: 84px; padding-top: 4px; }
+  .reason-score { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+  .reason-score .bar { flex: 1; height: 6px; }
+  .reason-score .bar span { transform-origin: 0 50%; animation: grow 1000ms var(--ease) both; }
+  .reason-score .bod-b { width: 52px; flex-shrink: 0; text-align: right; font-size: 24px; }
+  .pick-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    margin-top: 40px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    border-top: 3px solid var(--ink);
+    /* The choice stays in reach when the card runs past the fold. */
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--paper);
+  }
+  .pick-actions .chip-row {
+    border-top: none !important;
+    flex-wrap: wrap;
+    overflow: visible;
+    row-gap: 12px;
+    column-gap: 26px;
+    padding: 0;
+  }
+  .pick-actions .btn-pair { width: min(500px, 42%); flex-shrink: 0; }
+
+  /* Settled */
+  .done {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      "head photo"
+      "price photo"
+      "actions photo";
+    column-gap: var(--spread-gap);
+  }
+  .done-head { grid-area: head; }
+  .done-name { font-size: clamp(60px, 5.6vw, 96px); }
+  .done-price { grid-area: price; }
+  .done-price .bod-b { font-size: 46px !important; }
+  .done-photo { grid-area: photo; height: auto; min-height: 480px; margin-top: 16px !important; }
+  .done-actions { grid-area: actions; align-self: end; max-width: 540px; }
+  .done.no-photo {
+    grid-template-areas:
+      "head actions"
+      "price actions"
+      ". actions";
+  }
+  .done.no-photo .done-actions { align-self: start; padding-top: 72px; }
+
+  /* Nothing fits, offline */
+  .trouble { position: relative; }
+  .trouble > *:not(.trouble-mark) { position: relative; max-width: 760px; }
+  .trouble .h2 { font-size: clamp(60px, 6vw, 100px); }
+  .trouble .mt-auto { max-width: 520px; }
+  .trouble-mark {
+    position: absolute;
+    right: 0;
+    top: 24px;
+    font-family: var(--display);
+    font-weight: 900;
+    font-size: clamp(280px, 30vw, 480px);
+    line-height: 0.8;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--accent-bright);
+    animation: rise 900ms 150ms var(--ease) both;
+    pointer-events: none;
+  }
+
+  /* Setup */
+  .setup { width: 100%; max-width: 780px; margin: 0 auto; }
+  .setup.setup-welcome { max-width: none; }
+  .setup-welcome {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    column-gap: var(--spread-gap);
+    align-items: end;
+    padding-bottom: 48px;
+  }
+  .setup-welcome .h1 { font-size: clamp(80px, 7.6vw, 132px); }
+  .row-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 32px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .row-grid > div:last-child:empty { display: none; }
+
+  /* Account */
+  .profile-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--spread-gap);
+    align-items: start;
+  }
+
+  /* Sheets become a drawer from the right */
+  .sheet {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: min(560px, 92vw);
+    max-width: none;
+    max-height: none;
+    transform: none;
+    padding: 28px 40px 40px;
+    border-top: none;
+    border-left: 3px solid var(--ink);
+    animation: drawer 520ms var(--ease) both;
+  }
+  .toast-wrap { max-width: 680px; top: 20px; }
+}
+@keyframes drawer { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

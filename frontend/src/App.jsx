@@ -25,14 +25,6 @@ const remember = (key, value) => {
   }
 };
 
-function seenBefore() {
-  try {
-    return localStorage.getItem(SEEN_KEY) === '1';
-  } catch (e) {
-    return false;
-  }
-}
-
 /**
  * /alternate rebuilds the winner from a shorter set of fields, so the restaurant and
  * summary can be missing. The shortlist still has them, so fill them back in.
@@ -81,7 +73,9 @@ export default function App() {
   const [areasOpen, setAreasOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(!seenBefore());
+  // A first-time visitor lands on the product, not on a sign-up wall. Setup stays one tap
+  // away on the home screen ("Sign in →"), which is also how the account demo is reached.
+  const [setupOpen, setSetupOpen] = useState(false);
   const rejected = useRef([]);
 
   const keepLocation = useCallback((place) => {

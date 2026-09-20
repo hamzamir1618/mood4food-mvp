@@ -45,7 +45,9 @@ def test_no_relaxation_when_enough_candidates(monkeypatch):
 
     assert result["candidate_count"] == 3
     assert result["relaxations"] == []
-    assert "Found" in result["message"]
+    # The message reaches the user as the notice above the pick, so it stays empty when
+    # nothing was given up. It used to carry a count written for the logs.
+    assert result["message"] == ""
 
 
 def test_preferred_category_is_relaxed_when_too_few_matches(monkeypatch):
@@ -71,6 +73,9 @@ def test_preferred_category_is_relaxed_when_too_few_matches(monkeypatch):
     assert relaxations[0]["constraint"] == "preferred_category"
     assert relaxations[0]["old_value"] == "seafood"
     assert relaxations[0]["new_value"] is None
+    # ...and the user is told, rather than being handed a substitute as though it matched.
+    assert "seafood" in result["message"]
+    assert result["message"].startswith("I couldn't find")
 
 
 def test_budget_is_never_relaxed(monkeypatch):
