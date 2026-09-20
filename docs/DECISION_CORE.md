@@ -77,6 +77,13 @@ u_taste = 1 − Σ_d w_d · |dish_d − want_d| / Σ_d w_d
   - dearer dishes fall to 0 at the dearest 5%;
   - price counts at half confidence (`NO_BUDGET_CONFIDENCE`).
 - **The Frugal Student persona:** cheaper always ranks higher, by the dish's rank in price among the options.
+- **The budget slider:** a band is flat — every dish under the median ties on it — so raising the
+  budget weight against a flat term changed nothing, which is what made the sliders feel dead. As
+  the weight rises past the even third, the score mixes smoothly from the band into the persona's
+  rank-by-price, reaching it fully at 100%. Past halfway the explanation switches with it, from
+  "no pricier than a typical option here" to "cheaper than 80% of the options". Measured on a
+  393-dish pool: moving the slider from 33 to 66 took the pick from a Rs 2,789 fajita to a Rs 355
+  tikka leg, where before it did not move at all.
 - **Shared dishes:** the cost is divided by the number of people sharing, capped at the dish's servings. The party size is 1 until Phase 5 asks for it.
 
 ### Health
@@ -109,7 +116,7 @@ Context usually has weight 0.1. When the query names a meal it has 0.3, because 
 
 ### Distance
 
-Distance has weight 0.3 (`DISTANCE_WEIGHT`), beside health, budget and taste, which sum to 1. It scores 1 up to 3 km and falls linearly to 0 at 12 km. Most of the dataset's restaurants are within 8 km of G-9; Bahria Town, DHA and Rawat are 18–27 km out. A dish more than 7.5 km away (a distance score under 0.5) names it as a caveat in its summary: "It's also 22 km away."
+Distance has weight 0.15 (`DISTANCE_WEIGHT`), beside health, budget and taste, which sum to 1. It is kept small deliberately: `api/location.py` already drops restaurants beyond 10 km when closer ones match, so the term only separates the ones that survived. Nearly every remaining restaurant scores about 1 on it, so a larger weight would add a constant to every dish and mute the three weights the user controls. It scores 1 up to 3 km and falls linearly to 0 at 12 km. Most of the dataset's restaurants are within 8 km of G-9; Bahria Town, DHA and Rawat are 18–27 km out. A dish more than 7.5 km away (a distance score under 0.5) names it as a caveat in its summary: "It's also 22 km away."
 
 Before ranking, restaurants more than 10 km away are left out when anything closer matches (`api/location.py`, `nearby`). When nothing does, every match stays: a far match beats none. A restaurant with no known coordinates is never left out for distance.
 
@@ -145,9 +152,17 @@ u_total = Σ_t w_t · (c_t · u_t + (1 − c_t) · 0.5) / Σ_t w_t      × novel
   3. the user's learned weights;
   4. the persona's weights.
 
-  Context adds 0.1 or 0.3, and distance 0.3 when the request sent a location.
+  Context adds 0.1 or 0.3, and distance 0.15 when the request sent a location.
+
+- **Ties** are broken by the other terms, then by name. A term the weights have turned off
+  saturates — with budget alone, every dish inside the limit scores the same — and breaking those
+  ties alphabetically clustered one restaurant's dishes at the top.
 
 ## Shortlist
+
+Only the best size of a dish appears: "Chicken Fajita (Medium)" and "(Large)" from one restaurant
+are one entry, and the other sizes are still reachable through "Next". A shortlist that reads as the
+same dish three times looks like a system with nothing to say.
 
 The blueprint's `top_candidates` is the best five, with one exception. The fifth place goes to a deliberate stretch when there is one: the best dish from a category none of the other four share, scoring at least 80% of the winner. It is marked `exploration: true` and labelled "Something different". See `LEARNING.md`.
 

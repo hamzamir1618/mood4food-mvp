@@ -8,6 +8,7 @@ runner-up. See docs/DECISION_CORE.md.
 """
 
 import logging
+import re
 
 from tier_1.contracts.schemas import Candidate
 from tier_1.persona_manager import get_all_personas
@@ -85,6 +86,38 @@ def run_debate(candidates: list[dict], prefs: Preferences) -> dict:
 
 
 STRETCH_MIN_SHARE = 0.8  # a stretch must score at least 80% of the winner
+# "(Half)", "(Full)", "(Medium)", "1 Person", "- 2 Pcs": the same dish sold in another size.
+SIZE_SUFFIX = re.compile(
+    r"\s*[-(]?\s*\b(half|full|small|medium|large|regular|single|double|jumbo|mini|"
+    r"\d+\s*(?:pcs?|pieces?|persons?|people)|for\s+\d+)\b\s*\)?\s*$",
+    re.I,
+)
+
+
+def _same_dish(candidate: dict) -> tuple:
+    """A dish and its other sizes share this key: one restaurant, one name without the size."""
+    name = (candidate.get("name") or "").strip()
+    previous = None
+    while previous != name:  # "Karahi (Half) - 2 Pcs" sheds one suffix at a time
+        previous = name
+        name = SIZE_SUFFIX.sub("", name).strip(" -–—,")
+    return (candidate.get("restaurant_name") or "", name.lower())
+
+
+def without_sizes(ranked: list[dict]) -> list[dict]:
+    """
+    The best of each dish, not every size of it. A shortlist reading "Chicken Fajita
+    (Medium)" then "Chicken Fajita (Large)" from one restaurant looks like a system with
+    nothing to say; the other sizes are still there when the user asks for the next dish.
+    """
+    seen, kept = set(), []
+    for c in ranked:
+        key = _same_dish(c)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(c)
+    return kept
 
 
 def shortlist(ranked: list[dict]) -> list[dict]:
@@ -94,6 +127,7 @@ def shortlist(ranked: list[dict]) -> list[dict]:
     STRETCH_MIN_SHARE of the winner. A concierge that only confirms its own model becomes
     a filter bubble; the stretch is labelled, never hidden.
     """
+    ranked = without_sizes(ranked)
     if len(ranked) <= TOP_N:
         return ranked
     usual = {c.get("category") for c in ranked[: TOP_N - 1]}
