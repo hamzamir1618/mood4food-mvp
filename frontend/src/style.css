@@ -239,6 +239,7 @@ a.btn-accent:hover { color: #ffffff; }
 .pick-main, .pick-side { display: contents; }
 .o-1 { order: 1; } .o-2 { order: 2; } .o-3 { order: 3; } .o-4 { order: 4; }
 .o-5 { order: 5; } .o-6 { order: 6; } .o-7 { order: 7; } .o-8 { order: 8; }
+.o-9 { order: 9; } .o-10 { order: 10; }
 .pick-photo { height: 150px; }
 .done-photo { height: 190px; }
 .setup-welcome, .setup-welcome-side { display: flex; flex-direction: column; flex: 1; }
@@ -246,6 +247,23 @@ a.btn-accent:hover { color: #ffffff; }
 .btn-arrow { display: inline-block; transition: transform 260ms var(--ease); }
 .home-tagline { margin: 10px 0 0; max-width: 34ch; }
 .q-working { display: flex; align-items: center; gap: 10px; }
+/* What counts most: three weights that always sum to 1. */
+.weights { padding-top: 18px; border-top: 1px solid var(--rule); margin-top: 18px; }
+.weight { display: grid; grid-template-columns: 74px 1fr 40px; align-items: center; gap: 12px; padding: 7px 0; }
+.weight input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.weight input[type="range"]:disabled { opacity: 0.5; cursor: default; }
+.weight-value { font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* The dishes that came second, so the shortlist is visible rather than asserted. */
+.runners { padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--rule); }
+.runner { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: baseline;
+  padding: 10px 0; border-bottom: 1px solid var(--rule-soft); }
+.runner-num { font-size: 16px; color: var(--accent); }
+.runner-name { font-family: var(--display); font-size: 21px; line-height: 1.1; }
+.runner-place { padding-top: 3px; }
+.runner-right { text-align: right; }
+.runner-match { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+
 /* The widened-search notice: plain, accented, never mistaken for the dish's own copy. */
 .pick-notice {
   margin: 10px 0 0;
@@ -405,6 +423,17 @@ a.btn-accent:hover { color: #ffffff; }
   .pick-price { font-size: 46px !important; }
   .pick-photo { height: clamp(280px, 28vw, 420px); }
   .pick-card.no-photo .pick-side { padding-top: 16px; }
+  /* The right-hand column runs the full height of the spread: photo, reasons, the weights
+     and the runners-up, instead of leaving the lower half of the page empty. */
+  .pick-main .weights { margin-top: 22px; padding-top: 16px; }
+  /* The runners-up run the full width beneath both columns, where a newspaper would put
+     them, so the shorter column doesn't leave the page half empty. */
+  .pick-runners { grid-column: 1 / -1; }
+  .pick-runners .runners { margin-top: 28px; padding-top: 18px; border-top: 3px solid var(--ink); }
+  .pick-runners .runner { grid-template-columns: 40px 1fr auto; padding: 13px 0; }
+  .weight { grid-template-columns: 84px 1fr 46px; }
+  .runner-name { font-size: 24px; }
+  .runner-match { font-size: 28px; }
   .reason { padding: 14px 0; }
   .reason-label { width: 84px; padding-top: 4px; }
   .reason-score { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
