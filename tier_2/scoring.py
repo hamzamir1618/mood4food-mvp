@@ -51,13 +51,21 @@ USUAL_BAND = (0.7, 1.2)  # of the user's usual spend
 CHEAP_FLOOR = 0.6  # utility of a very cheap dish: fine, just less like what was asked
 NO_BUDGET_CONFIDENCE = 0.5  # with no budget, price counts only a little
 CHEAPER_IS_BETTER = {"frugal_student"}  # personas that want the lowest price, not a band
+# How much the budget slider turns price from "is it acceptable" into "is it the cheapest".
+# At the even setting the band decides, as before; pushed to the top, price is ranked against
+# the other options. In between the two are mixed, so the slider moves the pick the whole way
+# up rather than doing nothing until it crosses a threshold. A band alone is flat — every dish
+# under the median ties on it — which is why turning the weight up used to change nothing.
+BUDGET_EVEN = 1 / 3
 
 PROTEIN_TARGET = {"muscle_gain": 8.0, "weight_loss": 6.0}  # g protein per 100 kcal
 AMDR = {"protein": (0.10, 0.35), "carbs": (0.45, 0.65), "fat": (0.20, 0.35)}
 
 CONTEXT_WEIGHT = 0.1  # the clock, the weather, the usual expectation of a meal
 CONTEXT_WEIGHT_EXPLICIT = 0.3  # the query itself names the meal: "lunch", "dinner"...
-DISTANCE_WEIGHT = 0.3  # alongside health, budget and taste, which sum to 1
+DISTANCE_WEIGHT = 0.15  # alongside health, budget and taste, which sum to 1. Kept small
+# deliberately: api/location.py already drops restaurants over 10 km when closer ones match,
+# so this only separates the ones that survived, and a bigger share would mute the sliders.
 NEAR_KM = 3.0  # this close counts as nearby: full distance utility
 FAR_KM = 12.0  # ...falling linearly to 0 here (most of Islamabad is within 8 km of G-9)
 AREA_PRECISION_CONFIDENCE = 0.7  # the restaurant is placed at its sector's centre
@@ -224,16 +232,18 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
     frugal = prefs.persona in CHEAPER_IS_BETTER
 
     pool = prefs.price_pool or [cost]
+    # Price against the other options: the cheapest scores 1, the dearest 0.
+    dearer = len(pool) - bisect.bisect_right(pool, cost)
+    rank_u = dearer / (len(pool) - 1) if len(pool) > 1 else 1.0
+    if len(pool) > 1 and dearer == len(pool) - 1:
+        rank_verdict = "the cheapest of the options"
+    elif len(pool) > 1 and dearer == 0:
+        rank_verdict = "the dearest of the options"
+    else:
+        rank_verdict = f"cheaper than {rank_u:.0%} of the options"
+
     if frugal:
-        # Price relative to the other options: the cheapest scores 1, the dearest 0.
-        dearer = len(pool) - bisect.bisect_right(pool, cost)
-        utility = dearer / (len(pool) - 1) if len(pool) > 1 else 1.0
-        if len(pool) > 1 and dearer == len(pool) - 1:
-            verdict = "the cheapest of the options"
-        elif len(pool) > 1 and dearer == 0:
-            verdict = "the dearest of the options"
-        else:
-            verdict = f"cheaper than {utility:.0%} of the options"
+        utility, verdict = rank_u, rank_verdict
         sentence = f"{_rs(price)}{each}, {verdict}."
         phrase = f"is {verdict}"
     elif not (ceiling or usual):
@@ -273,6 +283,16 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
             spare = high - cost
             phrase = f"comes in {_rs(spare)} under {short}" if spare >= 50 else f"fits {short}"
         sentence = f"{_rs(price)}{each}, {verdict}."
+
+    if not frugal:
+        share = _clamp(
+            (prefs.weights.get("w_budget", BUDGET_EVEN) - BUDGET_EVEN) / (1 - BUDGET_EVEN)
+        )
+        if share > 0:
+            utility = (1 - share) * utility + share * rank_u
+            if share >= 0.5:  # the user has made price the point; say so in those terms
+                verdict, phrase = rank_verdict, f"is {rank_verdict}"
+                sentence = f"{_rs(price)}{each}, {verdict}."
     if status == "unverified":
         sentence += " The price couldn't be checked against the menu."
     return Term(utility, confidence, sentence, phrase=phrase)
@@ -574,11 +594,22 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
     }
 
 
+def _tie_break(s: dict) -> tuple:
+    """
+    Ranking key. A term the weights have turned off saturates — with budget alone, every
+    dish inside the limit scores the same — so the total ties often. Falling back to the
+    other terms keeps the order meaningful instead of alphabetical, and the name last keeps
+    a run repeatable.
+    """
+    others = [s.get(f"u_{t}") or 0.0 for t in AGENTS]
+    return (-s["u_total"], -sum(others), -max(others, default=0.0), s["name"])
+
+
 def rank(candidates: list[dict], prefs: Preferences) -> list[dict]:
-    """Scores every candidate; best first, ties broken by name so runs are repeatable."""
+    """Scores every candidate; best first, ties broken by the other terms then by name."""
     prefs = replace(prefs, price_pool=sorted(_cost(c, prefs.party_size)[1] for c in candidates))
     scored = [score_dish(c, prefs) for c in candidates]
-    return sorted(scored, key=lambda s: (-s["u_total"], s["name"]))
+    return sorted(scored, key=_tie_break)
 
 
 def traces(ranked: list[dict], prefs: Preferences, top: int = 5) -> list[str]:
