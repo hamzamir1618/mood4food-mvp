@@ -15,40 +15,65 @@ export default function Question({ question, step, onAnswer, onSkip, busy }) {
   };
 
   return (
-    <div className="screen">
-      <div className="between pt-16">
-        <div className="lab accent">Question {num(step)} of 03</div>
-      </div>
-      <div className="rule-ink draw" style={{ marginTop: 10 }} />
-
-      <h2 className="h2 mask pt-16">{question.text}</h2>
-      {question.why && (
-        <div className="body-serif muted rise pt-8" style={{ animationDelay: '140ms' }}>
-          {question.why}
+    <div className="screen question">
+      <div className="q-bar">
+        <div className="between pt-16">
+          {/* Two is the limit the backend enforces (dialogue/questions.py MAX_QUESTIONS). */}
+          <div className="lab accent">Question {num(step)} of 02</div>
         </div>
-      )}
-
-      <div className="stagger pt-16">
-        {question.chips.map((chip, i) => (
-          <div key={chip.value} style={{ borderTop: '1px solid var(--rule)' }}>
-            <button
-              className={`row${picked === i ? ' is-on' : ''}`}
-              onClick={() => choose(i, chip)}
-              disabled={busy && picked !== i}
-            >
-              <span className="row-fill" />
-              <span className="row-num">{num(i)}</span>
-              <span className="row-label">{chip.label}</span>
-              <span className="row-mark lab lab-sm">{picked === i ? 'Chosen' : ''}</span>
-            </button>
-          </div>
-        ))}
-        <div style={{ borderTop: '1px solid var(--rule)' }} />
+        <div className="rule-ink draw" style={{ marginTop: 10 }} />
       </div>
 
-      <button className="btn btn-text rise" style={{ justifyContent: 'flex-start', marginTop: 16 }} onClick={onSkip} disabled={busy}>
-        <span className="lab lab-sm">{question.skip_label || 'Just pick for me'} →</span>
-      </button>
+      <div className="q-head">
+        <h2 className="h2 mask pt-16">{question.text}</h2>
+        {question.why && (
+          <div className="body-serif muted rise pt-8" style={{ animationDelay: '140ms' }}>
+            {question.why}
+          </div>
+        )}
+        <div className="q-numeral wide-only" aria-hidden="true">
+          {num(step)}
+        </div>
+      </div>
+
+      <div className="q-body">
+        <div className="stagger pt-16">
+          {question.chips.map((chip, i) => (
+            <div key={chip.value} style={{ borderTop: '1px solid var(--rule)' }}>
+              <button
+                className={`row${picked === i ? ' is-on' : ''}`}
+                onClick={() => choose(i, chip)}
+                disabled={busy && picked !== i}
+              >
+                <span className="row-fill" />
+                <span className="row-num">{num(i)}</span>
+                <span className="row-label">{chip.label}</span>
+                <span className="row-mark lab lab-sm">
+                  {picked === i && busy ? <span className="spinner" /> : picked === i ? 'Chosen' : ''}
+                </span>
+              </button>
+            </div>
+          ))}
+          <div style={{ borderTop: '1px solid var(--rule)' }} />
+        </div>
+
+        {/* The wait after an answer runs 2-4 seconds. Without this the screen looks frozen. */}
+        {busy && (
+          <div className="q-working lab lab-sm muted pt-12" role="status" aria-live="polite">
+            <span className="spinner" />
+            Working out your pick
+          </div>
+        )}
+
+        <button
+          className="btn btn-text rise"
+          style={{ justifyContent: 'flex-start', marginTop: 16 }}
+          onClick={onSkip}
+          disabled={busy}
+        >
+          <span className="lab lab-sm">{question.skip_label || 'Just pick for me'} →</span>
+        </button>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,32 @@ export class ApiError extends Error {
 
 const BASE = '';
 
+/*
+  What a failure says out loud. The backend speaks three dialects: a plain `detail` sentence
+  written for a person, a pydantic validation array, and rate-limit and crash bodies that carry
+  no `detail` at all. Only the first is fit to show, so the rest are translated here rather
+  than surfacing "The server responded 500." or "String should have at most 500 characters".
+*/
+const BY_STATUS = {
+  429: "That's a lot of requests in one minute. Give it a moment and try again.",
+  500: 'Something broke on my side. Try that again.',
+  502: "I can't reach my own services right now. Try again in a moment.",
+  503: 'One of my services is unavailable right now. Try again in a moment.',
+  504: 'That took too long. Try again in a moment.',
+};
+
+function readable(status, details) {
+  const detail = details?.detail;
+  if (typeof detail === 'string') return detail; // written for a person already
+  if (Array.isArray(detail) && detail[0]?.msg) {
+    const msg = String(detail[0].msg);
+    if (/at most \d+ characters/.test(msg)) return 'That request is too long. Keep it under 500 characters.';
+    if (/at least 1 character/.test(msg)) return "Tell me what you'd like to eat.";
+    return "I couldn't read that request.";
+  }
+  return BY_STATUS[status] || 'Something went wrong. Try that again.';
+}
+
 async function handle(resp) {
   if (!resp.ok) {
     let details = {};
@@ -19,14 +45,7 @@ async function handle(resp) {
     } catch (e) {
       /* a non-JSON error body is fine; the status still tells us enough */
     }
-    const detail = details.detail;
-    const message =
-      typeof detail === 'string'
-        ? detail
-        : Array.isArray(detail) && detail[0]?.msg
-          ? detail[0].msg
-          : `The server responded ${resp.status}.`;
-    throw new ApiError(message, resp.status, details);
+    throw new ApiError(readable(resp.status, details), resp.status, details);
   }
   return resp.json();
 }

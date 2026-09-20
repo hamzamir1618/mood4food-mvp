@@ -34,7 +34,10 @@ export default function Setup({ onDone, onSignedIn, toast }) {
   const [spend, setSpend] = useState('');
 
   useEffect(() => {
-    api.personas().then(setPersonas).catch(() => {});
+    api
+      .personas()
+      .then(setPersonas)
+      .catch(() => {});
   }, []);
 
   const run = async (work, after) => {
@@ -86,7 +89,7 @@ export default function Setup({ onDone, onSignedIn, toast }) {
   const stepIndex = STEPS.indexOf(step);
 
   return (
-    <div className="screen">
+    <div className={`screen setup setup-${step}`}>
       {stepIndex >= 0 && (
         <>
           <div className="between pt-12">
@@ -102,7 +105,7 @@ export default function Setup({ onDone, onSignedIn, toast }) {
       )}
 
       {step === 'welcome' && (
-        <>
+        <div className="setup-welcome">
           <h1 className="h1 mask pt-24">
             Tell me your
             <br />
@@ -110,23 +113,26 @@ export default function Setup({ onDone, onSignedIn, toast }) {
             <br />
             the <span style={{ fontStyle: 'italic' }}>dish</span>.
           </h1>
-          <p className="body-serif rise pt-16" style={{ margin: 0 }}>
-            Picks from real Islamabad menus, weighed for taste, budget and health, with the reasons
-            spelled out.
-          </p>
-          <div className="mt-auto pt-24" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button className="btn btn-accent btn-wide" onClick={() => setStep('account')}>
-              <span className="lab">Create an account</span>
-              <span className="bod" style={{ fontSize: 20 }}>→</span>
-            </button>
-            <button className="btn btn-line" onClick={() => setStep('signin')}>
-              <span className="lab">Sign in</span>
-            </button>
-            <button className="btn btn-text" onClick={onDone}>
-              <span className="lab lab-sm">Continue as a guest</span>
-            </button>
+          <div className="setup-welcome-side">
+            <p className="body-serif rise pt-16" style={{ margin: 0 }}>
+              Picks from real Islamabad menus, weighed for taste, budget and health, with the reasons spelled out.
+            </p>
+            <div className="mt-auto pt-24" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button className="btn btn-accent btn-wide" onClick={() => setStep('account')}>
+                <span className="lab">Create an account</span>
+                <span className="bod" style={{ fontSize: 20 }}>
+                  →
+                </span>
+              </button>
+              <button className="btn btn-line" onClick={() => setStep('signin')}>
+                <span className="lab">Sign in</span>
+              </button>
+              <button className="btn btn-text" onClick={onDone}>
+                <span className="lab lab-sm">Continue as a guest</span>
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {(step === 'account' || step === 'signin') && (
@@ -194,15 +200,19 @@ export default function Setup({ onDone, onSignedIn, toast }) {
           <p className="small muted pt-8">
             Pick the closest. It's only a starting point: I learn from the dishes you approve.
           </p>
-          <div className="scroll-y pt-12" style={{ flex: 1 }}>
+          <div className="scroll-y row-grid pt-12" style={{ flex: 1 }}>
             {Object.entries(personas).map(([key, p], i) => (
               <div key={key} style={{ borderTop: '1px solid var(--rule)' }}>
                 <button className={`row${persona === key ? ' is-on' : ''}`} onClick={() => setPersona(key)}>
                   <span className="row-fill" />
                   <span className="row-num">{num(i)}</span>
                   <span className="stack" style={{ position: 'relative', flex: 1 }}>
-                    <span className="row-label" style={{ fontSize: 22 }}>{p.display_name}</span>
-                    <span className="lab lab-sm" style={{ opacity: 0.7 }}>{p.description}</span>
+                    <span className="row-label" style={{ fontSize: 22 }}>
+                      {p.display_name}
+                    </span>
+                    <span className="lab lab-sm" style={{ opacity: 0.7 }}>
+                      {p.description}
+                    </span>
                   </span>
                   <span className="row-mark lab lab-sm">{persona === key ? 'Chosen' : ''}</span>
                 </button>
@@ -304,15 +314,19 @@ export default function Setup({ onDone, onSignedIn, toast }) {
         <>
           <h2 className="h2 mask pt-16">What are you eating for?</h2>
           <p className="small muted pt-8">It changes how a dish's calories and protein are weighed.</p>
-          <div className="pt-12">
+          <div className="row-grid pt-12">
             {GOALS.map(([value, label, note], i) => (
               <div key={value} style={{ borderTop: '1px solid var(--rule)' }}>
                 <button className={`row${goal === value ? ' is-on' : ''}`} onClick={() => setGoal(value)}>
                   <span className="row-fill" />
                   <span className="row-num">{num(i)}</span>
                   <span className="stack" style={{ position: 'relative', flex: 1 }}>
-                    <span className="row-label" style={{ fontSize: 22 }}>{label}</span>
-                    <span className="lab lab-sm" style={{ opacity: 0.7 }}>{note}</span>
+                    <span className="row-label" style={{ fontSize: 22 }}>
+                      {label}
+                    </span>
+                    <span className="lab lab-sm" style={{ opacity: 0.7 }}>
+                      {note}
+                    </span>
                   </span>
                   <span className="row-mark lab lab-sm">{goal === value ? 'Chosen' : ''}</span>
                 </button>

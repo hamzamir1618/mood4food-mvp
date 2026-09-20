@@ -104,6 +104,11 @@ FOOD_GROUPS = {
     "shrimp": ("prawns",),
     "eggs": ("egg",),
     "vegetables": ("mixed vegetables",),
+    # "breakfast" and "nashta" name no category in this dataset, and matching them as a
+    # category left too few dishes, so the request was dropped and anything could win.
+    "breakfast": ("paratha", "puri"),
+    "nashta": ("paratha", "puri"),
+    "desi nashta": ("paratha", "puri"),
 }
 
 
@@ -160,7 +165,7 @@ DISH_NAMES = {
     "paye": ("paye", "paya"),
     "sajji": ("sajji",),
     "tikka": ("tikka",),
-    "kebab": ("kebab", "kabab", "kebap"),
+    "kebab": ("kebab", "kabab", "kebap", "seekh", "sheekh"),
     "shawarma": ("shawarma",),
     "paratha": ("paratha",),
     "burger": ("burger",),
@@ -177,6 +182,41 @@ DISH_NAMES = {
     "dumpling": ("dumpling", "momo", "momos"),
     "soup": ("soup",),
     "salad": ("salad",),
+    # Dishes a local diner names directly. A name with nothing behind it is still worth
+    # listing: it produces an honest "I don't have that" instead of a silent substitution.
+    "halwa puri": ("halwa puri", "halwa poori"),
+    "puri": ("puri", "poori"),
+    "chaat": ("chaat",),
+    "samosa": ("samosa", "samosay"),
+    "pakora": ("pakora", "pakoray"),
+    "chapli": ("chapli",),
+    "boti": ("boti",),
+    "malai boti": ("malai boti",),
+    "bihari": ("bihari",),
+    "tandoori": ("tandoori", "tandori"),
+    "broast": ("broast",),
+    "chargha": ("chargha", "charga"),
+    "kofta": ("kofta",),
+    "shinwari": ("shinwari",),
+    "kabuli pulao": ("kabuli", "kabli"),
+    "mandi": ("mandi",),
+    "kabsa": ("kabsa",),
+    "doner": ("doner", "donair"),
+    "shashlik": ("shashlik",),
+    "manchurian": ("manchurian",),
+    "hummus": ("hummus", "houmous"),
+    "falafel": ("falafel",),
+    "mezze": ("mezze", "mezz"),
+    "taco": ("taco",),
+    "quesadilla": ("quesadilla",),
+    "lasagna": ("lasagna", "lasagne"),
+    "halwa": ("halwa",),
+    "kheer": ("kheer",),
+    "firni": ("firni",),
+    "gulab jamun": ("gulab jamun",),
+    "jalebi": ("jalebi",),
+    "cheesecake": ("cheesecake", "cheese cake"),
+    "brownie": ("brownie",),
 }
 # "anything but pizza", "no more burgers", "don't want biryani": the dish is not wanted.
 _NEGATED = (
@@ -220,6 +260,49 @@ def narrow_to_named_dish(candidates: list[dict], intent: dict) -> tuple[list[dic
         "reason": "no_dish_with_that_name",
     }
     return candidates, relaxation
+
+
+MEAL_WORDS = ("lunch", "dinner", "brunch", "supper", "snack", "meal")
+MOOD_WORDS = {
+    "spice": "spicy",
+    "sweet": "sweet",
+    "salty": "salty",
+    "sour": "sour",
+    "bitter": "bitter",
+    "umami": "savoury",
+}
+
+
+def relaxation_sentence(relaxations: list[dict]) -> str:
+    """
+    What the user is owed when the query asked for something the menus couldn't meet. The
+    pipeline widens rather than returning nothing, and saying so is the difference between a
+    helpful substitute and a confidently wrong answer.
+    """
+    asked = next(
+        (
+            str(r.get("old_value") or "").strip()
+            for r in relaxations
+            if r.get("constraint") in ("named_dish", "preferred_category") and r.get("old_value")
+        ),
+        "",
+    )
+    mood = next(
+        (
+            r["constraint"][len("minimum_relevance_") :]
+            for r in relaxations
+            if str(r.get("constraint", "")).startswith("minimum_relevance_")
+        ),
+        "",
+    )
+    if asked.lower() in MEAL_WORDS:
+        return "I don't sort dishes by meal time, so I've gone on the rest of your request."
+    if asked:
+        return f"I couldn't find {asked} on the menus I hold, so this is the closest I have."
+    if mood:
+        word = MOOD_WORDS.get(mood, mood)
+        return f"Nothing here is properly {word}, so this is the closest I have."
+    return ""
 
 
 def requested_match(term: str | None) -> dict:
@@ -402,6 +485,13 @@ def query_safe_candidates(
             ): "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&q=80",
         }
 
+        # Whole words only. Substring matching put a photograph of a coffee on 61 dishes,
+        # because "platter" contains "latte" and "steak" and "steamed" contain "tea".
+        keyword_images = [
+            (re.compile("|".join(rf"{re.escape(kw)}s?" for kw in keywords)), url)
+            for keywords, url in KEYWORD_REP_IMAGES.items()
+        ]
+
         with driver.session() as session:
             req_vegan = is_vegan or "vegan" in pruned_list
             req_veg = is_vegetarian or "vegetarian" in pruned_list
@@ -422,11 +512,9 @@ def query_safe_candidates(
 
                 if not db_img:
                     dish_name = record["name"].lower()
-                    img_url = None
-                    for keywords, url in KEYWORD_REP_IMAGES.items():
-                        if any(kw in dish_name for kw in keywords):
-                            img_url = url
-                            break
+                    img_url = next(
+                        (url for pattern, url in keyword_images if pattern.search(dish_name)), None
+                    )
                     if not img_url:
                         img_url = CATEGORY_REP_IMAGES.get(cat, CATEGORY_REP_IMAGES["other"])
                     is_rep = True
@@ -738,6 +826,9 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
     # A dish the query names ("karahi", "biryani") narrows the pool to dishes with that name
     before = len(candidates)
     candidates, named_relaxation = narrow_to_named_dish(candidates, intent)
+    # "halwa puri" and "nihari" match too few dishes to survive the category filter, but the
+    # name then finds them. Don't apologise for a request that was met.
+    named_hit = named_relaxation is None and len(candidates) < before
     if named_relaxation:
         log.warning(
             "no dish named %s fits, so the name isn't required", named_relaxation["old_value"]
@@ -801,7 +892,16 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
         msg = "No matches even after maximum relaxation attempts."
         log.warning(msg)
     else:
-        msg = f"Found {len(candidates)} candidates."
+        # Reaches the user verbatim as the notice above the pick, so it is written for them
+        # and is empty when nothing was given up.
+        msg = relaxation_sentence(
+            [
+                r
+                for r in relaxations
+                if not (named_hit and r.get("constraint") == "preferred_category")
+            ]
+        )
+        log.info("found %d candidates%s", len(candidates), f" — {msg}" if msg else "")
 
     # Step 3 — persist contract
     write_candidate_evaluation(intent, candidates, relaxations, msg)
