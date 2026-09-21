@@ -57,6 +57,15 @@ CHEAPER_IS_BETTER = {"frugal_student"}  # personas that want the lowest price, n
 # up rather than doing nothing until it crosses a threshold. A band alone is flat — every dish
 # under the median ties on it — which is why turning the weight up used to change nothing.
 BUDGET_EVEN = 1 / 3
+# "Cheap", "affordable", "sasta": the user cares about price but named no figure. That is
+# weight on price, not a ceiling. At 0.6 the budget ramp ranks dishes by price among the
+# options, so cheap food rises without the pool being cut to whatever falls under a guess.
+CHEAP_WORDS = re.compile(
+    r"\b(cheap(er|est)?|affordable|inexpensive|budget|economical|pocket[- ]friendly|"
+    r"low[- ]cost|sast[ai]|kam paise|not (too )?expensive|don'?t have much money)\b",
+    re.I,
+)
+CHEAP_BUDGET_WEIGHT = 0.6
 
 PROTEIN_TARGET = {"muscle_gain": 8.0, "weight_loss": 6.0}  # g protein per 100 kcal
 AMDR = {"protein": (0.10, 0.35), "carbs": (0.45, 0.65), "fat": (0.20, 0.35)}
@@ -663,16 +672,25 @@ def build_preferences(
     meal = next((m for m in MEALS if re.search(rf"\b{m}\b", raw)), None)
     asked = str(intent.get("preferred_category") or "").lower()
     wants_snack = "sweet" in craved or any(w in asked for w in SNACK_REQUESTS)
+    resolved = normalise_weights(
+        weights or (None if persona_chosen else context.get("weights")) or persona_data["weights"]
+    )
+    # Sliders the user has moved always win; otherwise "cheap" leans the weights toward price.
+    said = f"{raw} {intent.get('craving') or ''}"
+    if not weights and CHEAP_WORDS.search(said) and resolved["w_budget"] < CHEAP_BUDGET_WEIGHT:
+        rest = resolved["w_health"] + resolved["w_taste"]
+        share = (1 - CHEAP_BUDGET_WEIGHT) / rest if rest else 0.0
+        resolved = {
+            "w_health": resolved["w_health"] * share if rest else (1 - CHEAP_BUDGET_WEIGHT) / 2,
+            "w_budget": CHEAP_BUDGET_WEIGHT,
+            "w_taste": resolved["w_taste"] * share if rest else (1 - CHEAP_BUDGET_WEIGHT) / 2,
+        }
     return Preferences(
         meal=meal,
         expects_meal=not wants_snack,
         taste=context.get("taste") or dict(persona_data["taste_preference"]),
         # sliders, then a persona picked now, then learned weights, then the persona's
-        weights=normalise_weights(
-            weights
-            or (None if persona_chosen else context.get("weights"))
-            or persona_data["weights"]
-        ),
+        weights=resolved,
         importance=context.get("importance") or {d: 1.0 for d in TASTE_DIMS},
         learned_from=int(context.get("learned_from") or 0),
         peers=context.get("peers") or {},

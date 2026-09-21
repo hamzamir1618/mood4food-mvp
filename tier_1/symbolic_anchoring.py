@@ -344,6 +344,72 @@ def _float_or_none(value) -> float | None:
     return float(value) if value is not None else None
 
 
+def _photo(unsplash_id: str) -> str:
+    return f"https://images.unsplash.com/photo-{unsplash_id}?auto=format&fit=crop&w=800&q=80"
+
+
+# Stock photographs, shown labelled "Representative image": what kind of dish it is, never
+# the plate you'll be served. Every one was checked by eye against its label (2026-09-21):
+# the bread photo used to be samosas, the soup photo a grain bowl, and the café fallback a
+# stack of sprinkled donuts that ended up on aloo paratha and halwa puri.
+CATEGORY_PHOTOS = {
+    "chinese_asian": _photo("1585032226651-759b368d7246"),  # noodles
+    "desi_traditional": _photo("1585937421612-70a008356fbe"),  # curries with rice
+    "afghan": _photo("1585937421612-70a008356fbe"),
+    "continental_upscale": _photo("1600891964092-4316c288032e"),  # steak and fries
+    "middle_eastern": _photo("1529006557810-274b9b2fc783"),  # shawarma
+    "fast_food": _photo("1568901346375-23c9450c58cd"),  # burger
+    "pizza": _photo("1513104890138-7c749659a591"),
+    "beverages": _photo("1536935338788-846bb9981813"),
+    # "cafe_bakery" and "other" are deliberately absent. They hold cakes, parathas, salads and
+    # full breakfasts alike, so no single photograph is honest for them; no photo is better
+    # than a wrong one.
+}
+KEYWORD_PHOTOS = (
+    (
+        ("cake", "cheesecake", "brownie", "lava cake", "pastry", "molten"),
+        _photo("1578985545062-69928b1d9587"),
+    ),
+    (
+        ("naan", "nan", "roti", "chapati", "paratha", "puri", "kulcha"),
+        _photo("1708783741187-ff1d081d87da"),
+    ),
+    (("shake", "malt", "smoothie", "lassi", "frappe"), _photo("1572490122747-3968b75cc699")),
+    (("wrap", "roll", "shawarma", "gyro"), _photo("1626700051175-6818013e1d4f")),
+    (
+        ("coffee", "tea", "chai", "espresso", "latte", "cappuccino"),
+        _photo("1541167760496-1628856ab772"),
+    ),
+    (("ice cream", "sundae", "gelato"), _photo("1497034825429-c343d7c6a68f")),
+    (("burger", "cheeseburger", "hamburger"), CATEGORY_PHOTOS["fast_food"]),
+    (("pizza",), CATEGORY_PHOTOS["pizza"]),
+    (("karahi", "masala", "handi", "makhni"), CATEGORY_PHOTOS["desi_traditional"]),
+    (("kebab", "kabab", "seekh", "tikka", "boti", "skewer"), _photo("1603360946369-dc9bb6258143")),
+    (
+        ("juice", "lemonade", "drink", "soda", "cola", "sprite", "fanta", "coke", "pepsi"),
+        CATEGORY_PHOTOS["beverages"],
+    ),
+    (("donut", "doughnut"), _photo("1551024601-bec78aea704b")),
+    (("salad",), _photo("1512621776951-a57141f2eefd")),
+    (("soup",), _photo("1665594051407-7385d281ad76")),  # corn and vegetable soup
+    (("pasta", "spaghetti", "macaroni"), _photo("1473093295043-cdd812d0e601")),
+)
+# Whole words, optional plural. Substring matching put a coffee cup on 61 dishes, because
+# "platter" contains "latte" and "steak" contains "tea".
+_KEYWORD_PATTERNS = tuple(
+    (re.compile("|".join(r"\b" + re.escape(w) + r"s?\b" for w in words), re.I), url)
+    for words, url in KEYWORD_PHOTOS
+)
+
+
+def representative_image(name: str, category: str) -> str:
+    """The stock photo for a dish: by what its name says it is, else by category, else none."""
+    for pattern, url in _KEYWORD_PATTERNS:
+        if pattern.search(name or ""):
+            return url
+    return CATEGORY_PHOTOS.get(category or "", "")
+
+
 def query_safe_candidates(
     allergens: list[str],
     budget_max: int,
@@ -394,104 +460,6 @@ def query_safe_candidates(
             time.sleep(sleep_time)
 
     try:
-        CATEGORY_REP_IMAGES = {
-            "chinese_asian": "https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=800&q=80",
-            "desi_traditional": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80",
-            "afghan": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=800&q=80",
-            "continental_upscale": "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=800&q=80",
-            "middle_eastern": "https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=800&q=80",
-            "fast_food": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80",
-            "cafe_bakery": "https://images.unsplash.com/photo-1551024601-bec78aea704b?auto=format&fit=crop&w=800&q=80",
-            "pizza": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80",
-            "beverages": "https://images.unsplash.com/photo-1536935338788-846bb9981813?auto=format&fit=crop&w=800&q=80",
-            "other": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80",
-        }
-
-        KEYWORD_REP_IMAGES = {
-            (
-                "cake",
-                "brownie",
-                "lava",
-                "pastry",
-                "lava cake",
-                "molten",
-            ): "https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=800&q=80",
-            (
-                "naan",
-                "roti",
-                "paratha",
-                "puri",
-                "kulcha",
-            ): "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80",
-            (
-                "shake",
-                "malt",
-                "smoothie",
-                "lassi",
-                "frappe",
-            ): "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=800&q=80",
-            (
-                "wrap",
-                "roll",
-                "shawarma",
-                "gyro",
-            ): "https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=800&q=80",
-            (
-                "coffee",
-                "tea",
-                "chai",
-                "espresso",
-                "latte",
-                "cappuccino",
-            ): "https://images.unsplash.com/photo-1541167760496-1628856ab772?auto=format&fit=crop&w=800&q=80",
-            (
-                "ice cream",
-                "sundae",
-                "gelato",
-            ): "https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?auto=format&fit=crop&w=800&q=80",
-            ("burger", "cheeseburger", "hamburger"): CATEGORY_REP_IMAGES["fast_food"],
-            ("pizza",): CATEGORY_REP_IMAGES["pizza"],
-            ("karahi", "masala", "handi", "makhni"): CATEGORY_REP_IMAGES["desi_traditional"],
-            (
-                "kebab",
-                "kabab",
-                "seekh",
-                "tikka",
-                "boti",
-                "skewer",
-            ): "https://images.unsplash.com/photo-1603360946369-dc9bb6258143?auto=format&fit=crop&w=800&q=80",
-            (
-                "juice",
-                "lemonade",
-                "drink",
-                "soda",
-                "cola",
-                "sprite",
-                "fanta",
-                "coke",
-                "pepsi",
-            ): CATEGORY_REP_IMAGES["beverages"],
-            ("donut", "doughnut"): CATEGORY_REP_IMAGES["cafe_bakery"],
-            (
-                "salad",
-            ): "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=800&q=80",
-            (
-                "soup",
-            ): "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=80",
-            (
-                "pasta",
-                "spaghetti",
-                "macaroni",
-            ): "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=800&q=80",
-        }
-
-        # Whole words only. Substring matching put a photograph of a coffee on 61 dishes,
-        # because "platter" contains "latte" and "steak" and "steamed" contain "tea".
-        keyword_images = [
-            (re.compile("|".join(rf"{re.escape(kw)}s?" for kw in keywords)), url)
-            for keywords, url in KEYWORD_REP_IMAGES.items()
-        ]
-
         with driver.session() as session:
             req_vegan = is_vegan or "vegan" in pruned_list
             req_veg = is_vegetarian or "vegetarian" in pruned_list
@@ -511,16 +479,9 @@ def query_safe_candidates(
                 located = record.get("location_precision") in ("place", "area")
 
                 if not db_img:
-                    dish_name = record["name"].lower()
-                    img_url = next(
-                        (url for pattern, url in keyword_images if pattern.search(dish_name)), None
-                    )
-                    if not img_url:
-                        img_url = CATEGORY_REP_IMAGES.get(cat, CATEGORY_REP_IMAGES["other"])
-                    is_rep = True
+                    img_url, is_rep = representative_image(record["name"], cat), True
                 else:
-                    img_url = db_img
-                    is_rep = False
+                    img_url, is_rep = db_img, False
 
                 candidates.append(
                     {
