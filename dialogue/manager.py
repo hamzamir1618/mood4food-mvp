@@ -12,11 +12,31 @@ import logging
 from fastapi import HTTPException, Request
 
 from dialogue import critiques, distill, pool, questions, state
-from dialogue.state import Conversation
+from dialogue.state import Adjustments, Conversation, Question
 
 log = logging.getLogger(__name__)
 
 SKIP_LABEL = "Just pick for me"
+KEEP_LABEL = "Keep my pick"
+# How "Everything here is ..." reads for categories whose short name isn't a food on its own.
+KIND_PHRASES = {"cafe_bakery": "café food", "sandwich": "sandwiches", "other": "one kind of food"}
+RELAX = "relax"  # the slot of the "what can I loosen?" question
+
+# What a refinement that found nothing may offer to loosen, one at a time, and only when doing
+# so would actually find a dish. Allergies, diet and halal are Tier 1 rules, not adjustments:
+# they are never on this list and never offered.
+RELAXABLE = (
+    (("category",), "Any cuisine, not just {category}"),
+    (("ceiling",), "Spend more than {ceiling}"),
+    (("price_below",), "Forget “cheaper”"),
+    (("calories_below",), "Forget “lighter”"),
+    (("calories_above", "protein_at_least"), "Forget “more filling”"),
+    (("spice_above",), "Forget “spicier”"),
+    (("spice_below",), "Forget “milder”"),
+    (("health_above",), "Forget “healthier”"),
+    (("exclude_categories",), "Bring back the cuisines I set aside"),
+    (("exclude_restaurants", "exclude_dishes"), "Bring back the dishes I skipped"),
+)
 
 
 def handle(request: Request, turn) -> dict:
@@ -74,6 +94,15 @@ def _new_query(request: Request, text: str) -> dict:
 def _answer(request: Request, conversation: Conversation, value: str, chip: dict) -> dict:
     session_id = request.state.session_id
     slot = conversation.pending.slot
+    if slot == RELAX:
+        conversation.pending = None
+        loosened = Adjustments(**chip["replace"])
+        blueprint = pool.rerank(session_id, loosened)
+        if blueprint is None:  # the options were checked when offered; the pool can't shrink
+            reply = "That no longer finds anything, so I've kept my pick."
+            return _recommendation(request, conversation, _current_enriched(session_id), reply)
+        conversation.adjustments = loosened
+        return _recommendation(request, conversation, blueprint, f"{chip['label']}: {chip['then']}")
     conversation.asked.append(slot)
     conversation.pending = None
     adjustments = conversation.adjustments.merged(chip["adjust"])
@@ -90,19 +119,120 @@ def _refine(request: Request, conversation: Conversation, critique: str) -> dict
     session_id = request.state.session_id
     current = _current(session_id)
     winner = current["winning_dish"]
-    change = critiques.adjustment(critique, winner, current.get("utility_breakdown") or {})
-    if change is None:
-        reply = critiques.missing(critique, winner)
-        return _recommendation(request, conversation, _current_enriched(session_id), reply)
-    trial = conversation.adjustments.merged(change)
-    blueprint = pool.rerank(session_id, trial)
     word = critiques.WORDS[critique]
+    if critique == "different":
+        trial, done = _different(session_id, conversation.adjustments, winner)
+    else:
+        change = critiques.adjustment(critique, winner, current.get("utility_breakdown") or {})
+        if change is None:
+            reply = critiques.missing(critique, winner)
+            return _recommendation(request, conversation, _current_enriched(session_id), reply)
+        trial, done = conversation.adjustments.merged(change), f"Here's something {word}."
+    blueprint = pool.rerank(session_id, trial)
     if blueprint is None:
-        reply = f"Nothing {word} fits everything you asked, so I've kept {winner['name']}."
-        return _recommendation(request, conversation, _current_enriched(session_id), reply)
+        return _loosen(request, conversation, trial, word, winner)
     conversation.adjustments = trial
     _record_refinement(request, critique, blueprint)
-    return _recommendation(request, conversation, blueprint, f"Here's something {word}.")
+    return _recommendation(request, conversation, blueprint, done)
+
+
+def _different(session_id: str, adj: Adjustments, winner: dict) -> tuple[Adjustments, str]:
+    """
+    "Something different", read against what is actually on the table. Excluding the current
+    dish's cuisine is the natural reading, but it can't work when every dish shares one (a
+    search for pizza) or when the user answered a cuisine a moment ago — "different" then
+    contradicts their own answer. So:
+      - a cuisine was answered: a different cuisine, and the answer steps aside;
+      - the dishes span several cuisines: another one;
+      - they're all one cuisine: the same kind of dish from somewhere else.
+    """
+    from tier_2.consensus_manager import CATEGORY_NAMES, _same_dish
+
+    evaluation, context = pool.held(session_id)
+    current, _, _ = pool.candidates_under(
+        evaluation.get("safe_candidates", []), evaluation.get("source_intent") or {}, context, adj
+    )
+    category = winner.get("category") or ""
+    kind = KIND_PHRASES.get(category) or CATEGORY_NAMES.get(category) or "one kind of food"
+    if adj.category:
+        answered = CATEGORY_NAMES.get(adj.category, adj.category.replace("_", " "))
+        trial = adj.model_copy(update={"category": None}).merged(
+            {"exclude_categories": [adj.category]}
+        )
+        return trial, f"Here's something other than {answered}."
+    if len({c.get("category") for c in current}) > 1:
+        return adj.merged({"exclude_categories": [category]}), "Here's something different."
+    restaurants = {c.get("restaurant_name") for c in current if c.get("restaurant_name")}
+    here = winner.get("restaurant_name")
+    if here and len(restaurants) > 1:
+        return (
+            adj.merged({"exclude_restaurants": [here]}),
+            f"Everything here is {kind}, so here's one from somewhere else.",
+        )
+    # One restaurant: set aside the dish in every size it's sold, or "different" is just the
+    # half portion of the same nihari.
+    family = _same_dish(winner)
+    same = [c.get("dish_id") for c in current if _same_dish(c) == family] or [winner.get("dish_id")]
+    return (
+        adj.merged({"exclude_dishes": same}),
+        f"Everything here is {kind}, so here's another one.",
+    )
+
+
+def _loosen(
+    request: Request, conversation: Conversation, trial: Adjustments, word: str, winner: dict
+) -> dict:
+    """
+    A refinement found nothing. Rather than a dead end, offer to loosen one of the user's own
+    earlier choices — only those that would then find a dish — and let them pick. The
+    refinement they just asked for is kept; allergies, diet and halal are never offered.
+    """
+    from tier_2.consensus_manager import CATEGORY_NAMES
+    from tier_2.scoring import _rs
+
+    session_id = request.state.session_id
+    evaluation, context = pool.held(session_id)
+    found = evaluation.get("safe_candidates", [])
+    intent = evaluation.get("source_intent") or {}
+    before = conversation.adjustments
+    defaults = Adjustments()
+    # What this refinement itself changed is what the user just asked for: never offer to undo it.
+    touched = {f for f in Adjustments.model_fields if getattr(trial, f) != getattr(before, f)}
+    chips = {}
+    for fields, label in RELAXABLE:
+        if all(getattr(before, f) == getattr(defaults, f) for f in fields):
+            continue  # the user never set it, so there's nothing of theirs to loosen
+        if touched & set(fields):
+            continue
+        loosened = trial.model_copy(update={f: getattr(defaults, f) for f in fields})
+        kept, _, _ = pool.candidates_under(found, intent, context, loosened)
+        if not kept:
+            continue
+        chips[fields[0]] = {
+            "label": label.format(
+                category=CATEGORY_NAMES.get(before.category or "", before.category or ""),
+                ceiling=_rs(before.ceiling or 0),
+            ),
+            "replace": loosened.model_dump(),
+            "then": f"here's something {word}.",
+            "adjust": {},
+        }
+    if not chips:
+        reply = (
+            f"Nothing {word} is left in what you asked for, so I've kept {winner['name']}. "
+            "A new search is the way to widen it."
+        )
+        return _recommendation(request, conversation, _current_enriched(session_id), reply)
+    question = Question(
+        slot=RELAX,
+        text="Can I loosen one thing?",
+        why=(
+            f"Nothing {word} fits everything you asked. "
+            "Your allergies and diet stay exactly as they are."
+        ),
+        chips=chips,
+    )
+    return _ask(request, conversation, question, reply=None, skip_label=KEEP_LABEL)
 
 
 # ── Replies ──────────────────────────────────────────────────────────────────
@@ -119,6 +249,18 @@ def _next(request: Request, conversation: Conversation, blueprint: dict, reply: 
     if question is None:
         conversation.closed = True
         return _recommendation(request, conversation, blueprint, reply)
+    return _ask(request, conversation, question, reply, SKIP_LABEL, blueprint)
+
+
+def _ask(
+    request: Request,
+    conversation: Conversation,
+    question: Question,
+    reply: str | None,
+    skip_label: str,
+    blueprint: dict | None = None,
+) -> dict:
+    session_id = request.state.session_id
     conversation.pending = question
     conversation.turn += 1
     state.save(session_id, conversation)
@@ -132,9 +274,9 @@ def _next(request: Request, conversation: Conversation, blueprint: dict, reply: 
             "text": question.text,
             "why": question.why,
             "chips": [{"value": v, "label": c["label"]} for v, c in question.chips.items()],
-            "skip_label": SKIP_LABEL,
+            "skip_label": skip_label,
         },
-        "leading": (blueprint.get("winning_dish") or {}).get("name"),
+        "leading": ((blueprint or {}).get("winning_dish") or {}).get("name"),
     }
 
 

@@ -31,6 +31,10 @@ class Adjustments(BaseModel):
     craved: dict[str, float] = Field(default_factory=dict)
     category: Optional[str] = None
     exclude_categories: list[str] = Field(default_factory=list)
+    exclude_restaurants: list[str] = Field(
+        default_factory=list
+    )  # "different" in a one-cuisine pool
+    exclude_dishes: list[str] = Field(default_factory=list)  # ...when there's only one restaurant
     goal: Optional[str] = None
     calories_below: Optional[float] = None
     calories_above: Optional[float] = None
@@ -49,7 +53,7 @@ class Adjustments(BaseModel):
                 data[key] = value if data[key] is None else min(data[key], value)
             elif key in HIGHEST:
                 data[key] = value if data[key] is None else max(data[key], value)
-            elif key == "exclude_categories":
+            elif key in ("exclude_categories", "exclude_restaurants", "exclude_dishes"):
                 data[key] = sorted({*data[key], *value})
             elif key == "craved":
                 data[key] = {**data[key], **value}
