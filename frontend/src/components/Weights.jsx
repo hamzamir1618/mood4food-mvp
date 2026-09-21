@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { pct } from '../utils.js';
 
 const TERMS = [
-  ['w_taste', 'Taste'],
+  ['w_taste', 'Your taste'],
   ['w_budget', 'Budget'],
   ['w_health', 'Health'],
 ];

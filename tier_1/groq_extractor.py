@@ -33,6 +33,7 @@ class GroqExtractorImpl(IntentExtractor):
 
         system_prompt = """You are a food ordering assistant. Extract intent into a minimal JSON object. Omit fields if they are false, null, empty, or 0.
 Fields: budget_max_pkr(float), allergens_pruned([str]), mood_vector(sweet,salty,sour,bitter,umami,spice), craving(str), is_vegan(bool), is_vegetarian(bool), is_halal(bool), preferred_category(str), preferred_category_raw_phrase(str).
+IMPORTANT: Set budget_max_pkr ONLY when the user states an amount in rupees. Words such as "cheap", "affordable" or "on a budget" are not an amount: leave budget_max_pkr out and keep the word in craving.
 IMPORTANT: For allergens_pruned, strictly map excluded items to standard categories: gluten, dairy, fish, meat, egg, nuts, soy, shellfish. (e.g. "no bread" -> ["gluten"], "no cheese" -> ["dairy"]).
 
 Examples:
@@ -46,8 +47,9 @@ Examples:
 "no bread" -> {"allergens_pruned": ["gluten"]}
 "halal food only" -> {"is_halal": true}
 "under 500" -> {"budget_max_pkr": 500.0}
-"cheap eats" -> {"budget_max_pkr": 300.0, "craving": "cheap eats"}
-"I don't have much money" -> {"budget_max_pkr": 400.0}
+"cheap eats" -> {"craving": "cheap eats"}
+"I don't have much money" -> {"craving": "something affordable"}
+"something cheap under 600" -> {"budget_max_pkr": 600.0, "craving": "something cheap"}
 "something with chicken" -> {"craving": "something with chicken", "preferred_category": "chicken", "preferred_category_raw_phrase": "chicken"}
 "I want seafood" -> {"craving": "I want seafood", "preferred_category": "seafood", "preferred_category_raw_phrase": "seafood"}
 "biryani please" -> {"craving": "biryani", "preferred_category": "biryani", "preferred_category_raw_phrase": "biryani"}
@@ -67,6 +69,13 @@ Examples:
 
             intent = GroundedIntent.model_validate_json(raw_output)
             intent.raw_input = text
+            # A ceiling is a hard filter, so it has to come from the user, not the model. The
+            # prompt used to teach "cheap eats" -> Rs 300, which cut Islamabad to 48 dishes.
+            if intent.budget_max_pkr is not None and not any(ch.isdigit() for ch in text):
+                logger.info(
+                    "dropped a budget the request never stated", budget=intent.budget_max_pkr
+                )
+                intent.budget_max_pkr = None
             logger.info("Groq extraction succeeded", text=text, extractor="groq")
             return intent
         except groq.APITimeoutError as e:

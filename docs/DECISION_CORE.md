@@ -77,6 +77,13 @@ u_taste = 1 − Σ_d w_d · |dish_d − want_d| / Σ_d w_d
   - dearer dishes fall to 0 at the dearest 5%;
   - price counts at half confidence (`NO_BUDGET_CONFIDENCE`).
 - **The Frugal Student persona:** cheaper always ranks higher, by the dish's rank in price among the options.
+- **"Cheap" without a figure** ("cheap eats", "affordable", "sasta") sets no ceiling. The
+  extraction prompt used to teach the model `"cheap eats" -> Rs 300`, and a ceiling is a hard
+  filter: it cut 1,859 recommendable dishes to 48, which is why one Rs 220 burger (the only dish
+  under Rs 300 in I-8, its price never verified) kept winning. Now the word raises the budget
+  weight to 0.6 (`CHEAP_WORDS`, `CHEAP_BUDGET_WEIGHT`), so cheap dishes rank higher from the full
+  pool. A budget reaches the filter only when the text contains a number; the extractor drops any
+  other, whatever the model returns. Weights the user sets on the sliders still overrule it.
 - **The budget slider:** a band is flat — every dish under the median ties on it — so raising the
   budget weight against a flat term changed nothing, which is what made the sliders feel dead. As
   the weight rises past the even third, the score mixes smoothly from the band into the persona's
@@ -157,6 +164,13 @@ u_total = Σ_t w_t · (c_t · u_t + (1 − c_t) · 0.5) / Σ_t w_t      × novel
 - **Ties** are broken by the other terms, then by name. A term the weights have turned off
   saturates — with budget alone, every dish inside the limit scores the same — and breaking those
   ties alphabetically clustered one restaurant's dishes at the top.
+
+## Re-ranking with the sliders
+
+`POST /recalculate` re-ranks the pool the query found under new weights, **after** applying what
+the conversation narrowed it to: a cuisine answered, "Cheaper", "Healthier". It used to re-rank
+the whole pool, so moving a slider silently discarded the answers — choose Desi, move a slider,
+get a fast-food burger.
 
 ## Shortlist
 
