@@ -66,12 +66,28 @@ Each refinement asks for a dish better than the current pick in one direction, a
 | More filling | at least 10% higher in calories, with at least as much protein | |
 | Spicier | spicier | asks for spice 0.3 above the current pick |
 | Milder | milder | asks for spice 0.3 below it |
-| Something different | from another category | |
+| Something different | from another cuisine; see below | |
 
 **How refinements behave:**
 - **They accumulate,** and limits only ever tighten.
-- **If nothing is left, the pick stays and the reply says so,** for example "Nothing cheaper fits everything you asked, so I've kept …".
-- **They can't break what the request asked for.** After "spicy desi food", "something different" finds nothing, because only desi dishes were found.
+- **"Something different" reads the table first.** It used to mean "another category" only, and
+  failed in about half of realistic flows (measured on 12): every dish a search for pizza, nihari
+  or dessert finds shares one category, and after answering a cuisine it contradicted the answer.
+  Now:
+  - a cuisine was answered: a different cuisine, and the answer steps aside ("Here's something
+    other than Middle Eastern");
+  - the dishes span several cuisines: another one;
+  - they're all one cuisine: the same kind of dish from another restaurant ("Everything here is
+    pizza, so here's one from somewhere else"); with a single restaurant, another dish there,
+    setting aside every size of the current one so it can't return the half portion.
+  Measured again on 10 flows: useful in all 10.
+- **If nothing is left, it asks what to loosen** rather than stopping: "Can I loosen one thing?",
+  offering only the user's own earlier choices (a budget answered, a cuisine, an earlier
+  refinement), only those that would then find a dish, and never the refinement just asked for.
+  Allergies, diet and halal are Tier 1 rules, not adjustments, so they are never offered.
+  "Keep my pick" leaves everything as it was.
+- **With nothing of the user's to loosen, the pick stays and the reply says so:** "Nothing
+  cheaper is left in what you asked for, so I've kept …. A new search is the way to widen it."
 - **A refinement never re-queries** the database or calls an LLM. The tests check this by counting calls.
 
 ## Saving what it heard

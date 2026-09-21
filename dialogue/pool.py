@@ -20,6 +20,8 @@ def allows(adj: Adjustments, dish: dict) -> bool:
             adj.price_below is None or price < adj.price_below,
             adj.category is None or dish.get("category") == adj.category,
             dish.get("category") not in adj.exclude_categories,
+            dish.get("restaurant_name") not in adj.exclude_restaurants,
+            dish.get("dish_id") not in adj.exclude_dishes,
             adj.calories_below is None or (kcal is not None and kcal < adj.calories_below),
             adj.calories_above is None or (kcal is not None and kcal > adj.calories_above),
             adj.protein_at_least is None

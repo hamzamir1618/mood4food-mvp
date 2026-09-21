@@ -160,7 +160,8 @@ def test_refining_narrows_what_the_query_already_found(chat):
     typed = _say(chat, text="same but cheaper")["recommendation"]["winning_dish"]
     assert typed["price_pkr"] < second["price_pkr"]
     last = _say(chat, critique="cheaper")
-    assert last["reply"].startswith("Nothing cheaper fits")
+    # already the cheapest, and "cheaper" is the user's own choice, so there's nothing to loosen
+    assert last["reply"].startswith("Nothing cheaper is left in what you asked for")
     assert last["recommendation"]["winning_dish"]["name"] == typed["name"]  # the pick stays
     assert chat.calls == {"ingest": 1, "anchor": 1}  # never re-queried
 
@@ -169,8 +170,48 @@ def test_milder_and_different_move_the_way_asked(chat):
     first = _say(chat, text="spicy desi food under 2000")["recommendation"]["winning_dish"]
     milder = _say(chat, critique="milder")["recommendation"]["winning_dish"]
     assert milder["taste_profile"]["spice"] < first["taste_profile"]["spice"]
-    # the query asked for desi food, so there's nothing different within what it found
-    assert _say(chat, critique="different")["reply"].startswith("Nothing different fits")
+
+
+def test_different_in_a_one_cuisine_pool_finds_another_of_the_same_kind(chat):
+    # Everything the query found is desi, so another cuisine is impossible. "Different" used to
+    # stop there; it now means a different dish of the kind that was asked for.
+    first = _say(chat, text="spicy desi food under 2000")["recommendation"]["winning_dish"]
+    reply = _say(chat, critique="different")
+    other = reply["recommendation"]["winning_dish"]
+    assert other["dish_id"] != first["dish_id"]
+    assert other["category"] == "desi_traditional"
+    assert reply["reply"].startswith("Everything here is desi")
+
+
+def test_a_refinement_that_finds_nothing_asks_what_to_loosen(chat):
+    _say(chat, text="spicy desi food under 2000")
+    cheaper = _say(chat, critique="cheaper")["recommendation"]["winning_dish"]
+    # spicier than this, and still cheaper than the first pick: nothing in the pool does both
+    asked = _say(chat, critique="spicier")
+    assert asked["type"] == "question"
+    assert asked["question"]["id"] == "relax"
+    labels = [c["label"] for c in asked["question"]["chips"]]
+    # only the user's own earlier choice, and only because loosening it finds a dish
+    assert labels == ["Forget “cheaper”"]
+    assert asked["question"]["skip_label"] == "Keep my pick"
+    loosened = _say(chat, answer={"question": "relax", "value": "price_below"})
+    dish = loosened["recommendation"]["winning_dish"]
+    assert dish["taste_profile"]["spice"] > cheaper["taste_profile"]["spice"]  # spicier was kept
+
+
+def test_nothing_to_loosen_says_so_rather_than_asking(chat):
+    _say(chat, text="spicy desi food under 2000")
+    _say(chat, critique="spicier")  # to the hottest desi dish there is
+    again = _say(chat, critique="spicier")
+    assert again["type"] == "recommendation"
+    assert "A new search is the way to widen it" in again["reply"]
+
+
+def test_loosening_never_offers_allergies_or_diet():
+    from dialogue.manager import RELAXABLE
+
+    offered = {field for fields, _ in RELAXABLE for field in fields}
+    assert not offered & {"allergens_pruned", "is_vegan", "is_vegetarian", "is_halal"}
 
 
 # ── Reading free text ────────────────────────────────────────────────────────
