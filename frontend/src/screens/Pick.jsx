@@ -143,7 +143,12 @@ export default function Pick({
 
           {blueprint?.agent_weights && onWeights && (
             <div className="o-9" data-nodrag="1">
-              <Weights weights={blueprint.agent_weights} onChange={onWeights} busy={busy} />
+              <Weights
+                weights={blueprint.agent_weights}
+                onChange={onWeights}
+                busy={busy}
+                tasteUnset={blueprint.utility_breakdown?.u_taste == null}
+              />
             </div>
           )}
         </div>
