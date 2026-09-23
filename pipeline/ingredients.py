@@ -8,8 +8,8 @@ behind every number.
 
 Fields
   role       bulk | fat | veg | trace — how the nutrition estimate apportions a serving
-             (bulk 50%, fat 15%, veg 15%, the rest water and trace; unchanged from the
-             sourcing project's method)
+             (bulk 71%, fat 7%, veg 15%, the rest water and trace; calibrated against
+             USDA-measured restaurant dishes, see pipeline/nutrition.py)
   allergens  allergen tags it carries: dairy, egg, fish, shellfish, gluten, nuts, soy, sesame
   animal     meat | fish | shellfish | egg | dairy | honey | "" — drives is_vegan / is_vegetarian
   haram      True for pork and alcohol — drives is_halal
@@ -104,6 +104,33 @@ VOCABULARY: dict[str, Ingredient] = {
     "crab": I("bulk", ("shellfish",), "shellfish", aliases=("crabs",)),
     "lobster": I("bulk", ("shellfish",), "shellfish", aliases=("lobsters",)),
     "squid": I("bulk", ("shellfish",), "shellfish", aliases=("calamari",)),
+    # Mussels and scallops were read as "fish", so they carried no shellfish allergen. ("Oyster"
+    # stays with oyster sauce: on these menus it is the sauce, as in Chilli Oyster Chicken.)
+    "molluscs": I(
+        "bulk",
+        ("shellfish",),
+        "shellfish",
+        aliases=("mussel", "mussels", "scallop", "scallops", "clam", "clams"),
+    ),
+    "anchovy": I("trace", ("fish",), "fish", aliases=("anchovies",)),
+    # Puffed, fried starch crackers flavoured with fish or prawn. Named so the longer spelling
+    # wins: "fish crackers" was read as "fish" and estimated as a plate of fried fish (43 g of
+    # protein). They keep the allergen and the diet flags of the seafood in them.
+    "fish crackers": I("bulk", ("fish",), "fish", aliases=("fish cracker",)),
+    "prawn crackers": I(
+        "bulk",
+        ("shellfish",),
+        "shellfish",
+        aliases=(
+            "prawn cracker",
+            "prawns crackers",
+            "prawns cracker",
+            "shrimp crackers",
+            "shrimp cracker",
+            "krupuk",
+            "keropok",
+        ),
+    ),
     "egg": I(
         "bulk",
         ("egg",),
@@ -137,6 +164,7 @@ VOCABULARY: dict[str, Ingredient] = {
     ),
     "paneer": I("bulk", ("dairy",), "dairy"),
     "tofu": I("bulk", ("soy",)),
+    "edamame": I("bulk", ("soy",), aliases=("edamame beans",)),
     "chickpeas": I(
         "bulk",
         aliases=("chickpea", "chana", "cholay", "chole", "hummus", "houmous", "hommus", "falafel"),
@@ -200,6 +228,17 @@ VOCABULARY: dict[str, Ingredient] = {
             "breadcrumbs",
             "bread crumbs",
             "panko",
+            # Wheat wrappers, which carried no gluten unless the automated pass listed flour
+            "wonton",
+            "wontons",
+            "dumpling",
+            "dumplings",
+            "momo",
+            "momos",
+            "gyoza",
+            "dim sum",
+            "shumai",
+            "siu mai",
         ),
     ),
     "bread": I(
@@ -353,6 +392,8 @@ VOCABULARY: dict[str, Ingredient] = {
     "pistachios": I("fat", ("nuts",), aliases=("pistachio", "pista")),
     "peanuts": I("fat", ("nuts",), aliases=("peanut",)),
     "walnuts": I("fat", ("nuts",), aliases=("walnut", "akhrot")),
+    # Nutella is hazelnut spread: it was only chocolate, so it carried no nut allergen.
+    "hazelnuts": I("trace", ("nuts",), aliases=("hazelnut", "nutella", "praline", "ferrero")),
     "sesame": I("fat", ("sesame",), aliases=("sesame seeds", "til")),
     "coconut": I("fat", ("nuts",), aliases=("nariyal",)),
     # ── Sweet ────────────────────────────────────────────────────────────────
@@ -510,3 +551,39 @@ def implied_coating(name: str, description: str, ingredients: list[str]) -> list
     if any("gluten" in VOCABULARY[i].allergens or i == "gram flour" for i in ingredients):
         return []
     return ["wheat flour"]
+
+
+# Dishes whose standard recipe contains an allergen the name doesn't state. Menus and the
+# automated pass leave these out, and a missing allergen is the unsafe direction: the dish is
+# served to someone who excluded it. Like a coating, what a recipe implies counts for allergens
+# and exclusions only, never for nutrition (a spoon of flour in nihari is not 280 g of wheat).
+# The allergen audit of 2026-09-21 found each of these missing on real dishes.
+RECIPE_IMPLIES = (
+    (r"nihari|haleem", ("wheat flour",), "is thickened with wheat"),
+    (r"kunaf[ae]h?|knafeh", ("wheat flour",), "is a wheat pastry"),
+    (r"kung pao", ("peanuts",), "is made with peanuts"),
+    (r"chapli|kofta|koftay", ("egg",), "is usually bound with egg"),
+    (r"katsu|schnitzel|cordon bleu", ("egg",), "is breaded with an egg wash"),
+    (r"kabuli pulao|kunaf[ae]h?|knafeh", ("pistachios",), "is garnished with nuts"),
+    (r"(?<!namkeen )tikka|tandoori", ("yogurt",), "is usually marinated in yogurt"),
+    (r"tom yum|tom kha", ("fish sauce",), "is made with fish sauce"),
+    (r"korma|qorma", ("almonds",), "is often made with nuts"),
+    (r"ca?esar|ceaser", ("anchovy",), "dressing is made with anchovy"),
+)
+_RECIPE_PATTERNS = [
+    (re.compile(rf"\b(?:{p})\b", re.I), adds, why) for p, adds, why in RECIPE_IMPLIES
+]
+
+
+def implied_by_recipe(name: str, ingredients: list[str]) -> list[str]:
+    """
+    Ingredients a dish's standard recipe has that its list doesn't, for allergens only. Like
+    the coating rule, it only ever adds, and a dish with no known ingredients stays unknown.
+    """
+    if not ingredients:
+        return []
+    added = []
+    for pattern, adds, _ in _RECIPE_PATTERNS:
+        if pattern.search(name or ""):
+            added += [a for a in adds if a not in ingredients and a not in added]
+    return added
