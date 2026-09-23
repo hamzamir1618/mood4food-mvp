@@ -29,9 +29,10 @@ from pipeline.ingredients import (
     VOCABULARY,
     derive_diet_flags,
     detect_ingredients,
+    implied_by_recipe,
     implied_coating,
 )
-from pipeline.nutrition import estimate, implausible
+from pipeline.nutrition import estimate, implausible, is_soup
 from pipeline.sources import dish_uid, load_handoff, load_master, load_ocr_candidates, norm
 from pipeline.usda_reference import load_reference
 from taste_enrichment import enrich_taste_profiles
@@ -63,6 +64,19 @@ def plain_bread(name: str, ingredients: list[str]) -> bool:
         and bool(ingredients)
         and set(ingredients) <= PLAIN_BREAD_INGREDIENTS
     )
+
+
+# Sides filed as meals: fish crackers as a Chinese main (a 350 g serving, 1,600 kcal), a Rs 30
+# "Salad" as continental. Seafood crackers are a side whatever else the name says ("Chinese
+# Fish Crackers", "Prawns Cracker (Half)"). A named salad (Green, Caesar, Fattoush) can be a
+# meal and is left alone; only the bare word and kachumber, a chopped side, count.
+SIDE_NAME = re.compile(
+    r"\b(?:fish|prawns?|shrimps?) crackers?\b|^\s*(?:salad|kachumber salad)\s*$", re.I
+)
+
+
+def plain_side(name: str) -> bool:
+    return bool(SIDE_NAME.search(name or ""))
 
 
 # Facts the project owner confirmed that no data source records.
@@ -410,7 +424,7 @@ def build() -> tuple[list[dict], dict]:
         # The pass sometimes files a main dish as an add-on (jumbo prawns, qeema naan).
         # A dish that names meat or seafood is a meal, so it keeps its previous category.
         names_meat = any(VOCABULARY[n].animal in ("meat", "fish", "shellfish") for n in named)
-        if category == "add_ons" and names_meat:
+        if category == "add_ons" and names_meat and not plain_side(name):
             category = r["category"] if r["category"] not in NOT_RECOMMENDED else "other"
             category_source = "handoff (a dish that names meat or seafood is not an add-on)"
         # ...and the other way round: a plain bread filed as a meal (Sada Nan as desi) is a
@@ -418,6 +432,9 @@ def build() -> tuple[list[dict], dict]:
         elif category not in NOT_RECOMMENDED and plain_bread(name, sorted(found)):
             category = "add_ons"
             category_source = f"{category_source} (a plain bread is an add-on)"
+        elif category not in NOT_RECOMMENDED and plain_side(name):
+            category = "add_ons"
+            category_source = f"{category_source} (a side is an add-on)"
         ingredients = [n for n in VOCABULARY if n in found]
         if named:
             basis = (
@@ -429,8 +446,11 @@ def build() -> tuple[list[dict], dict]:
         # allergens and exclusions only: breading is a small share of a serving, so it stays
         # out of the nutrition estimate.
         coating = implied_coating(name, desc, ingredients)
+        # ...and so does what the dish's standard recipe has (nihari's flour, kung pao's
+        # peanuts): allergens and exclusions only.
+        recipe = implied_by_recipe(name, ingredients)
         for_nutrition = ingredients
-        ingredients = [n for n in VOCABULARY if n in found or n in coating]
+        ingredients = [n for n in VOCABULARY if n in found or n in coating or n in recipe]
 
         # Allergens and diet flags. With no ingredients we know nothing, and say so:
         # allergens unknown, not vegan, not vegetarian (a dish with an unknown recipe is
@@ -466,7 +486,7 @@ def build() -> tuple[list[dict], dict]:
             )
 
         # Nutrition
-        est = estimate(for_nutrition, category, reference)
+        est = estimate(for_nutrition, category, reference, soup=is_soup(name))
         confidence = nutrition_confidence(est, basis)
 
         # Price

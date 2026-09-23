@@ -15,16 +15,71 @@ from pipeline.build_dataset import (
     listed_items,
     nutrition_confidence,
     plain_bread,
+    plain_side,
     read_platter_answers,
 )
 from pipeline.ingredients import (
     VOCABULARY,
     derive_diet_flags,
     detect_ingredients,
+    implied_by_recipe,
     implied_coating,
 )
 from pipeline.nutrition import estimate, implausible
 from pipeline.sources import dish_uid
+
+
+# ── Allergen audit, 2026-09-21: each case was missing on a real dish ─────────────
+@pytest.mark.parametrize(
+    "name, allergen",
+    [
+        ("Mussel Imported", "shellfish"),  # read as fish only
+        ("Scallops", "shellfish"),
+        ("Nutella Kunafa", "nuts"),  # Nutella was only chocolate
+        ("Hazelnut Cinnamon Whipped Latte", "nuts"),
+        ("Spicy Edamame", "soy"),
+        ("Chilli Oyster Chicken", "shellfish"),  # oyster sauce
+        ("Chilli Wonton", "gluten"),  # wheat wrappers
+        ("Chicken Momos", "gluten"),
+    ],
+)
+def test_a_name_that_states_an_allergen_source_carries_it(name, allergen):
+    flags = derive_diet_flags(detect_ingredients(name))
+    assert allergen in flags["allergens"]
+
+
+@pytest.mark.parametrize(
+    "name, allergen",
+    [
+        ("Beef Nalli Nihari Half", "gluten"),
+        ("Kunafa", "gluten"),
+        ("Kung Pao Chicken With Jasmine Rice", "nuts"),
+        ("Chapli Kebab Beef", "egg"),
+        ("Kofta Afghani", "egg"),
+        ("Chicken Tikka Leg", "dairy"),
+        ("Spicy & Sour Chicken Tom Yum Gai", "fish"),
+        ("Qorma Gosht", "nuts"),
+        ("Chicken Caesar", "fish"),
+        ("Katsu Curry With Steam Rice", "egg"),
+        ("Kabuli Pulao", "nuts"),
+    ],
+)
+def test_a_standard_recipe_adds_the_allergen_its_name_leaves_out(name, allergen):
+    added = implied_by_recipe(name, ["beef"])
+    assert allergen in derive_diet_flags(added)["allergens"]
+
+
+def test_recipe_rules_only_add_and_leave_unknown_dishes_unknown():
+    assert implied_by_recipe("Beef Nihari", []) == []  # no ingredients: allergens stay unknown
+    assert implied_by_recipe("Kuzu Sis (Lamb Namkeen Tikka)", ["lamb"]) == []  # salt, no yogurt
+    assert implied_by_recipe("Chicken Karahi", ["chicken"]) == []
+    assert implied_by_recipe("Beef Nihari", ["beef", "wheat flour"]) == []  # already there
+
+
+def test_oyster_on_these_menus_is_the_sauce_not_a_plate_of_molluscs():
+    found = detect_ingredients("Chilli Oyster Chicken")
+    assert "oyster sauce" in found and "molluscs" not in found
+
 
 # ── Ingredients and diet flags ───────────────────────────────────────────────
 
@@ -146,9 +201,39 @@ def test_no_ingredients_means_no_estimate():
 
 def test_estimate_splits_the_serving_by_role():
     est = estimate(["chicken", "onion", "cooking oil"], "desi_traditional", REF)
-    # 400 g serving: 200 g bulk + 60 g fat + 60 g veg, all at 100 kcal / 100 g
-    assert est["calories"] == pytest.approx(320.0)
+    # 400 g serving: 284 g bulk + 28 g fat + 60 g veg, all at 100 kcal / 100 g (the split
+    # calibrated against USDA-measured restaurant dishes; scripts/calibrate_nutrition.py)
+    assert est["calories"] == pytest.approx(372.0)
     assert est["defaults_used"] == []
+
+
+def test_a_serving_is_no_longer_15_percent_pure_oil():
+    # The old split put 60 g of oil in every desi serving; measured dishes don't support it.
+    from pipeline.nutrition import SHARES
+
+    assert SHARES["fat"] <= 0.08
+
+
+def test_crackers_are_not_counted_again_as_the_seafood_they_are_named_for():
+    est = estimate(["fish", "fish crackers", "cooking oil"], "add_ons", REF)
+    assert est == estimate(["fish crackers", "cooking oil"], "add_ons", REF)
+
+
+@pytest.mark.parametrize(
+    "name, side",
+    [
+        ("Fish Crackers", True),
+        ("Chinese Fish Crackers", True),
+        ("Prawns Cracker (Half)", True),
+        ("Salad", True),
+        ("Kachumber Salad", True),
+        ("Green Salad", False),  # can be a meal at a Lebanese restaurant
+        ("Chicken Caesar Salad", False),
+        ("Fish Tikka", False),
+    ],
+)
+def test_a_side_filed_as_a_meal_is_an_add_on(name, side):
+    assert plain_side(name) is side
 
 
 def test_a_vegetable_dish_is_not_padded_with_flour():

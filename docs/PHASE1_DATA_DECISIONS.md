@@ -37,6 +37,11 @@ Two definitions worth knowing:
 - Plain bread or rice ordered as a side is `add_ons`, and so is never recommended.
   - The automated pass filed ten plain breads as meals (Sada Nan, Kalonji Naan, Makkai Roti). As meals they got a 400 g serving and ~1,100 kcal. A dish whose name is a bread's, names no filling, and holds only dough, fat and a topping is now `add_ons` (`plain_bread` in `pipeline/build_dataset.py`). Aloo paratha, cheese naan, halwa puri and puri chanay stay meals.
   - For nutrition, a prepared bread is not counted again as wheat flour or generic bread.
+- Seafood crackers and plain side salads are `add_ons` too (`plain_side`, 2026-09-21).
+  - Fish crackers had been filed as a Chinese main, and "fish" in the name made them a plate of fried fish: 726 kcal with 43 g of protein, which won a health-weighted query. A Rs 30 "Salad" at Savour Foods was filed as continental, with 500 kcal from olive oil.
+  - Any name with *fish*, *prawn* or *shrimp crackers* counts ("Chinese Fish Crackers", "Prawns Cracker (Half)"), as does a bare *Salad* or *Kachumber Salad*. A named salad (Green, Caesar, Fattoush) can be a meal and is left alone.
+  - The rule wins over the one that keeps a dish naming seafood out of `add_ons`.
+  - Nine dishes moved. *Fish crackers* and *prawn crackers* are vocabulary entries that keep the fish or shellfish allergen. For nutrition they stand for their seafood, with USDA's extruded corn chips as the stand-in (USDA has no fish crackers).
 
 ### Ingredients, allergens and diet flags
 
@@ -44,6 +49,20 @@ Two definitions worth knowing:
 - **Named detection is authoritative.** The model's lists can miss allergens: it left egg out of shakshuka even when the prompt gave that exact example. Allergen data is therefore still an estimate, and the app should say so.
 - An owner's item list adds its ingredients to the platter. An item that is also on the same restaurant's menu brings that dish's ingredients with it: *Philadelphia Maki* names no fish, but Umai's own menu entry for it does. The list counts as the whole dish, and so can support a vegetarian claim, only when every item on it was recognised. Without these two rules, Umai's Zen and Hanami sushi platters were marked vegetarian. The vocabulary also covers platter terms: *malai*, *tandoori*, *tikka* and *patakha boti*, *reshmi kabab* and *sajji* → chicken; *maki*, *nigiri* and *sushi* → rice; *sashimi*, *nigiri*, *toro* and *sake* → fish. *Chapli kebab* is left out, because it comes in beef, chicken and mutton here.
 - A name that means a fried coating adds wheat flour: *nuggets*, *broast*, *zinger*, *strips*, *crispy*, *katsu*, *cordon bleu*, *fried chicken/fish*, *fish & chips*, *mozzarella sticks* and similar, or *breaded*, *crumbed* or *battered* in the description. Menus rarely list the batter and the pass often left it out, so 31 recommendable dishes read as gluten-free, and Mozzarella Sticks won the gluten-free query in the golden set. The rule only adds an allergen. It skips dishes that already carry gluten, dishes that name gram flour (pakoras), and dishes with no known ingredients, which stay unknown. The flour counts for allergens and exclusions but not for nutrition, because breading is a small share of a serving and would otherwise displace the protein. *Lady finger* (okra) and *finger chips* (fries) are excluded. *Breadcrumbs* and *panko* map to wheat flour.
+- **The allergen audit (2026-09-21)** checked every recommendable dish's name against words that name an allergen source and against standard recipes. Only additions resulted; no tag was removed.
+  - Names: *mussels*, *scallops* and *clams* are shellfish (they had read as fish only); *Nutella*, *hazelnut* and *praline* are nuts; *edamame* is soy; dumpling, wonton, momo and gyoza wrappers are wheat. *Oyster* stays with oyster sauce, which is what it means on these menus.
+  - Standard recipes (`RECIPE_IMPLIES`), which count for allergens and exclusions only, never nutrition:
+    - nihari and haleem → wheat;
+    - kunafa → wheat and nuts;
+    - kung pao → peanuts;
+    - chapli kebab and kofta → egg;
+    - katsu, schnitzel and cordon bleu → egg;
+    - tikka and tandoori → yogurt (namkeen tikka excepted);
+    - tom yum and tom kha → fish sauce;
+    - korma → nuts;
+    - Caesar → anchovy;
+    - kabuli pulao → nuts.
+  - 56 tags were added across 55 dishes. Tom Kha Vegetable is no longer marked vegetarian (fish sauce), which is the cautious reading.
 - Pork and alcohol count only when the dish itself names them. Suggestions from the pass are ignored, and the build report lists them.
 - A dish is vegan or vegetarian only when the whole dish was assessed, meaning the pass answered or the owner listed what it includes.
 - A dish with no ingredients has unknown allergens and is excluded for anyone who declares an allergy.
@@ -51,12 +70,23 @@ Two definitions worth knowing:
 ### Nutrition
 
 - USDA SR Legacy values for every ingredient (`data/reference/ingredient_nutrition.csv`, with the FDC id on each row) replace the sourcing project's Open Food Facts matches. For 43 of 82 ingredients those matches were a different food.
-- The apportioning method is the same (a category serving weight split 50% bulk, 15% fat, 15% vegetables), with three fixes:
+- The apportioning method is the sourcing project's (a category serving weight split between bulk, fat and vegetables), with three fixes:
   - no estimate for a dish without ingredients;
   - vegetable dishes are not padded with flour;
   - desserts and drinks get no onion default.
+- **The split is calibrated against dishes USDA measured whole (2026-09-21, `scripts/calibrate_nutrition.py`).**
+  - USDA SR Legacy includes lab-analysed restaurant plates ("Restaurant, Chinese, kung pao chicken", "Fast foods, cheeseburger"). 113 of our dishes are the same food as 28 of them.
+  - The sourcing project's 50% bulk / 15% fat put 15% of every plate's weight down as pure oil: 60 g in a desi serving. The median dish got 68% of its energy from fat, and 78% of dishes were over 50%. USDA's measured dishes sit at a median of 44%, and only 5 of 135 are over 60%.
+  - A grid of splits was scored on the matched dishes by median error in fat share and in calories per 100 g. Among splits within 0.005 of the best, the least biased was chosen: **71% bulk, 7% fat, 15% vegetables.**
+  - Fat share error went from +20 points to +2. Calories per 100 g were no worse (median error 20.5% before, 19.2% after).
+  - After the rebuild, the median dish gets 48% of its energy from fat (was 69%), and 16% of dishes are over 60% (was 74%).
+  - It fits Chinese dishes and fast food best. Deep-fried Italian and family-style dishes (mozzarella sticks, fried prawns) now come out 13 points under, because frying adds fat that one share can't capture.
+- **A soup is mostly broth.** Split like a plate, a hot and sour soup was 250 g of chicken: 749 kcal and 74 g of protein. USDA measures a Chinese restaurant's hot and sour soup at 39 kcal per 100 g.
+  - A dish named as a soup (*soup*, *shorba*, *yakhni*, *broth*, *chowder*, *bisque*, *tom yum*) counts only 20% of its serving as solids; the rest is broth.
+  - This was calibrated on 36 of our soups matched to 9 measured ones. As plates they were +367% on calories per 100 g; at 20% the median error is 26%.
+- **A dish with no main ingredient is made of what it does have.** A vegetable dish is its vegetables (as before), and a cheese plate is its cheese: the table files cheese as a fat, so "Jibne Kurdiyey" (cheese and herbs) came out at 61 kcal, now 208. Only fats that are foods count — cheese, cream, tahini, nuts, coconut — never the oil, ghee or butter a dish was cooked in, or a "Duck Roast" listing oil and soy sauce would be a plate of oil (2,434 kcal).
 - `nutrition_confidence` is `high`, `medium`, `low` or `none`. Estimates are also flagged when they fail an energy-consistency check or exceed 2,500 kcal.
-- Known limitation: the method's 15% fat share (for example 60 g of oil or butter in a 400 g curry) keeps oily dishes high. Revisit it in Phase 3 if health scoring needs finer resolution.
+- Known limitation: one fat share for every cooking method. Fried food is under-estimated and dishes cooked with little oil slightly over. The ingredient lists from the automated pass also decide a lot: a mushroom soup listing chicken (the stock) is estimated with chicken.
 
 ### Price check
 

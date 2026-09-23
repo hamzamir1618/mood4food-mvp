@@ -110,6 +110,19 @@ CHOICES = {
     "corn": ("Corn, sweet, yellow, cooked, boiled, drained, without salt", ""),
     "potato": ("Potatoes, boiled, cooked without skin, flesh, without salt", ""),
     "fries": ("Fast foods, potato, french fried in vegetable oil", ""),
+    "molluscs": (
+        "Mollusks, scallop, (bay and sea), cooked, steamed",
+        "scallop stands in for mussels, clams and oysters",
+    ),
+    "edamame": ("Edamame, frozen, prepared", ""),
+    "fish crackers": (
+        "Snacks, corn-based, extruded, chips, plain",
+        "USDA has no fish or prawn crackers; an extruded, fried starch snack stands in",
+    ),
+    "prawn crackers": (
+        "Snacks, corn-based, extruded, chips, plain",
+        "USDA has no fish or prawn crackers; an extruded, fried starch snack stands in",
+    ),
     "milk": ("Milk, whole, 3.25% milkfat, with added vitamin D", ""),
     "yogurt": ("Yogurt, plain, whole milk", ""),
     "cream": ("Cream, fluid, heavy whipping", ""),
