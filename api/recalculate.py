@@ -35,6 +35,7 @@ def recalculate(request: Request, payload: WeightUpdate):
     from tier_2.consensus_manager import build_blueprint, run_debate
     from tier_2.scoring import build_preferences, health_term
     from tier_3.fulfillment_engine import enrich_blueprint
+    from ui.compose import pick_for_session
 
     session_id = request.state.session_id
     evaluation = load_contract(session_id, "candidate_evaluation")
@@ -90,4 +91,5 @@ def recalculate(request: Request, payload: WeightUpdate):
         winner["name"] if winner else "None",
     )
     blueprint.pop("all_candidate_scores", None)  # never sent; candidate_count carries the size
+    blueprint["layout"] = pick_for_session(session_id, blueprint)  # the sliders reorder the reasons
     return blueprint

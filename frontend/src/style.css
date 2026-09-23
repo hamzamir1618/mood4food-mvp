@@ -253,6 +253,9 @@ a.btn-accent:hover { color: #ffffff; }
 .weight input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .weight input[type="range"]:disabled { opacity: 0.5; cursor: default; }
 .weight-value { font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+.weight.is-off { color: var(--muted); }
+.weight.is-off input[type="range"]:disabled { opacity: 0.3; }
+.weights-note { margin: 4px 0 0; }
 
 /* The dishes that came second, so the shortlist is visible rather than asserted. */
 .runners { padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--rule); }
