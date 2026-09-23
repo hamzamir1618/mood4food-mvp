@@ -58,9 +58,16 @@ Dishes no person reviewed (`review_status = auto_imported`) have their taste and
 u_taste = 1 − Σ_d w_d · |dish_d − want_d| / Σ_d w_d
 ```
 
-- **What the user wants:** for a taste the query asks for ("something sweet"), the query's value; for every other dimension, the user's usual taste. That is the learned taste once it has evidence, otherwise the persona's.
+- **What the user wants:** for a taste the query asks for ("something sweet"), the query's value; for every other dimension, the user's usual taste. That is the taste learned from approvals or set by hand.
+- **No known taste, no craving: taste doesn't apply (2026-09-21).**
+  - Before, a guest's dishes were scored against the persona's made-up profile and described as "your usual taste".
+  - The dish tastes it compared with are largely templates: 1,139 "original" values share 72 profiles, and 378 dishes are exactly "umami 0.6, the rest 0".
+  - Across 1,850 candidates the taste score's spread was 0.06, against 0.30 for health. At taste 100% it picked whichever dish sat nearest the stereotype: an Afghan tikka burger.
+  - Now the term is left out, like distance without a location. The sliders show taste as off, with a line saying what would turn it on.
+  - With a craving but no known taste, only the craved dimensions count.
 - **Weights:** each dimension counts by its learned importance (1 until the user has approved at least three dishes; see `LEARNING.md`). A dimension the query asks for counts 4 times that (`CRAVING_IMPORTANCE`).
 - **Why not cosine:** cosine similarity scored an intensely sweet dessert and a barely sweet side identically (0.9234). This measure separates them.
+- **A dish's taste is an estimate, and counts as one (2026-09-21).** "Original" means the value arrived with the source data, which generated it; 1,139 dishes share 72 profiles. Its confidence is 0.8, the same as the keyword estimate, not the 1.0 that would say someone tasted the dish.
 - **The sentence names what was asked for and how strong the dish is,** for example "You asked for sweet; this is strongly sweet."
 
 ### Budget
@@ -84,6 +91,49 @@ u_taste = 1 − Σ_d w_d · |dish_d − want_d| / Σ_d w_d
   weight to 0.6 (`CHEAP_WORDS`, `CHEAP_BUDGET_WEIGHT`), so cheap dishes rank higher from the full
   pool. A budget reaches the filter only when the text contains a number; the extractor drops any
   other, whatever the model returns. Weights the user sets on the sliders still overrule it.
+  - The word also makes cheaper better, as for the Frugal Student persona, with price counting
+    in full (2026-09-21). It had been scored like no budget at all: price at half confidence,
+    and every dish up to the median price scoring 1. Once health could tell dishes apart, a Rs 720
+    soup beat a Rs 150 pogaca for "something cheap". A rupee figure still sets a band instead.
+
+## What the words say that the fields can't carry
+
+`GroundedIntent` has nine fields, so everything else a person says was dropped in silence until
+the 2026-09-21 word sweep. Rather than widen the schema and the prompt for each one, the words
+are read by rule in `tier_1/query_words.py`, after extraction, so the Groq extractor and the
+keyword fallback get the same reading. Every rule only ever adds what the user asked for.
+
+| The words | What happens | Where |
+|---|---|---|
+| "no onion", "hold the mayo", "without garlic" | The ingredient is excluded, as a hard filter | `dislikes` |
+| "pescatarian" | Land meat is excluded; fish and prawns stay | `excluded_foods` |
+| "grilled", "bbq", "nothing fried" | The pool narrows to dishes named that way, and fried ones drop out | Tier 1 |
+| "fried", "crispy" | The pool narrows to fried dishes | Tier 1 |
+| "in F-7", "in Blue Area" | The area sets the location for this request, so distance counts | `area_asked` |
+| "near me", with no area chosen | Says so: the app can't know where you are | `asks_for_nearby` |
+| "healthy", "high protein", "low calorie", "light", "keto", "sugar free" | Lean the weights and set how health is judged | `HEALTH_WORDS`, `GOAL_WORDS` |
+| "fancy", "premium", "expensive", "a treat" | Price counts for little (0.15): the opposite of "cheap" | `PRICEY_WORDS` |
+| "rice", "noodles", "traditional" | A request the fallback used to drop | keyword extractor |
+| "something with dairy", "with cheese" | The food asked for, when the extractor named no category. Groq returns none for "something with dairy", so any dish could win it | `wanted_food` |
+| "popular", "quick", "delivery", "open now", "date night", "cold" | **Said, not ignored:** "I can't sort dishes by how popular they are, so I've gone on the rest of your request." | `unsupported` |
+
+The last row is the point of the exercise: a request the app has no data for now gets an answer
+that says so, in the same notice that already explains a widened search.
+
+**Health words** (`HEALTH_WORDS`, `GOAL_WORDS`, 2026-09-21).
+- "Healthy" leans the weights to health 0.6, as "cheap" leans them to budget; both at once share 0.8.
+- A nutrition goal named in the request sets how health is judged, over any saved goal, for that request only:
+  - "high protein" → muscle gain;
+  - "low calorie" → weight loss;
+  - "light" or "low fat" → light.
+- The word sweep found every one of these ignored: neither extractor has a field for them.
+
+**Asked for an ingredient, a dish that names it** (Tier 1, `prefer_named_ingredient`).
+"Something with chicken" matched a mushroom soup whose ingredient list had chicken (the stock),
+and "spicy chicken karahi" (filed under "karahi") matched a seekh kebab karahi. The meat or
+seafood a query's words ask for, not negated, and the requested food group now narrow the pool
+to dishes that name it, after any named-dish narrowing. This only applies when at least five
+dishes name it; with fewer, the pool is left alone.
 - **The budget slider:** a band is flat — every dish under the median ties on it — so raising the
   budget weight against a flat term changed nothing, which is what made the sliders feel dead. As
   the weight rises past the even third, the score mixes smoothly from the band into the persona's
@@ -103,6 +153,25 @@ The goal comes from the profile, or from the persona: Gym Bro means muscle gain,
 | Weight loss | 70% calories (full at 450 kcal or less, 0 at 900), 30% protein density (6 g per 100 kcal scores full) |
 | Light | 60% calories (full at 400 kcal or less, 0 at 800), 40% share of energy from fat (full at 30% or less) |
 | Balanced | 80% how close protein, carbohydrate and fat are to the Acceptable Macronutrient Distribution Ranges (10–35%, 45–65%, 20–35% of energy), 20% a 300–900 kcal serving |
+| Low carb | 60% carbohydrate share (full at 25% of energy or less, none at 50%), 40% protein density. Asked for by "keto", "low carb", "sugar free" or "diabetic" |
+
+- **The balanced split (revised 2026-09-21).**
+  - A macro loses its credit over 15 percentage points outside its range (20 before).
+  - A macro *over* its range counts for half on its own. Too much fat can no longer hide behind two macros in range, which had let a kulfi 44% fat score 0.81 while its sentence said "Heavy on fat" (now 0.62).
+  - Too little of a macro is only averaged: a low-carb karahi isn't an unhealthy dish.
+- **Sugar isn't known, so a sugary dish's health counts for less (half its confidence).**
+  - A dish is sugary when its taste is clearly sweet (0.6 or more), or when it is a sweet or bake whose ingredients include sugar, honey, syrup, chocolate, condensed milk or ice cream.
+  - Many desserts carry only their restaurant's average taste, so taste alone missed them.
+  - A savoury dish's sweetener is a dressing or marinade, and doesn't count.
+  - The rule is skipped when the user asked for something sweet, because then the sugar is the point.
+  - The reason says so: "It's sweetened, and its sugar isn't known, so this counts for less."
+- **Measured on the golden set.** Safety stayed at 36/36 and relevance at 29/29. Five winners changed, all still passing:
+  - "something sweet": Sütlac → Baked Cheese Cake;
+  - "cake": Biscoff → Baked Cheese Cake;
+  - "seafood": Fish Garlic Sauce → Spicy Thai Mixed Seafood Soup;
+  - the nut-allergic Chinese request: Crispy Honey Chicken → Duck Roast;
+  - "filling but low calorie": Burrito → Indonesian Thick Ramen, from the filling rule.
+  - The first attempt counted any sweetener in the ingredients. It sent "gluten free please" to a dessert, because Tangy Chicken Salad lists sugar for its dressing, and was narrowed to sweets and bakes.
 
 - **Estimates are worded as estimates.** Every sentence says "About…", because all nutrition here is estimated, and the app says so beside the numbers.
 - **The main problem is named.** In the balanced goal, a macro over its range is named before one under it. A karahi with 70% of its energy from fat and 3% from carbs is "heavy on fat", not "light on carbs" (which it said before, from a tie).
@@ -111,7 +180,11 @@ The goal comes from the profile, or from the persona: Gym Bro means muscle gain,
 
 ### Context
 
-Context usually has weight 0.1. When the query names a meal it has 0.3, because what the query says outweighs what the clock suggests.
+Context usually has weight 0.1. When the query names a meal, or asks for something filling, it has 0.3, because what the query says outweighs what the clock suggests.
+
+- **Filling** ("filling", "hearty", "hungry", "starving", "pet bhar"). Neither extractor has a field for it, so like "cheap" it is read from the words.
+  - The fit is 60% energy (full credit from 550 kcal, none at 200 kcal) and 40% protein (full credit at 20 g).
+  - Before this, "something cheap but filling" lost the word "filling" entirely. After "Cheaper" and the health slider at 70%, a 267 kcal kulfi won because it was the least fat-heavy of six fried options.
 
 - **Meal fit:** unless the query asks for something sweet, a dessert, a cake, coffee or a snack, a café or bakery item fits at 0.6 and a main dish at 1.
   - This is only said out loud when the dish doesn't fit, or when the query named the meal.
@@ -206,6 +279,21 @@ Intents are written the way the extractor produces them, so extraction quality d
 |---|---|---|
 | Before Phase 3 | 34 / 34 | 22 / 27 |
 | After Phase 3 | 34 / 34 | 27 / 27 |
+| 2026-09-21, 23 queries, before the day's changes | 36 / 36 | 29 / 29 |
+| 2026-09-21, after the health, filling, cheap, named-ingredient and calibrated-nutrition changes | 36 / 36 | 29 / 29 |
+
+Across the 2026-09-21 changes, 16 of the 23 winners moved and all still pass. Examples:
+- "something with chicken": Pide With Chicken & Cheese → Grilled Chicken Sandwich;
+- "something sweet": Sütlac → Biscoff Cheese Cake;
+- "sour": Coconut Nouc Cham Dumpling Bowl → Tangy Chicken Salad.
+
+The per-run files are in `data/golden/`.
+
+**Plausibility (added 2026-09-21).**
+- Every winner is also checked for believable data: a meal rather than a side or drink; 100–2,000 kcal (40–450 for a soup, 40 and up for a salad); under 75% of energy from fat; calories that agree with the macros.
+- A line under the table counts the dataset's recommendable dishes that break the same bounds, with the median fat share.
+- Safety and relevance had passed for months while the median dish got 68% of its energy from fat. This line would have shown it on the first run.
+- After the audit: plausibility 92 / 92. Dataset median fat share 48%; 10 dishes over 75% (oil-dressed salads, palak paneer); 2 with unbelievable calories.
 
 The five that now pass:
 
@@ -225,8 +313,13 @@ The checks are the project's own judgement of a sensible winner, not a user stud
   - "Hot Gulab Jamun" carries a spice value of 0.6, because "hot" means served warm.
   - One restaurant's "Fresh Lime" and "Black Olives" still sit in meal categories from the old handoff data.
   - The remaining automated pass will fix some of these; nothing in scoring can.
-- **The nutrition method's 15% fat share keeps oily dishes high,** and some soups and salads come out over 600 kcal (see `PHASE1_DATA_DECISIONS.md`).
+- **Nutrition is estimated, not measured.** The split of a serving and a soup's broth share are now calibrated against dishes USDA measured whole (`PHASE1_DATA_DECISIONS.md`). One fat share still covers every cooking method, and the automated pass's ingredient lists decide a lot.
 - **The context rules are heuristics.** Their weight is deliberately small, and each one explains itself when it matters.
+- **Balanced health judges the macro split, not sugar or portion.**
+  - Sugar is only inferred: from a sweet taste, or a sweetener among a sweet's ingredients. It lowers trust in the estimate, not the score.
+  - A dessert whose ingredients miss the sugar, and whose taste is a restaurant average, isn't caught.
+  - With health weighted high and no word about a meal, a small, fairly balanced dessert can still beat a fried main.
 - **Learned importance, weights and similar-taste pulls start from nothing.** With few approvals and few users they barely move a ranking. See `LEARNING.md`.
-- **Party size is always 1** until Phase 5's conversation asks.
+- **Party size** comes from the conversation's question, or from the request's own words ("for 4 people", "the two of us"). In the second case the question isn't asked.
+- **Words still ignored, after the sweep's fixes:** "something new" (novelty only counts against the last week's history), "the best" (too vague to act on), and "family dinner" as a party size (how many is a family?). "Lunch" and "late night" count in the context term, which is small by design.
 - **The current UI shows only the health, budget and taste sentences.** The context, coverage and novelty reasons reach the blueprint but aren't rendered until Phase 6.

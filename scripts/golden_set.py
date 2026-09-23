@@ -9,6 +9,8 @@ each winner against the query using the dish's own record in Neo4j:
   - safety, always: the budget ceiling, excluded allergens, vegan, vegetarian, halal
   - relevance, where the query asks for something specific: a biryani for "biryani",
     fish or prawns for "seafood", a protein-dense dish for the gym, and so on
+  - plausibility, always: a meal, believable calories and fat, macros that add up. A line
+    under the table counts the dataset's dishes that break the same bounds.
 
 Intents are written the way the intent extractor produces them, so extraction quality
 doesn't affect the result. Each case can also carry a persona and goal, saved as the
@@ -111,6 +113,78 @@ def safety_checks(intent: dict) -> list:
         checks.append(("halal", lambda d: d.get("is_halal", True) is not False))
     checks.append(("not quarantined", lambda d: not d.get("quarantined")))
     return checks
+
+
+# Plausibility: is the winner's data believable? Safety and relevance passed for months while
+# the median dish got 68% of its energy from fat and soups ran to 750 kcal (2026-09-21); these
+# checks, and the dataset line under the table, would have shown it on the first run.
+KCAL_RANGE = (100, 2000)  # a recommendable serving, in kcal
+SOUP_KCAL_MAX = 450
+LIGHT_KCAL_MIN = 40  # a clear soup or a green salad really can be under 100 kcal
+FAT_SHARE_MAX = 0.75
+MACRO_AGREEMENT = 0.20  # calories and 4/4/9 kcal per gram of protein, carbs and fat
+
+
+def _fat_share(d: dict) -> float | None:
+    kcal, fat = d.get("calories"), d.get("fat_g")
+    return 9 * fat / kcal if kcal and fat is not None else None
+
+
+def _kcal_believable(name: str, kcal: float) -> bool:
+    from pipeline.nutrition import is_soup
+
+    soup = is_soup(name)
+    low = LIGHT_KCAL_MIN if soup or "salad" in name.lower() else KCAL_RANGE[0]
+    return low <= kcal <= (SOUP_KCAL_MAX if soup else KCAL_RANGE[1])
+
+
+def plausibility_checks() -> list:
+
+    def kcal_ok(d):
+        kcal = d.get("calories")
+        if not kcal:
+            return True  # no estimate is honest: health doesn't count it
+        return _kcal_believable(d.get("name") or "", kcal)
+
+    def macros_agree(d):
+        kcal = d.get("calories")
+        if not kcal:
+            return True
+        grams = [d.get(k) or 0 for k in ("protein_g", "carbs_g", "fat_g")]
+        return abs(4 * grams[0] + 4 * grams[1] + 9 * grams[2] - kcal) / kcal <= MACRO_AGREEMENT
+
+    return [
+        (
+            "a meal, not a side or drink",
+            lambda d: d.get("category") not in ("add_ons", "beverages"),
+        ),
+        ("believable calories per serving", kcal_ok),
+        (
+            f"fat under {FAT_SHARE_MAX:.0%} of energy",
+            lambda d: (_fat_share(d) or 0) <= FAT_SHARE_MAX,
+        ),
+        ("calories agree with the macros", macros_agree),
+    ]
+
+
+def dataset_plausibility(driver) -> dict:
+    """How many recommendable dishes break the same bounds: a method error shows up here."""
+
+    records, _, _ = driver.execute_query(
+        "MATCH (d:Dish) WHERE coalesce(d.quarantined, false) = false "
+        "AND NOT d.category IN ['add_ons', 'beverages', 'sides'] AND d.calories > 0 "
+        "RETURN d.name AS name, d.calories AS calories, d.fat_g AS fat_g"
+    )
+    dishes = [dict(r) for r in records]
+    shares = sorted(s for s in (_fat_share(d) for d in dishes) if s is not None)
+    return {
+        "dishes": len(dishes),
+        "median_fat_share": round(shares[len(shares) // 2], 3) if shares else None,
+        "over_fat_max": sum(s > FAT_SHARE_MAX for s in shares),
+        "kcal_out_of_range": sum(
+            not _kcal_believable(d["name"] or "", d["calories"]) for d in dishes
+        ),
+    }
 
 
 # ── Cases ────────────────────────────────────────────────────────────────────
@@ -350,7 +424,11 @@ def run_case(c: dict, driver) -> dict:
     d = _dish(driver, winner["dish_id"]) if winner.get("dish_id") else {}
     checks = [
         {"check": desc, "kind": kind, "passed": bool(d) and bool(fn(d))}
-        for kind, group in (("safety", safety_checks(intent)), ("relevance", c["expect"]))
+        for kind, group in (
+            ("safety", safety_checks(intent)),
+            ("relevance", c["expect"]),
+            ("plausibility", plausibility_checks()),
+        )
         for desc, fn in group
     ]
     density = _protein_density(d) if d else None
@@ -384,6 +462,11 @@ def _summary(results: list[dict]) -> tuple[int, int, int, int]:
     )
 
 
+def _plausible(results: list[dict]) -> tuple[int, int]:
+    checks = [c for r in results for c in r["checks"] if c["kind"] == "plausibility"]
+    return sum(c["passed"] for c in checks), len(checks)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run the decision-core golden set.")
     parser.add_argument("--label", required=True, help="name for this run, e.g. baseline")
@@ -398,6 +481,7 @@ def main():
     )
     try:
         results = [run_case(c, driver) for c in CASES]
+        dataset = dataset_plausibility(driver)
     finally:
         driver.close()
 
@@ -421,10 +505,16 @@ def main():
             b_failed = sum(not c["passed"] for c in b["checks"])
             print(f"{'':17} was: {str(b['winner']['name'])[:34]:34} ({b_failed} failed)")
     s_ok, s_n, r_ok, r_n = _summary(results)
-    print(f"\n{args.label}: safety {s_ok}/{s_n}, relevance {r_ok}/{r_n}")
+    p_ok, p_n = _plausible(results)
+    print(f"\n{args.label}: safety {s_ok}/{s_n}, relevance {r_ok}/{r_n}, plausibility {p_ok}/{p_n}")
     if before:
         s_ok, s_n, r_ok, r_n = _summary(list(before.values()))
         print(f"{args.compare}: safety {s_ok}/{s_n}, relevance {r_ok}/{r_n}")
+    print(
+        f"dataset: {dataset['dishes']} recommendable dishes with nutrition; median fat share "
+        f"{dataset['median_fat_share']:.0%}; {dataset['over_fat_max']} over "
+        f"{FAT_SHARE_MAX:.0%} fat; {dataset['kcal_out_of_range']} with unbelievable calories"
+    )
 
 
 if __name__ == "__main__":

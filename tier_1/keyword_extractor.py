@@ -19,33 +19,61 @@ class KeywordExtractorImpl(IntentExtractor):
             budget = float(match.group(1) or match.group(2))
 
         # ── Allergen / exclusion extraction ──
+        # A named meat excludes that meat, not all meat: "mutton karahi, no chicken" had
+        # removed every karahi. Tier 1 reads a vocabulary ingredient as an exclusion.
+        # The allergen words were checked by the 2026-09-21 word sweep: "nut allergy" and
+        # "lactose intolerant" matched nothing, so an allergy stated in words was ignored.
         exclusion_keywords = {
             "vegan": "vegan",
             "vegetarian": "vegetarian",
             "meat": "meat",
-            "chicken": "meat",
-            "beef": "meat",
-            "mutton": "meat",
-            "pork": "meat",
+            "chicken": "chicken",
+            "beef": "beef",
+            "mutton": "mutton",
+            "lamb": "lamb",
+            "pork": "pork",
             "dairy": "dairy",
             "milk": "dairy",
+            "lactose": "dairy",
             "cheese": "dairy",
+            "cream": "dairy",
+            "butter": "dairy",
+            "yogurt": "dairy",
+            "yoghurt": "dairy",
+            "paneer": "dairy",
             "gluten": "gluten",
             "wheat": "gluten",
             "bread": "gluten",
             "naan": "gluten",
             "roti": "gluten",
             "pasta": "gluten",
+            "nut": "nuts",
             "nuts": "nuts",
             "peanut": "nuts",
             "peanuts": "nuts",
+            "almond": "nuts",
+            "almonds": "nuts",
+            "cashew": "nuts",
+            "cashews": "nuts",
+            "pistachio": "nuts",
+            "pistachios": "nuts",
+            "walnut": "nuts",
+            "walnuts": "nuts",
+            "hazelnut": "nuts",
+            "hazelnuts": "nuts",
             "shellfish": "shellfish",
             "shrimp": "shellfish",
+            "prawn": "shellfish",
             "prawns": "shellfish",
+            "crab": "shellfish",
+            "lobster": "shellfish",
             "egg": "egg",
             "eggs": "egg",
             "fish": "fish",
             "seafood": "fish",
+            "soy": "soy",
+            "soya": "soy",
+            "sesame": "sesame",
         }
 
         negation_words = {
@@ -112,24 +140,33 @@ class KeywordExtractorImpl(IntentExtractor):
         is_halal = bool(re.search(r"\bhalal\b", text_lower))
 
         # ── Mood vector seed ──
+        # Whole words only ("hot" is not "photo"), and never a negated one: "not spicy" had
+        # been read as spice 1.0. "Light" and "hearty" are about the meal, not its flavour
+        # (tier_2/scoring.py reads them), so they no longer seed a taste.
         mood_map = {
             "spicy": TasteProfile(spice=1.0),
             "sweet": TasteProfile(sweet=1.0),
             "comfort": TasteProfile(salty=0.5, umami=0.5),
-            "light": TasteProfile(sour=0.5),
-            "hearty": TasteProfile(umami=1.0),
             "fresh": TasteProfile(sour=0.5, sweet=0.2),
             "crispy": TasteProfile(salty=0.5),
             "rich": TasteProfile(umami=0.8, sweet=0.2),
             "creamy": TasteProfile(sweet=0.3, umami=0.3),
             "tangy": TasteProfile(sour=1.0),
+            "sour": TasteProfile(sour=1.0),
             "hot": TasteProfile(spice=1.0),
             "mild": TasteProfile(),
         }
 
+        # A taste is negated only by a word right before it ("not spicy", "not too spicy"):
+        # the exclusion scope runs on through lists, and "no chicken, something spicy" is spicy.
         mood_profile = TasteProfile()
         for keyword, profile in mood_map.items():
-            if keyword in text_lower:
+            said = re.search(rf"\b{keyword}\b", text_lower)
+            negated = re.search(
+                rf"\b(?:not|no|non|without|less|never)\s+(?:too\s+|very\s+|so\s+)?{keyword}\b",
+                text_lower,
+            )
+            if said and not negated:
                 mood_profile = profile
                 break
 
@@ -157,6 +194,12 @@ class KeywordExtractorImpl(IntentExtractor):
             "beef",
             "mutton",
             "fish",
+            # Foods the sweep found the fallback dropped: a request for rice or noodles
+            # matches dishes with them, and "traditional" food here means desi.
+            "rice",
+            "noodles",
+            "pasta",
+            "traditional",
         )
         preferred = next(
             (
@@ -166,7 +209,7 @@ class KeywordExtractorImpl(IntentExtractor):
             ),
             None,
         )
-        if preferred == "pakistani":
+        if preferred in ("pakistani", "traditional"):
             preferred = "desi"
 
         return GroundedIntent(

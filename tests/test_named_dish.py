@@ -59,3 +59,38 @@ def test_a_dish_nobody_serves_leaves_the_pool_and_says_so():
 )
 def test_a_name_that_states_the_spice_level_corrects_it(name, spice, corrected):
     assert spice_from_name(name, spice) == corrected
+
+
+def test_asked_for_an_ingredient_a_dish_that_names_it_is_preferred():
+    # Regression, 2026-09-21: "something with chicken" picked a mushroom soup whose
+    # typical ingredients listed chicken (the stock).
+    from tier_1.symbolic_anchoring import NAMED_INGREDIENT_MIN, prefer_named_ingredient
+
+    named = [{"name": f"Chicken Dish {i}"} for i in range(NAMED_INGREDIENT_MIN)]
+    pool = [{"name": "Mushroom Soup"}, *named]
+    assert prefer_named_ingredient(pool, "chicken") == named
+
+
+def test_a_meat_the_words_ask_for_is_preferred_even_when_filed_under_the_dish():
+    # The extractor files "spicy chicken karahi" under "karahi"; a seekh kebab karahi won.
+    from tier_1.symbolic_anchoring import NAMED_INGREDIENT_MIN, prefer_named_ingredient
+
+    chicken = [{"name": f"Chicken Karahi {i}"} for i in range(NAMED_INGREDIENT_MIN)]
+    pool = [{"name": "Seekh Kebab Karahi Full"}, *chicken]
+    intent = {"raw_input": "spicy chicken karahi under 2000"}
+    assert prefer_named_ingredient(pool, "karahi", intent) == chicken
+
+
+def test_a_negated_meat_is_not_preferred():
+    from tier_1.symbolic_anchoring import asked_proteins
+
+    assert asked_proteins({"raw_input": "karahi but not chicken"}) == set()
+    assert asked_proteins({"raw_input": "mutton karahi, no chicken"}) == {"mutton"}
+
+
+def test_too_few_dishes_naming_it_leaves_the_pool_alone():
+    from tier_1.symbolic_anchoring import prefer_named_ingredient
+
+    pool = [{"name": "Mushroom Soup"}, {"name": "Chicken Tikka"}]
+    assert prefer_named_ingredient(pool, "chicken") == pool
+    assert prefer_named_ingredient(pool, "desi") == pool  # a cuisine isn't an ingredient

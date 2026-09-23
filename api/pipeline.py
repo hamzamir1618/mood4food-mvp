@@ -11,6 +11,17 @@ from fastapi import HTTPException, Request
 log = logging.getLogger(__name__)
 
 
+def _known_areas() -> list[dict]:
+    """The areas the picker offers, for matching an area named in the request. Never fatal."""
+    from api.areas import areas
+
+    try:
+        return areas().get("areas") or []
+    except Exception as exc:
+        log.warning("areas unavailable, so an area named in the request is ignored: %s", exc)
+        return []
+
+
 def recommend(
     request: Request,
     text: str | None = None,
@@ -27,6 +38,7 @@ def recommend(
     from accounts.deps import current_user_id
     from accounts.store import get_profile, list_events
     from api.location import load_location, nearby, save_location, with_distances
+    from tier_1 import query_words
     from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
     from tier_1.persona_manager import DEFAULT_PERSONA
@@ -34,6 +46,7 @@ def recommend(
     from tier_2.consensus_manager import run_debate_pipeline
     from tier_2.context import scoring_context
     from tier_3.fulfillment_engine import enrich_blueprint
+    from ui.signals import gather as ui_signals
 
     # Stage 1: Multimodal Intent Parsing
     try:
@@ -45,6 +58,30 @@ def recommend(
     except Exception as exc:
         log.error("Tier 1a failed: %s", exc)
         raise HTTPException(500, f"Intent parsing failed: {exc}")
+
+    # Stage 1a-ii: what the words say that the extractor's fields can't carry — foods the
+    # request leaves out ("no onion", pescatarian) and the area it names ("in F-7").
+    said = str(intent.get("raw_input") or text or "")
+    excluded = query_words.excluded_foods(said)
+    if excluded:
+        intent["allergens_pruned"] = sorted(
+            set(intent.get("allergens_pruned") or []) | set(excluded)
+        )
+        log.info("the words exclude %s", excluded)
+    if not intent.get("preferred_category"):
+        from pipeline.ingredients import ALLERGEN_TAGS
+        from tier_1.symbolic_anchoring import FOOD_GROUPS
+
+        wanted = query_words.wanted_food(said, ALLERGEN_TAGS, tuple(FOOD_GROUPS))
+        if wanted:
+            intent["preferred_category"] = wanted
+            intent["preferred_category_raw_phrase"] = wanted
+            log.info("the words ask for '%s', which the extractor didn't name", wanted)
+    if location is None and query_words.mentions_a_place(said):
+        here = query_words.area_asked(said, _known_areas())
+        if here:
+            location = here
+            log.info("measuring from %s, named in the request", here["label"])
 
     # Stage 1b: a signed-in user's saved dietary constraints join the query. If they
     # can't be loaded, stop: recommending without a saved allergy is not a fallback.
@@ -80,10 +117,16 @@ def recommend(
         except Exception as exc:
             log.warning("similar tastes unavailable, so left out: %s", exc)
     context = scoring_context(DEFAULT_PERSONA, profile, history, peers)
+    try:
+        signals = ui_signals(profile, history, intent, context)
+    except Exception as exc:  # the screen falls back to its fixed layout
+        log.warning("layout signals unavailable: %s", exc)
+        signals = {}
 
     try:
         save_contract(session_id, "grounded_intent", intent)
         save_contract(session_id, "scoring_context", context)
+        save_contract(session_id, "ui_signals", signals)  # what this request's screens adapt to
         save_contract(session_id, "approved", [])  # approvals belong to one recommendation
         if location is not None:
             save_location(session_id, location)
@@ -101,6 +144,12 @@ def recommend(
             evaluation = evaluation.model_dump()
         candidates = with_distances(evaluation.get("safe_candidates") or [], location)
         evaluation["safe_candidates"] = nearby(candidates)
+        # "Near me" with nowhere to measure from: say so rather than ignore it.
+        if location is None and query_words.asks_for_nearby(said):
+            said_so = "I don't know where you are, so choose your area to sort by distance."
+            evaluation["message"] = " ".join(
+                s for s in (said_so, evaluation.get("message") or "") if s
+            )
         save_contract(session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)

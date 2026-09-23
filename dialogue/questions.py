@@ -144,6 +144,27 @@ def best_question(
     return best if best_share >= ASK_THRESHOLD else None
 
 
+NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "eight": 8, "ten": 10}
+# "For 4 people", "for two", "the two of us", "3 persons": a request that says who's eating.
+# Found by the 2026-09-21 word sweep to change nothing, while the same answer to the party
+# question re-ranks for sharing.
+PARTY_SAID = re.compile(
+    r"\b(?:for|feed|feeds|serves?)\s+(\d{1,2}|two|three|four|five|six|eight|ten)\b"
+    r"|\b(\d{1,2}|two|three|four|five|six|eight|ten)\s+(?:of us|people|persons|adults|guests)\b",
+    re.I,
+)
+
+
+def stated_party_size(text: str) -> int | None:
+    """How many are eating, when the request says so; None otherwise."""
+    m = PARTY_SAID.search(text or "")
+    if not m:
+        return None
+    word = (m.group(1) or m.group(2)).lower()
+    n = NUMBER_WORDS.get(word) or int(word)
+    return n if 1 <= n <= 20 else None
+
+
 def parse_answer(text: str, pending: Question) -> tuple[str, dict] | None:
     """A typed answer to the open question as (value, chip), or None if it isn't one."""
     lowered = text.lower()
