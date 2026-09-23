@@ -88,7 +88,13 @@ def _new_query(request: Request, text: str) -> dict:
     from api.pipeline import recommend
 
     blueprint = recommend(request, text=text)
-    return _next(request, Conversation(), blueprint, reply=None)
+    conversation = Conversation()
+    # A request that says who's eating has answered the party question already.
+    party = questions.stated_party_size(text)
+    if party and party > 1 and blueprint.get("winning_dish"):
+        conversation.adjustments = Adjustments(party_size=party)
+        blueprint = pool.rerank(request.state.session_id, conversation.adjustments) or blueprint
+    return _next(request, conversation, blueprint, reply=None)
 
 
 def _answer(request: Request, conversation: Conversation, value: str, chip: dict) -> dict:
@@ -284,9 +290,12 @@ def _recommendation(
     request: Request, conversation: Conversation, blueprint: dict, reply: str | None
 ) -> dict:
     session_id = request.state.session_id
+    from ui.compose import pick_for_session
+
     conversation.pending = None
     conversation.turn += 1
     state.save(session_id, conversation)
+    blueprint["layout"] = pick_for_session(session_id, blueprint)
     return {
         "type": "recommendation",
         "conversation_id": conversation.id,

@@ -4,6 +4,8 @@ Phase 5 turns a single request into a short conversation:
 - **It asks first, but only when worth it.** The concierge asks a question only when the answer would change what it recommends.
 - **Refinements reuse what the request found.** "Cheaper", "milder" and the rest work on the dishes the request already turned up.
 
+**The request's own words answer questions too (2026-09-21).** "Dinner for 4 people" sets the party size, so "Who's eating?" isn't asked and the pick is priced and portioned for four. Other words the extractor's fields can't carry — dislikes, a cooking method, an area, a nutrition goal, and the things the app has no data for — are read in `tier_1/query_words.py`; see `DECISION_CORE.md`.
+
 It adds no LLM calls. The first message of a request goes through the intent extractor as before, and everything after it is deterministic. The code is in `dialogue/` and the endpoint in `api/chat.py`. `/submit` still gives a single recommendation; both run the same pipeline (`api/pipeline.py`).
 
 ## The turn contract

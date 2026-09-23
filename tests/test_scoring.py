@@ -49,9 +49,28 @@ def test_taste_measures_intensity_not_just_direction():
     assert "strongly sweet" in intense.sentence and "barely sweet" in faint.sentence
 
 
+USUAL = {"sweet": 0.4, "salty": 0.5, "sour": 0.3, "bitter": 0.2, "umami": 0.6, "spice": 0.4}
+KNOWN = {"taste": USUAL}  # a taste learned from approvals or set by hand
+
+
 def test_a_dish_matching_the_usual_taste_exactly_scores_one():
-    p = build_preferences({})
-    assert scoring.taste_term(dish(taste_profile=dict(p.taste)), p).utility == pytest.approx(1.0)
+    p = build_preferences({}, KNOWN)
+    assert scoring.taste_term(dish(taste_profile=dict(USUAL)), p).utility == pytest.approx(1.0)
+
+
+def test_with_no_craving_and_no_known_taste_taste_does_not_apply():
+    # 2026-09-21: a guest's flavour was scored against the persona's made-up profile, called
+    # "your usual taste", and at taste 100% an Afghan burger won on closeness to a stereotype.
+    t = scoring.taste_term(dish(), build_preferences({}))
+    assert t.applies is False and t.sentence == ""
+    assert score_dish(dish(), build_preferences({}))["u_taste"] is None
+
+
+def test_a_craving_with_no_known_taste_judges_only_what_was_asked():
+    p = build_preferences({"mood_vector": {"spice": 0.9}})
+    fiery = dish(taste_profile={"spice": 0.9, "sweet": 0.9, "sour": 0.9})
+    plain = dish(taste_profile={"spice": 0.9})
+    assert scoring.taste_term(fiery, p).utility == scoring.taste_term(plain, p).utility == 1.0
 
 
 # ── Budget ───────────────────────────────────────────────────────────────────
@@ -198,7 +217,7 @@ def test_missing_nutrition_is_unknown_not_zero():
 
 
 def test_the_total_shrinks_each_term_toward_neutral_by_its_uncertainty():
-    p = build_preferences({"budget_max_pkr": 1000})
+    p = build_preferences({"budget_max_pkr": 1000}, KNOWN)
     s = score_dish(dish(price_status="unverified"), p)  # budget confidence 0.6
     w = {
         "health": p.weights["w_health"],
@@ -262,6 +281,123 @@ def test_context_prefers_a_meal_and_only_speaks_when_something_applies():
     assert "You asked for dinner" in scoring.context_term(dish(), dinner).sentence
 
 
+KULFI = {"calories": 267.1, "protein_g": 4.4, "carbs_g": 34.8, "fat_g": 13.2}
+SWEET_TASTE = {"sweet": 0.9, "salty": 0.1, "sour": 0.0, "bitter": 0.0, "umami": 0.1, "spice": 0.0}
+
+
+def test_too_much_fat_cannot_hide_behind_two_macros_in_range():
+    # Kulfi: 44% of energy from fat, carbs in range, protein a little low. The average of
+    # the three fits scored it 0.81 while its own sentence said "Heavy on fat".
+    t = scoring.health_term(dish(macros=KULFI), "balanced")
+    assert "Heavy on fat" in t.sentence
+    assert t.utility < scoring.SUMMARY_GOOD
+
+
+def test_too_little_of_a_macro_is_not_punished_like_too_much():
+    # A low-carb protein dish (30% carbs, 17% protein, 26% fat) is not an unhealthy one.
+    low_carb = {"calories": 670.0, "protein_g": 28.0, "carbs_g": 50.0, "fat_g": 19.0}
+    fatty = {"calories": 670.0, "protein_g": 17.0, "carbs_g": 50.0, "fat_g": 44.0}
+    assert (
+        scoring.health_term(dish(macros=low_carb), "balanced").utility
+        > scoring.health_term(dish(macros=fatty), "balanced").utility + 0.2
+    )
+
+
+def test_a_sweet_dishs_health_counts_less_because_its_sugar_is_unknown():
+    plain = scoring.health_term(dish(macros=KULFI), "balanced")
+    sweet = scoring.health_term(dish(macros=KULFI, taste_profile=SWEET_TASTE), "balanced")
+    assert sweet.utility == plain.utility
+    assert sweet.confidence == pytest.approx(plain.confidence * scoring.SUGAR_UNKNOWN_FACTOR)
+    assert "its sugar isn't known" in sweet.sentence
+
+
+def test_a_sweetener_among_the_ingredients_counts_even_when_the_taste_is_an_average():
+    # The real kulfi's taste is its restaurant's average (sweet 0.2); its ingredients say sugar.
+    ingredients = ["milk", "cream", "ice cream", "almonds", "sugar"]
+    kulfi = dish(macros=KULFI, category="cafe_bakery", ingredients=ingredients)
+    plain = scoring.health_term(dish(macros=KULFI), "balanced")
+    assert scoring.health_term(kulfi, "balanced").confidence == pytest.approx(
+        plain.confidence * scoring.SUGAR_UNKNOWN_FACTOR
+    )
+
+
+def test_sugar_in_a_savoury_dishs_dressing_does_not_make_it_a_sweet():
+    # Tangy Chicken Salad lists sugar for its dressing; marking it sweetened let a dessert
+    # win the golden set's "gluten free please".
+    salad = dish(ingredients=["chicken", "lettuce", "lemon", "sugar"])
+    assert scoring.health_term(salad, "balanced").confidence == 1.0
+
+
+def test_but_not_when_something_sweet_was_asked_for():
+    sweet = dish(macros=KULFI, taste_profile=SWEET_TASTE)
+    asked = build_preferences({"mood_vector": {"sweet": 1.0}})
+    assert score_dish(sweet, asked)["confidence"]["health"] == 1.0
+    assert "sugar" not in score_dish(sweet, asked)["reasons"]["health"]
+
+
+FRIED = {"calories": 734.1, "protein_g": 22.0, "carbs_g": 39.8, "fat_g": 55.0}
+
+
+@pytest.mark.parametrize(
+    "text", ["something cheap but filling", "I'm starving", "a hearty dinner", "pet bhar ke"]
+)
+def test_asking_for_something_filling_is_heard(text):
+    assert build_preferences({"raw_input": text}).wants_filling is True
+
+
+def test_filling_is_not_read_into_other_requests():
+    assert build_preferences({"raw_input": "something light"}).wants_filling is False
+
+
+def test_a_filling_request_judges_energy_and_protein_and_says_so():
+    p = build_preferences({"raw_input": "something filling"})
+    small = scoring.context_term(dish(category="cafe_bakery", macros=KULFI), p)
+    meal = scoring.context_term(dish(macros=FRIED), p)
+    assert meal.utility == 1.0
+    assert small.utility < 0.5
+    assert "you asked for something filling" in small.sentence
+
+
+def test_a_small_dessert_no_longer_wins_a_filling_request_on_its_macro_split():
+    # Regression, 2026-09-21: "something cheap but filling", then Cheaper, then health at
+    # 70% picked a 267 kcal kulfi. It was the least fat-heavy of six fried options, and
+    # "filling" reached no part of the scorer. Both estimates are "medium", as in the data.
+    # (With "high" confidence on both, a 70% health weight still prefers the kulfi's split.)
+    estimated = {"nutrition_confidence": "medium"}
+    kulfi = dish(
+        dish_id="k", name="Kulfi", category="cafe_bakery", price_pkr=149, macros=KULFI, **estimated
+    )
+    naan = dish(dish_id="n", name="Naan", price_pkr=100, macros=FRIED, **estimated)
+    said = {"raw_input": "something cheap but filling"}
+    for weights in (None, {"w_health": 0.7, "w_budget": 0.2, "w_taste": 0.1}):
+        ranked = rank([kulfi, naan], build_preferences(said, weights=weights))
+        assert ranked[0]["dish_id"] == "n"
+    # Without the word (and without "cheap", which makes price count), the same scorer still
+    # prefers the kulfi on health: it is the word "filling" that changed the pick.
+    plain = build_preferences(
+        {"raw_input": "something to eat"},
+        weights={"w_health": 0.7, "w_budget": 0.2, "w_taste": 0.1},
+    )
+    assert rank([kulfi, naan], plain)[0]["dish_id"] == "k"
+
+
+def test_asking_for_something_cheap_makes_cheaper_better_and_price_count_in_full():
+    # 2026-09-21: "cheap" was scored like no budget at all (price at half confidence, every
+    # dish up to the median scoring 1), so a Rs 720 soup beat a Rs 150 pogaca.
+    cheap = build_preferences({"raw_input": "something cheap"})
+    soup, pogaca = dish(dish_id="s", name="Soup", price_pkr=720), dish(name="P", price_pkr=150)
+    options = [soup, pogaca, dish(dish_id="x", name="X", price_pkr=2000)]
+    scored = {s["dish_id"]: s for s in rank(options, cheap)}
+    assert scored["d1"]["u_budget"] > scored["s"]["u_budget"]
+    assert scored["d1"]["confidence"]["budget"] == 1.0
+    assert "cheapest of the options" in scored["d1"]["reasons"]["budget"]
+    # A figure is a ceiling instead, and keeps its band.
+    assert (
+        build_preferences({"raw_input": "cheap, under 500", "budget_max_pkr": 500}).wants_cheap
+        is False
+    )
+
+
 def test_every_utility_stays_between_zero_and_one():
     rng = random.Random(0)
     for _ in range(200):
@@ -318,9 +454,9 @@ def test_traces_keep_the_shape_the_frontend_reads():
 
 
 def test_learned_importance_weights_the_taste_distance():
-    flat = build_preferences({})
+    flat = build_preferences({}, KNOWN)
     focused = build_preferences(
-        {}, {"importance": {**{d: 0.5 for d in scoring.TASTE_DIMS}, "spice": 2.0}}
+        {}, {**KNOWN, "importance": {**{d: 0.5 for d in scoring.TASTE_DIMS}, "spice": 2.0}}
     )
     off_on_spice = dish(taste_profile={**flat.taste, "spice": 1.0})
     assert (
@@ -347,3 +483,67 @@ def test_learned_weights_apply_unless_the_sliders_or_a_chosen_persona_say_otherw
     assert chosen.weights["w_health"] == pytest.approx(0.8)
     sliders = {"w_health": 1, "w_budget": 0, "w_taste": 0}
     assert build_preferences({}, {"weights": learned}, sliders).weights["w_health"] == 1.0
+
+
+# ── Health words, found ignored by the 2026-09-21 word sweep ───────────────────
+@pytest.mark.parametrize(
+    "text, goal",
+    [
+        ("something healthy", "balanced"),
+        ("a high protein meal", "muscle_gain"),
+        ("something low calorie", "weight_loss"),
+        ("something light", "light"),
+    ],
+)
+def test_health_words_lean_the_weights_and_set_how_health_is_judged(text, goal):
+    p = build_preferences({"raw_input": text})
+    assert p.goal == goal
+    assert p.weights["w_health"] == pytest.approx(scoring.CHEAP_BUDGET_WEIGHT)
+
+
+def test_the_requests_goal_wins_over_the_saved_one_for_that_request():
+    p = build_preferences({"raw_input": "something light"}, {"goal": "muscle_gain"})
+    assert p.goal == "light"
+
+
+def test_cheap_and_healthy_share_the_lean_and_sliders_still_win():
+    both = build_preferences({"raw_input": "cheap and healthy"}).weights
+    assert both["w_budget"] == pytest.approx(0.4) and both["w_health"] == pytest.approx(0.4)
+    moved = {"w_health": 0.1, "w_budget": 0.1, "w_taste": 0.8}
+    assert build_preferences({"raw_input": "healthy"}, weights=moved).weights == moved
+
+
+def test_keto_and_sugar_free_judge_health_by_carbohydrate():
+    p = build_preferences({"raw_input": "keto please"})
+    assert p.goal == "low_carb"
+    lean = dish(macros={"calories": 600, "protein_g": 45, "carbs_g": 10, "fat_g": 40})
+    rice = dish(macros={"calories": 600, "protein_g": 15, "carbs_g": 100, "fat_g": 12})
+    assert scoring.health_term(lean, "low_carb").utility > 0.9
+    assert scoring.health_term(rice, "low_carb").utility < 0.3
+    assert "Low in carbs" in scoring.health_term(lean, "low_carb").sentence
+    assert build_preferences({"raw_input": "sugar free"}).goal == "low_carb"
+
+
+def test_a_fancy_request_makes_price_count_for_little():
+    # The opposite of "cheap": the user has said price isn't the point.
+    assert build_preferences({"raw_input": "somewhere fancy"}).weights["w_budget"] == pytest.approx(
+        scoring.PRICEY_BUDGET_WEIGHT
+    )
+    plain = build_preferences({"raw_input": "dinner"}).weights["w_budget"]
+    assert plain > scoring.PRICEY_BUDGET_WEIGHT
+    # ...and an explicit "cheap" still wins over it.
+    assert build_preferences({"raw_input": "cheap but fancy"}).weights["w_budget"] == pytest.approx(
+        scoring.CHEAP_BUDGET_WEIGHT
+    )
+
+
+def test_a_persona_the_user_picked_counts_as_their_taste():
+    # Choosing Sweet Tooth is a statement about flavour; the default Balanced Eater is not.
+    assert build_preferences({}).taste_known is False
+    assert build_preferences({}, persona="sweet_tooth").taste_known is True
+    assert build_preferences({}, {"persona": "gym_bro"}).taste_known is True
+    sweet = dish(taste_profile={"sweet": 0.9, "salty": 0.1, "umami": 0.1})
+    savoury = dish(dish_id="s", name="S", taste_profile={"sweet": 0.0, "salty": 0.7, "umami": 0.8})
+    taste_only = {"w_health": 0.0, "w_budget": 0.0, "w_taste": 1.0}
+    p = build_preferences({}, weights=taste_only, persona="sweet_tooth")
+    assert rank([savoury, sweet], p)[0]["dish_id"] == "d1"

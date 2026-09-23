@@ -253,3 +253,20 @@ def test_typed_answers_are_understood():
     party = Question(slot="party", text="", chips=questions.PARTY_CHIPS)
     assert questions.parse_answer("for 3 people", party)[1]["adjust"] == {"party_size": 3}
     assert questions.parse_answer("just me", party)[0] == "1"
+
+
+def test_a_request_that_says_who_is_eating_is_not_asked_again(chat):
+    # 2026-09-21 word sweep: "for 4 people" changed nothing, while the same answer to the
+    # party question re-ranks for sharing.
+    reply = _say(chat, text="I'm hungry, for 4 people")
+    while reply["type"] == "question":
+        assert reply["question"]["text"] != "Who's eating?"
+        reply = _say(chat, skip=True)
+    assert reply["type"] == "recommendation"
+
+
+def test_the_party_size_is_read_from_the_words():
+    assert questions.stated_party_size("dinner for 4 people") == 4
+    assert questions.stated_party_size("the two of us") == 2
+    assert questions.stated_party_size("something under 1500") is None
+    assert questions.stated_party_size("chicken 65") is None

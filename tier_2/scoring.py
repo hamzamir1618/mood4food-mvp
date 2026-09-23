@@ -7,7 +7,7 @@ the data behind it can be trusted, and a sentence explaining it.
   taste    intensity-aware distance between the dish's six taste values and what the
            user wants, with the dimensions the query asked for counting more
   budget   a target band on the price, rather than "cheaper is always better"
-  health   conditioned on a goal: muscle gain, weight loss, light, or balanced
+  health   conditioned on a goal: muscle gain, weight loss, light, low carb, or balanced
   context  time of day and weather; small, and silent when no rule applies
   distance how far the restaurant is from the location the user sent; left out without one
   novelty  a penalty for dishes recommended or passed over in the last week
@@ -33,7 +33,10 @@ AGENTS = ("health", "budget", "taste")
 # ── Parameters ───────────────────────────────────────────────────────────────
 CRAVING_IMPORTANCE = 4.0  # a taste the query asks for counts four times as much
 TASTE_SOURCE_CONFIDENCE = {
-    "original": 1.0,
+    # "Original" means the value came with the source data, not that anyone tasted the dish:
+    # the sourcing project generated it, and 1,139 dishes share 72 profiles (378 of them are
+    # "umami 0.6, the rest 0"). It is an estimate like the keyword one, and counts as one.
+    "original": 0.8,
     "keyword": 0.8,
     "neutral": 0.8,
     "name_rule": 0.8,  # the spice level corrected from the dish's name (pipeline)
@@ -44,6 +47,18 @@ TASTE_SOURCE_CONFIDENCE = {
 PRICE_STATUS_CONFIDENCE = {"trusted": 1.0, "verified": 0.9, "unverified": 0.6}
 NUTRITION_CONFIDENCE = {"high": 1.0, "medium": 0.7, "low": 0.4}
 IMPLAUSIBLE_NUTRITION_FACTOR = 0.5
+# Sugar isn't in the data. In a sugary dish much of the carbohydrate is likely sugar, which a
+# macro split reads as healthy carbs, so its health estimate is trusted less. A dish is sugary
+# when its taste is clearly sweet, or it is a sweet or bake whose ingredients include a
+# sweetener: many desserts carry only their restaurant's average taste, so taste alone misses them.
+SWEET_DISH = 0.6  # the taste sweetness that makes a dish clearly sweet
+SWEETENERS = frozenset({"sugar", "honey", "syrup", "chocolate", "condensed milk", "ice cream"})
+SUGAR_UNKNOWN_FACTOR = 0.5
+# The balanced split: a macro loses its credit over this many percentage points outside its
+# range, and the worst macro *over* its range counts for half, so too much fat can't hide
+# behind two macros in range. Too little of one (a low-carb karahi) is only averaged.
+AMDR_SLACK = 0.15
+WORST_MACRO_SHARE = 0.5
 AUTO_IMPORTED_FACTOR = 0.85  # rows no person reviewed: name and price came from OCR
 
 LIMIT_BAND = (0.4, 1.0)  # of the query's ceiling
@@ -66,6 +81,57 @@ CHEAP_WORDS = re.compile(
     re.I,
 )
 CHEAP_BUDGET_WEIGHT = 0.6
+# Health words, found by the 2026-09-21 word sweep to change nothing: the extractor's schema
+# has no field for them, so like "cheap" they are read from the words. "Healthy" leans the
+# weights toward health; a nutrition goal named in the request also sets how health is judged,
+# for this request, over any saved goal.
+HEALTH_WORDS = re.compile(
+    r"\b(healthy|healthier|nutritious|wholesome|clean eating|good for me)\b", re.I
+)
+GOAL_WORDS = (
+    (
+        re.compile(r"\b(high[- ]protein|protein[- ]rich|lots of protein|gym|bulking)\b", re.I),
+        "muscle_gain",
+    ),
+    (
+        re.compile(
+            r"\b(low[- ]cal(orie)?s?|few(er)? calories|weight loss|lose weight|cutting|"
+            r"on a diet)\b",
+            re.I,
+        ),
+        "weight_loss",
+    ),
+    (re.compile(r"\b(light|low[- ]fat|not (too )?heavy|not oily|less oil)\b", re.I), "light"),
+    (
+        re.compile(
+            r"\b(keto(genic)?|low[- ]carb|no carbs|sugar[- ]free|diabetic( friendly)?)\b", re.I
+        ),
+        "low_carb",
+    ),
+)
+# "Fancy", "premium", "a treat": price is not the point, so it counts for little. The opposite
+# of "cheap", and like it, read from the words the extractor's fields can't carry.
+PRICEY_WORDS = re.compile(
+    r"\b(fancy|posh|upscale|premium|expensive|pricey|fine dining|high[- ]end|treat myself|"
+    r"splurge|special occasion|celebrat(e|ing|ion)|anniversary|birthday dinner)\b",
+    re.I,
+)
+PRICEY_BUDGET_WEIGHT = 0.15
+CARB_SHARE_MAX = 0.25  # of energy, for a low-carb request; no credit past twice that
+# The lean a request's words give the weights: one term asked for takes 0.6 (as "cheap" always
+# has), two share 0.8.
+ASKED_WEIGHT = {1: CHEAP_BUDGET_WEIGHT, 2: 0.8}
+# "Filling", "hearty", "starving": the dish should be a real meal. Neither extractor has a
+# field for it, so like "cheap" it is read from the words. It counts in the context term,
+# with a named meal's weight: enough energy, and protein, which is what keeps a meal filling.
+FILLING_WORDS = re.compile(
+    r"\b(filling|hearty|substantial|hungry|starving|full meal|proper meal|big meal|"
+    r"pet bhar(ne)?)\b",
+    re.I,
+)
+FILLING_KCAL = 550  # this much energy counts as a full meal...
+FILLING_KCAL_WIDTH = 350  # ...falling to no credit at 200 kcal
+FILLING_PROTEIN = 20.0  # grams of protein for full credit
 
 PROTEIN_TARGET = {"muscle_gain": 8.0, "weight_loss": 6.0}  # g protein per 100 kcal
 AMDR = {"protein": (0.10, 0.35), "carbs": (0.45, 0.65), "fat": (0.20, 0.35)}
@@ -132,6 +198,9 @@ class Preferences:
     price_pool: list[float] = field(default_factory=list)  # every candidate's cost, sorted
     meal: str | None = None  # "breakfast", "brunch", "lunch" or "dinner", if the query says
     expects_meal: bool = True  # False when the query asked for something sweet or a snack
+    wants_filling: bool = False  # the query asked for something filling
+    wants_cheap: bool = False  # the query asked for something cheap, without a figure
+    taste_known: bool = False  # the taste was learned from approvals or set by the user
     importance: dict[str, float] = field(default_factory=lambda: {d: 1.0 for d in TASTE_DIMS})
     learned_from: int = 0  # approvals the taste and importance were learned from
     peers: dict[str, int] = field(default_factory=dict)  # dish_uid -> similar users approving
@@ -182,11 +251,20 @@ def normalise_weights(weights: dict) -> dict[str, float]:
 
 # ── Terms ────────────────────────────────────────────────────────────────────
 def taste_term(dish: dict, prefs: Preferences) -> Term:
+    # With no craving and no taste learned or set by the user, there is nothing to judge
+    # flavour against. Scoring against the persona's made-up profile ranked dishes by how close
+    # their (largely templated) taste sat to a stereotype, told a guest "partly like your usual
+    # taste", and with the taste slider at the top picked whichever burger happened to be
+    # closest. Like distance without a location, the term then doesn't apply.
+    if not prefs.craved and not prefs.taste_known:
+        return Term(0.0, 0.0, "", applies=False)
     profile = dish.get("taste_profile") or {}
     x = {d: float(profile.get(d) or 0.0) for d in TASTE_DIMS}
     target = {d: prefs.craved.get(d, prefs.taste.get(d, 0.0)) for d in TASTE_DIMS}
+    # An unknown usual taste says nothing about the dimensions the query didn't ask for.
     weight = {
-        d: prefs.importance.get(d, 1.0) * (CRAVING_IMPORTANCE if d in prefs.craved else 1.0)
+        d: prefs.importance.get(d, 1.0)
+        * (CRAVING_IMPORTANCE if d in prefs.craved else (1.0 if prefs.taste_known else 0.0))
         for d in TASTE_DIMS
     }
     distance = sum(weight[d] * abs(x[d] - target[d]) for d in TASTE_DIMS) / sum(weight.values())
@@ -238,7 +316,11 @@ def budget_term(dish: dict, prefs: Preferences) -> Term:
     status = dish.get("price_status") or "unverified"
     confidence = PRICE_STATUS_CONFIDENCE.get(status, 0.6)
     ceiling, usual = prefs.budget_ceiling, prefs.typical_spend
-    frugal = prefs.persona in CHEAPER_IS_BETTER
+    # "Cheap" is a statement about price even without a figure: cheaper is better, and
+    # price counts in full, as for the frugal persona. Treated as "no budget" it counted
+    # at half and scored everything up to the median price the same, so once health could
+    # tell dishes apart a Rs 720 soup beat a Rs 150 pogaca for "something cheap".
+    frugal = prefs.persona in CHEAPER_IS_BETTER or prefs.wants_cheap
 
     pool = prefs.price_pool or [cost]
     # Price against the other options: the cheapest scores 1, the dearest 0.
@@ -318,7 +400,7 @@ def portions(dish: dict, party_size: int) -> float:
     return max(1.0, DOUBLE_SERVINGS / max(1, party_size))
 
 
-def health_term(dish: dict, goal: str, servings: float = 1.0) -> Term:
+def health_term(dish: dict, goal: str, servings: float = 1.0, sweet_asked: bool = False) -> Term:
     macros = dish.get("macros") or {}
     kcal, protein = macros.get("calories"), macros.get("protein_g")
     if not kcal or kcal <= 0 or protein is None:
@@ -356,6 +438,21 @@ def health_term(dish: dict, goal: str, servings: float = 1.0) -> Term:
             f"About {kcal:,.0f} kcal with {protein:.0f} g of protein. {verdict.capitalize()}."
         )
         phrase = f"is {verdict}, at {around}"
+    elif goal == "low_carb":
+        carb_fit = _range_score(shares["carbs"], 0.0, CARB_SHARE_MAX, CARB_SHARE_MAX)
+        utility = 0.6 * carb_fit + 0.4 * _clamp(density / PROTEIN_TARGET["weight_loss"])
+        verdict = (
+            "low in carbs"
+            if carb_fit >= 0.75
+            else "moderate in carbs"
+            if carb_fit >= 0.4
+            else "high in carbs"
+        )
+        sentence = (
+            f"About {carbs:.0f} g of carbohydrate, {shares['carbs']:.0%} of its "
+            f"{kcal:,.0f} kcal. {verdict.capitalize()}."
+        )
+        phrase = f"is {verdict}, at {around}"
     elif goal == "light":
         calorie_fit = 1.0 if kcal <= 400 else _clamp(1.0 - (kcal - 400) / 400)
         fat_fit = _range_score(shares["fat"], 0.0, 0.30, 0.30)
@@ -371,8 +468,14 @@ def health_term(dish: dict, goal: str, servings: float = 1.0) -> Term:
         sentence = f"About {kcal:,.0f} kcal, {fat_share}. {verdict.capitalize()}."
         phrase = f"is {verdict}, at {around}"
     else:  # balanced
-        fits = {m: _range_score(shares[m], lo, hi, 0.20) for m, (lo, hi) in AMDR.items()}
-        utility = 0.8 * sum(fits.values()) / 3 + 0.2 * _range_score(kcal, 300, 900, 400)
+        fits = {m: _range_score(shares[m], lo, hi, AMDR_SLACK) for m, (lo, hi) in AMDR.items()}
+        mean = sum(fits.values()) / 3
+        excess = [fits[m] for m in fits if shares[m] > AMDR[m][1]]
+        # Too much of a macro is the health concern; too little (a low-carb karahi) is not.
+        balance = (
+            (1 - WORST_MACRO_SHARE) * mean + WORST_MACRO_SHARE * min(excess) if excess else mean
+        )
+        utility = 0.8 * balance + 0.2 * _range_score(kcal, 300, 900, 400)
         misses = [m for m in fits if fits[m] < 0.8]
         # A macro over its range explains an unbalanced split better than one under it:
         # a karahi is heavy on fat, not light on carbs.
@@ -401,6 +504,17 @@ def health_term(dish: dict, goal: str, servings: float = 1.0) -> Term:
     confidence = NUTRITION_CONFIDENCE.get(dish.get("nutrition_confidence") or "", 0.0)
     if dish.get("nutrition_flag"):
         confidence *= IMPLAUSIBLE_NUTRITION_FACTOR
+    # Not when the user asked for something sweet: then the sugar is the point.
+    # A sweetener among a savoury dish's ingredients is a dressing or a marinade, so the
+    # ingredients only speak for sweets and bakes (cafe_bakery).
+    sweet_taste = float((dish.get("taste_profile") or {}).get("sweet") or 0.0) >= SWEET_DISH
+    sweetened_bake = dish.get("category") == "cafe_bakery" and bool(
+        SWEETENERS & set(dish.get("ingredients") or [])
+    )
+    sugary = sweet_taste or sweetened_bake
+    if sugary and not sweet_asked:
+        confidence *= SUGAR_UNKNOWN_FACTOR
+        sentence += " It's sweetened, and its sugar isn't known, so this counts for less."
     return Term(_clamp(utility), confidence * _review_factor(dish), sentence, phrase=phrase)
 
 
@@ -425,6 +539,12 @@ def context_term(dish: dict, prefs: Preferences) -> Term:
             reasons.append(f"you asked for {prefs.meal}")
         elif snack:
             reasons.append("you didn't ask for a snack or dessert")
+    if prefs.wants_filling and kcal:
+        protein = (dish.get("macros") or {}).get("protein_g")
+        energy = _range_score(kcal, FILLING_KCAL, float("inf"), FILLING_KCAL_WIDTH)
+        fill = energy if protein is None else 0.6 * energy + 0.4 * _clamp(protein / FILLING_PROTEIN)
+        fits.append(fill)
+        reasons.append("you asked for something filling")
     if prefs.hour is not None and (prefs.hour >= 23 or prefs.hour < 4):
         fits.append(1.0 if category in {"fast_food", "pizza", "sandwich"} else 0.6)
         reasons.append("it's late at night")
@@ -521,7 +641,9 @@ def summary(terms: dict[str, Term], weights: dict[str, float]) -> str:
 
 def score_dish(dish: dict, prefs: Preferences) -> dict:
     terms = {
-        "health": health_term(dish, prefs.goal, portions(dish, prefs.party_size)),
+        "health": health_term(
+            dish, prefs.goal, portions(dish, prefs.party_size), not prefs.expects_meal
+        ),
         "budget": budget_term(dish, prefs),
         "taste": taste_term(dish, prefs),
         "context": context_term(dish, prefs),
@@ -531,7 +653,9 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "health": prefs.weights["w_health"],
         "budget": prefs.weights["w_budget"],
         "taste": prefs.weights["w_taste"],
-        "context": CONTEXT_WEIGHT_EXPLICIT if prefs.meal else CONTEXT_WEIGHT,
+        "context": (
+            CONTEXT_WEIGHT_EXPLICIT if prefs.meal or prefs.wants_filling else CONTEXT_WEIGHT
+        ),
         "distance": DISTANCE_WEIGHT,
     }
     # Each term counts in proportion to its confidence; the rest of its weight counts
@@ -675,27 +799,54 @@ def build_preferences(
     resolved = normalise_weights(
         weights or (None if persona_chosen else context.get("weights")) or persona_data["weights"]
     )
-    # Sliders the user has moved always win; otherwise "cheap" leans the weights toward price.
+    # Sliders the user has moved always win; otherwise "cheap" leans the weights toward price
+    # and a health word toward health. Both at once share the lean.
     said = f"{raw} {intent.get('craving') or ''}"
-    if not weights and CHEAP_WORDS.search(said) and resolved["w_budget"] < CHEAP_BUDGET_WEIGHT:
+    query_goal = next((goal for pattern, goal in GOAL_WORDS if pattern.search(said)), None)
+    leans = [
+        key
+        for key, asked in (
+            ("w_budget", CHEAP_WORDS.search(said)),
+            ("w_health", HEALTH_WORDS.search(said) or query_goal),
+        )
+        if asked
+    ]
+    if not weights and PRICEY_WORDS.search(said) and "w_budget" not in leans:
         rest = resolved["w_health"] + resolved["w_taste"]
-        share = (1 - CHEAP_BUDGET_WEIGHT) / rest if rest else 0.0
+        share = (1 - PRICEY_BUDGET_WEIGHT) / rest if rest else 0.0
         resolved = {
-            "w_health": resolved["w_health"] * share if rest else (1 - CHEAP_BUDGET_WEIGHT) / 2,
-            "w_budget": CHEAP_BUDGET_WEIGHT,
-            "w_taste": resolved["w_taste"] * share if rest else (1 - CHEAP_BUDGET_WEIGHT) / 2,
+            "w_health": resolved["w_health"] * share,
+            "w_budget": PRICEY_BUDGET_WEIGHT,
+            "w_taste": resolved["w_taste"] * share,
+        }
+    if not weights and leans:
+        each = ASKED_WEIGHT[len(leans)] / len(leans)
+        leaned = {k: max(resolved[k], each) for k in leans}
+        others = [k for k in resolved if k not in leaned]
+        rest = sum(resolved[k] for k in others)
+        left = 1 - sum(leaned.values())
+        resolved = {
+            **leaned,
+            **{k: (resolved[k] / rest * left if rest else left / len(others)) for k in others},
         }
     return Preferences(
         meal=meal,
         expects_meal=not wants_snack,
+        wants_filling=bool(FILLING_WORDS.search(said)),
+        wants_cheap=bool(CHEAP_WORDS.search(said)) and not ceiling,
         taste=context.get("taste") or dict(persona_data["taste_preference"]),
+        # The session context carries a taste only when there is evidence for it
+        # (tier_2/context.py). A persona the user picked says what they like, so its profile
+        # counts as their taste; the default one, which nobody chose, does not.
+        taste_known=bool(context.get("taste")) or persona_chosen or persona != DEFAULT_PERSONA,
         # sliders, then a persona picked now, then learned weights, then the persona's
         weights=resolved,
         importance=context.get("importance") or {d: 1.0 for d in TASTE_DIMS},
         learned_from=int(context.get("learned_from") or 0),
         peers=context.get("peers") or {},
         craved=craved,
-        goal=context.get("goal") or PERSONA_GOALS.get(persona, "balanced"),
+        # What this request asks for ("high protein", "low calorie") wins over the saved goal
+        goal=query_goal or context.get("goal") or PERSONA_GOALS.get(persona, "balanced"),
         budget_ceiling=float(ceiling) if ceiling and ceiling < 999_999 else None,
         typical_spend=context.get("typical_spend"),
         party_size=int(context.get("party_size") or 1),

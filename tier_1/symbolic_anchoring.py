@@ -14,6 +14,7 @@ from neo4j import GraphDatabase
 
 from config import settings
 from pipeline.ingredients import ALLERGEN_TAGS, VOCABULARY
+from tier_1 import query_words
 
 # ── Config ──────────────────────────────────────────────────────────────────
 CONTRACTS_DIR = Path(__file__).resolve().parent / "contracts"
@@ -262,6 +263,53 @@ def narrow_to_named_dish(candidates: list[dict], intent: dict) -> tuple[list[dic
     return candidates, relaxation
 
 
+# Asked for an ingredient ("something with chicken"), a dish that names it is what was meant.
+# The ingredient match also finds dishes where the automated pass listed it as typical, and
+# with calibrated nutrition a mushroom soup (chicken stock read as chicken) won "chicken". So
+# when enough dishes name the ingredient, those are kept; with fewer, nothing changes.
+NAMED_INGREDIENT_MIN = 5
+
+
+PROTEIN_ANIMALS = ("meat", "fish", "shellfish")
+
+
+def asked_proteins(intent: dict) -> set[str]:
+    """Meat and seafood the query's own words ask for ("spicy chicken karahi": chicken), not
+    negated. The extractor files that request under "karahi", so the words are read too."""
+    from pipeline.ingredients import detect_ingredients
+
+    text = " ".join(str(intent.get(k) or "") for k in ("raw_input", "craving")).lower()
+    found = set()
+    for name in detect_ingredients(text):
+        if VOCABULARY[name].animal not in PROTEIN_ANIMALS:
+            continue
+        spellings = [name, *VOCABULARY[name].aliases]
+        said = [s for s in spellings if re.search(rf"\b{re.escape(s)}\b", text)]
+        if any(not re.search(rf"{_NEGATED}{re.escape(s)}\b", text) for s in said):
+            found.add(name)
+    return found
+
+
+def prefer_named_ingredient(
+    candidates: list[dict], term: str, intent: dict | None = None
+) -> list[dict]:
+    """The candidates whose name mentions the requested ingredient or food group, or the meat
+    or seafood the query's words ask for, when at least NAMED_INGREDIENT_MIN do; otherwise
+    all of them."""
+    wanted = set(requested_match(term)["preferred_ingredients"]) | asked_proteins(intent or {})
+    if not wanted or not candidates:
+        return candidates
+    from pipeline.ingredients import detect_ingredients
+
+    kept = [c for c in candidates if wanted & set(detect_ingredients(c.get("name") or ""))]
+    return kept if len(kept) >= NAMED_INGREDIENT_MIN else candidates
+
+
+def said_in(intent: dict) -> str:
+    """The user's own words, for the rules that read them (tier_1/query_words.py)."""
+    return " ".join(str(intent.get(k) or "") for k in ("raw_input", "craving"))
+
+
 MEAL_WORDS = ("lunch", "dinner", "brunch", "supper", "snack", "meal")
 MOOD_WORDS = {
     "spice": "spicy",
@@ -273,12 +321,23 @@ MOOD_WORDS = {
 }
 
 
-def relaxation_sentence(relaxations: list[dict]) -> str:
+def cannot_sentence(said: str) -> str:
+    """What the request asked for that the app has no data for. Said, never ignored."""
+    missing = query_words.unsupported(said)
+    if not missing:
+        return ""
+    if len(missing) > 1:
+        missing = [*missing[:-1], f"or {missing[-1]}"]
+    return f"I can't {', '.join(missing)}, so I've gone on the rest of your request."
+
+
+def relaxation_sentence(relaxations: list[dict], said: str = "") -> str:
     """
-    What the user is owed when the query asked for something the menus couldn't meet. The
-    pipeline widens rather than returning nothing, and saying so is the difference between a
-    helpful substitute and a confidently wrong answer.
+    What the user is owed when the query asked for something the menus couldn't meet, or for
+    something the app has no data for. The pipeline widens rather than returning nothing, and
+    saying so is the difference between a helpful substitute and a confidently wrong answer.
     """
+    cannot = cannot_sentence(said)
     asked = next(
         (
             str(r.get("old_value") or "").strip()
@@ -296,13 +355,15 @@ def relaxation_sentence(relaxations: list[dict]) -> str:
         "",
     )
     if asked.lower() in MEAL_WORDS:
-        return "I don't sort dishes by meal time, so I've gone on the rest of your request."
-    if asked:
-        return f"I couldn't find {asked} on the menus I hold, so this is the closest I have."
-    if mood:
+        gave_up = "I don't sort dishes by meal time, so I've gone on the rest of your request."
+    elif asked:
+        gave_up = f"I couldn't find {asked} on the menus I hold, so this is the closest I have."
+    elif mood:
         word = MOOD_WORDS.get(mood, mood)
-        return f"Nothing here is properly {word}, so this is the closest I have."
-    return ""
+        gave_up = f"Nothing here is properly {word}, so this is the closest I have."
+    else:
+        gave_up = ""
+    return " ".join(s for s in (cannot, gave_up) if s)
 
 
 def requested_match(term: str | None) -> dict:
@@ -797,6 +858,16 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
         relaxations.append(named_relaxation)
     elif len(candidates) < before:
         log.info("the named dish narrowed the candidates from %d to %d", before, len(candidates))
+    # ...and then an ingredient it names: "chicken karahi" is a karahi that says chicken, not a
+    # seekh kebab karahi.
+    narrowed = len(candidates)
+    candidates = prefer_named_ingredient(candidates, preferred_category, intent)
+    if len(candidates) < narrowed:
+        log.info(
+            "dishes naming what was asked for narrowed the candidates from %d to %d",
+            narrowed,
+            len(candidates),
+        )
 
     # Second constraint: Minimum Relevance Filter for Dominant Moods
     mood_vector = intent.get("mood_vector", {})
@@ -849,6 +920,25 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
             )
             candidates = filtered_candidates
 
+    # A cooking method the request asks for: keep the dishes whose names are cooked that way,
+    # and drop the fried ones when the request says "not fried". Only when enough are left.
+    cooking = query_words.cooking_asked(said_in(intent))
+    if cooking and candidates:
+        wanted = query_words.FRIED if cooking == "fried" else query_words.GRILLED_NAME
+        kept = [c for c in candidates if wanted.search(c.get("name") or "")]
+        if query_words.avoids_frying(said_in(intent)):
+            kept = [
+                c for c in kept or candidates if not query_words.FRIED.search(c.get("name") or "")
+            ]
+        if len(kept) >= NAMED_INGREDIENT_MIN:
+            log.info(
+                "%s dishes narrowed the candidates from %d to %d",
+                cooking,
+                len(candidates),
+                len(kept),
+            )
+            candidates = kept
+
     if not candidates:
         msg = "No matches even after maximum relaxation attempts."
         log.warning(msg)
@@ -860,7 +950,8 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
                 r
                 for r in relaxations
                 if not (named_hit and r.get("constraint") == "preferred_category")
-            ]
+            ],
+            said_in(intent),
         )
         log.info("found %d candidates%s", len(candidates), f" — {msg}" if msg else "")
 
