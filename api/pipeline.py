@@ -46,7 +46,6 @@ def recommend(
     from tier_2.consensus_manager import run_debate_pipeline
     from tier_2.context import scoring_context
     from tier_3.fulfillment_engine import enrich_blueprint
-    from ui.signals import gather as ui_signals
 
     # Stage 1: Multimodal Intent Parsing
     try:
@@ -117,16 +116,10 @@ def recommend(
         except Exception as exc:
             log.warning("similar tastes unavailable, so left out: %s", exc)
     context = scoring_context(DEFAULT_PERSONA, profile, history, peers)
-    try:
-        signals = ui_signals(profile, history, intent, context)
-    except Exception as exc:  # the screen falls back to its fixed layout
-        log.warning("layout signals unavailable: %s", exc)
-        signals = {}
 
     try:
         save_contract(session_id, "grounded_intent", intent)
         save_contract(session_id, "scoring_context", context)
-        save_contract(session_id, "ui_signals", signals)  # what this request's screens adapt to
         save_contract(session_id, "approved", [])  # approvals belong to one recommendation
         if location is not None:
             save_location(session_id, location)

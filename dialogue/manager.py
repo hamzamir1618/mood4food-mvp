@@ -290,12 +290,9 @@ def _recommendation(
     request: Request, conversation: Conversation, blueprint: dict, reply: str | None
 ) -> dict:
     session_id = request.state.session_id
-    from ui.compose import pick_for_session
-
     conversation.pending = None
     conversation.turn += 1
     state.save(session_id, conversation)
-    blueprint["layout"] = pick_for_session(session_id, blueprint)
     return {
         "type": "recommendation",
         "conversation_id": conversation.id,
