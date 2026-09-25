@@ -31,6 +31,7 @@ COPY pipeline/ ./pipeline/
 COPY tier_1/ ./tier_1/
 COPY tier_2/ ./tier_2/
 COPY tier_3/ ./tier_3/
+COPY ui/ ./ui/
 COPY web_ui/ ./web_ui/
 COPY config.py orchestrator.py ./
 COPY --from=frontend /app/frontend/dist ./frontend/dist
