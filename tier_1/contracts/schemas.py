@@ -138,8 +138,6 @@ class DecisionBlueprint(BaseModel):
     relaxation_notice: Optional[str] = None
     candidate_count: int = 0
     fulfillment: Optional[Fulfillment] = None
-    # How the Pick screen is composed for this user (ui/compose.py); None: the fixed layout
-    layout: Optional[Dict[str, Any]] = None
 
 
 class Dish(BaseModel):
