@@ -143,3 +143,62 @@ def test_a_goal_and_a_food_rule_are_drawn_where_the_server_put_them(browser, app
         assert any("protein" in line.lower() for line in lines), lines
     finally:
         page.close()
+
+
+# ── Light and dark ───────────────────────────────────────────────────────────
+CONTRAST = r"""
+() => {
+  const lum = (c) => {
+    const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+    return (x + 0.05) / (y + 0.05);
+  };
+  const body = getComputedStyle(document.body);
+  const accent = document.querySelector('.accent');
+  const muted = document.querySelector('.muted');
+  return {
+    paper: body.backgroundColor,
+    ink: ratio(body.color, body.backgroundColor),
+    accent: accent ? ratio(getComputedStyle(accent).color, body.backgroundColor) : null,
+    muted: muted ? ratio(getComputedStyle(muted).color, body.backgroundColor) : null,
+  };
+}
+"""
+AA = 4.5  # what WCAG asks of small text
+
+
+@pytest.mark.parametrize("scheme, dark", [("light", False), ("dark", True)])
+def test_the_page_follows_the_system_setting_and_stays_legible(browser, app_url, scheme, dark):
+    page = browser.new_page(viewport={"width": 1440, "height": 1000}, color_scheme=scheme)
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector("#query", timeout=30_000)
+        seen = page.evaluate(CONTRAST)
+        on_paper = [int(n) for n in seen["paper"].replace("rgb(", "").rstrip(")").split(",")[:3]]
+        assert (sum(on_paper) / 3 < 60) is dark, f"{scheme}: the page is {seen['paper']}"
+        for part in ("ink", "accent", "muted"):
+            assert seen[part] >= AA, f"{scheme}: {part} is only {seen[part]:.1f}:1"
+    finally:
+        page.close()
+
+
+def test_the_readers_choice_beats_the_system_and_is_remembered(browser, app_url):
+    page = browser.new_page(viewport={"width": 1440, "height": 1000}, color_scheme="light")
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector(".theme-toggle", timeout=30_000)
+        page.locator(".theme-toggle").first.click()
+        page.wait_for_timeout(200)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_selector("#query", timeout=30_000)
+        assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
+        assert page.evaluate(CONTRAST)["ink"] >= AA
+    finally:
+        page.close()
