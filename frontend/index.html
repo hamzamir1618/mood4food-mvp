@@ -6,6 +6,14 @@
   <meta name="description" content="Mood4Food — AI-powered food recommendation engine that finds the best dish for your budget, health goals, and taste preferences.">
   <title>Mood4Food — Smart Food Recommender</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <!-- The remembered theme goes on before the first paint, so a dark reader never gets a
+       white flash on the way to it. The system setting is handled in CSS. -->
+  <script>
+    try {
+      var saved = localStorage.getItem('mood4food-theme');
+      if (saved === 'dark' || saved === 'light') document.documentElement.dataset.theme = saved;
+    } catch (e) {}
+  </script>
   <!-- Fonts: self-hosted via @fontsource-variable/outfit (imported in main.jsx, bundled by Vite) -->
 </head>
 <body>
