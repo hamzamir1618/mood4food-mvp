@@ -69,14 +69,55 @@ def plain_bread(name: str, ingredients: list[str]) -> bool:
 # Sides filed as meals: fish crackers as a Chinese main (a 350 g serving, 1,600 kcal), a Rs 30
 # "Salad" as continental. Seafood crackers are a side whatever else the name says ("Chinese
 # Fish Crackers", "Prawns Cracker (Half)"). A named salad (Green, Caesar, Fattoush) can be a
-# meal and is left alone; only the bare word and kachumber, a chopped side, count.
+# meal and is left alone; only the bare word and kachumber, a chopped side, count. A plain
+# portion of fries is a side too — "Loaded Fries" and "Korean BBQ Fries" are not.
 SIDE_NAME = re.compile(
-    r"\b(?:fish|prawns?|shrimps?) crackers?\b|^\s*(?:salad|kachumber salad)\s*$", re.I
+    r"\b(?:fish|prawns?|shrimps?) crackers?\b"
+    r"|^\s*(?:salad|kachumber salad|(?:french |classic |plain |salted |regular )?fries)\s*$",
+    re.I,
 )
 
 
 def plain_side(name: str) -> bool:
     return bool(SIDE_NAME.search(name or ""))
+
+
+# The categories that name a cuisine, as against a dish type. A restaurant can *be* desi or
+# Chinese; "pizza" and "sandwich" are things on a menu, so a starter is never moved into them.
+CUISINES = ("desi_traditional", "afghan", "middle_eastern", "chinese_asian", "continental_upscale")
+# ...and a fast-food main stays fast food wherever it is served: a burger at a pizza place is
+# still a burger, and someone asking for fast food should find it.
+FAST_FOOD_MAIN = re.compile(r"\b(burgers?|zinger|hot ?dogs?|sliders?)\b", re.I)
+
+
+def house_cuisine(rows: list[dict], cache: dict) -> dict[str, str]:
+    """
+    Each restaurant's own cuisine: the category most of its recommendable dishes carry.
+
+    "Fast food" describes the place, not the dish. The automated pass filed 92 starters and
+    sides as fast food — wings at Asian Wok, mozzarella sticks at Taksim, fried eggplant at
+    Terrazza — so answering "Fast food" to the cuisine question returned a Chinese restaurant's
+    prawn toast (2026-09-26). At a sit-down restaurant those are that restaurant's starters.
+    """
+    counts: dict[str, Counter] = {}
+    for row in rows:
+        llm = cache.get(row["dish_uid"]) or {}
+        named = llm.get("category") if llm.get("prompt_version") == PROMPT_VERSION else None
+        category = named if named and named != "unknown" else row.get("category")
+        if category and category not in NOT_RECOMMENDED:
+            counts.setdefault(row["restaurant_name"], Counter())[category] += 1
+    return {rest: tally.most_common(1)[0][0] for rest, tally in counts.items()}
+
+
+def house_category(category: str, name: str, house: str | None) -> str:
+    """
+    The category a dish keeps once its restaurant is taken into account: a fast-food starter
+    at a sit-down restaurant becomes that restaurant's cuisine. A fast-food main keeps its own
+    category wherever it is served, and nothing is moved into a dish type ("pizza").
+    """
+    if category == "fast_food" and house in CUISINES and not FAST_FOOD_MAIN.search(name or ""):
+        return house
+    return category
 
 
 # Facts the project owner confirmed that no data source records.
@@ -363,6 +404,8 @@ def build() -> tuple[list[dict], dict]:
     menu = menu_index(rows, master)
     places = restaurant_locations(rows)
 
+    houses = house_cuisine(rows, cache)
+
     # Taste: the existing seed-time enrichment, run on copies so it cannot alter anything else.
     taste_rows = [dict(r) for r in rows]
     taste_stats = enrich_taste_profiles(taste_rows)
@@ -402,6 +445,11 @@ def build() -> tuple[list[dict], dict]:
                 r["category"],
                 ("handoff (llm: unknown)" if llm else "handoff"),
             )
+        # A sit-down restaurant's wings and fries are its starters, not fast food (house_cuisine).
+        house = houses.get(r["restaurant_name"])
+        if (corrected := house_category(category, name, house)) != category:
+            category = corrected
+            category_source = f"{category_source} (a starter at a {house} restaurant)"
 
         # Ingredients: named in the dish text or the owner's item list, plus the typical ones
         # from the automated pass
