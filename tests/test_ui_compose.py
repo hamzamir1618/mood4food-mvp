@@ -268,3 +268,16 @@ def test_signals_carry_a_signed_in_users_saved_rules_and_learning():
     assert s["dietary"] == {"allergies": ["dairy"], "diet": "vegan", "halal_only": False}
     assert (s["goal"], s["persona"], s["learned_from"]) == ("muscle_gain", "gym_bro", 5)
     assert s["cheap_query"] is False
+
+
+def test_the_goal_the_request_asks_for_reaches_the_layout():
+    # A guest asking for protein has no saved goal; the words are the only signal there is.
+    from tier_2.context import scoring_context
+
+    context = scoring_context("balanced", None, [], {})
+    asked = signals.gather(None, [], {"raw_input": "high protein, no nuts"}, context)
+    assert asked["goal"] == "muscle_gain"
+    layout = compose.pick(blueprint(), asked)
+    assert block(layout, "nutrition")["variant"] == "protein"
+    saved = signals.gather(None, [], {"raw_input": "dinner"}, {**context, "goal": "weight_loss"})
+    assert saved["goal"] == "weight_loss"

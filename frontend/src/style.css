@@ -239,7 +239,8 @@ a.btn-accent:hover { color: #ffffff; }
 .pick-main, .pick-side { display: contents; }
 .o-1 { order: 1; } .o-2 { order: 2; } .o-3 { order: 3; } .o-4 { order: 4; }
 .o-5 { order: 5; } .o-6 { order: 6; } .o-7 { order: 7; } .o-8 { order: 8; }
-.o-9 { order: 9; } .o-10 { order: 10; }
+.o-9 { order: 9; } .o-10 { order: 10; } .o-11 { order: 11; } .o-12 { order: 12; }
+.o-13 { order: 13; } .o-14 { order: 14; }
 .pick-photo { height: 150px; }
 .done-photo { height: 190px; }
 .setup-welcome, .setup-welcome-side { display: flex; flex-direction: column; flex: 1; }
@@ -253,6 +254,22 @@ a.btn-accent:hover { color: #ffffff; }
 .weight input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 .weight input[type="range"]:disabled { opacity: 0.5; cursor: default; }
 .weight-value { font-size: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+/* Blocks the server composes: the food rules it applied, the number a goal is about, and the
+   layout's account of itself. See docs/SERVER_DRIVEN_UI.md. */
+/* The price leads for someone counting it (the layout's `headline` variant). */
+.pick-price { font-size: 32px; }
+.pick-price.is-headline { font-size: 46px; }
+.safety { border: 1.5px solid var(--ink); padding: 10px 12px; margin-top: 12px; }
+.safety-lines { list-style: none; margin: 4px 0 0; padding: 0; }
+.safety-lines li { padding: 1px 0; }
+.safety-lines li::before { content: "✓ "; color: var(--accent); font-weight: 700; }
+.tag-box.is-accent { border-color: var(--accent); color: var(--accent); }
+.nutrition { border-bottom: 1px solid var(--rule); padding-bottom: 8px; align-items: flex-end; }
+.why { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 10px; }
+.why summary { cursor: pointer; color: var(--muted); }
+.why[open] summary { color: var(--ink); }
+.why-lines { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+.why-lines li { padding: 2px 0; }
 .weight.is-off { color: var(--muted); }
 .weight.is-off input[type="range"]:disabled { opacity: 0.3; }
 .weights-note { margin: 4px 0 0; }
@@ -423,7 +440,8 @@ a.btn-accent:hover { color: #ffffff; }
   .pick-main, .pick-side { display: flex; flex-direction: column; }
   .match-num { font-size: clamp(140px, 13vw, 220px); letter-spacing: -8px; }
   .pick-name { font-size: clamp(52px, 4.8vw, 84px); }
-  .pick-price { font-size: 46px !important; }
+  .pick-price { font-size: 46px; }
+  .pick-price.is-headline { font-size: 64px; }
   .pick-photo { height: clamp(280px, 28vw, 420px); }
   .pick-card.no-photo .pick-side { padding-top: 16px; }
   /* The right-hand column runs the full height of the spread: photo, reasons, the weights
