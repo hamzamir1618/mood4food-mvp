@@ -34,6 +34,10 @@ Validation without human review:
 
 Two definitions worth knowing:
 - Desserts of every cuisine are `cafe_bakery`, because the sweet-craving filter depends on it.
+- **"Fast food" is the place, not the dish (2026-09-26).** The automated pass filed 94 starters and sides as fast food — prawn toast and chilli wings at Asian Wok, mozzarella sticks at Taksim, fried eggplant at Terrazza — so answering "Fast food" to the cuisine question returned a Chinese restaurant's starters. A dish filed `fast_food` now takes its restaurant's own cuisine (`house_cuisine`: the category most of that restaurant's recommendable dishes carry), with two guards:
+  - only into a cuisine (desi, Afghan, Middle Eastern, Chinese, continental), never into a dish type like `pizza`, or a burger at a pizza place would answer "Pizza";
+  - never a fast-food main — a burger, zinger, hot dog or slider stays fast food wherever it is served, and all 46 burgers still do.
+  - Fast food now means the 14 restaurants that are fast food. A plain portion of fries joined the sides; "Loaded Fries" and "Korean BBQ Fries" are dishes in their own right.
 - Plain bread or rice ordered as a side is `add_ons`, and so is never recommended.
   - The automated pass filed ten plain breads as meals (Sada Nan, Kalonji Naan, Makkai Roti). As meals they got a 400 g serving and ~1,100 kcal. A dish whose name is a bread's, names no filling, and holds only dough, fat and a topping is now `add_ons` (`plain_bread` in `pipeline/build_dataset.py`). Aloo paratha, cheese naan, halwa puri and puri chanay stay meals.
   - For nutrition, a prepared bread is not counted again as wheat flour or generic bread.

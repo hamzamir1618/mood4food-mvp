@@ -12,6 +12,8 @@ from pipeline.build_dataset import (
     KEY_COL,
     _cell_text,
     core_name,
+    house_category,
+    house_cuisine,
     listed_items,
     nutrition_confidence,
     plain_bread,
@@ -441,3 +443,46 @@ def test_remove_in_the_platter_worksheet_is_a_removal_not_an_item_list(tmp_path,
     assert answers["Habibi Restaurant | Zinger Meal"] == {"remove": True}
     assert answers["Janaan | Chicken Roast Platter"]["items"] == "Whole Roasted Chicken with Pulao"
     assert "Janaan | Unanswered Platter" not in answers
+
+
+# ── "Fast food" is the place, not the dish (2026-09-26) ───────────────────────
+def test_a_restaurants_own_cuisine_is_what_most_of_its_menu_is():
+    rows = [
+        {"dish_uid": "1", "restaurant_name": "Asian Wok", "category": "chinese_asian"},
+        {"dish_uid": "2", "restaurant_name": "Asian Wok", "category": "chinese_asian"},
+        {"dish_uid": "3", "restaurant_name": "Asian Wok", "category": "fast_food"},
+        {"dish_uid": "4", "restaurant_name": "KFC", "category": "fast_food"},
+        {"dish_uid": "5", "restaurant_name": "Asian Wok", "category": "beverages"},  # not a meal
+    ]
+    houses = house_cuisine(rows, {})
+    assert houses["Asian Wok"] == "chinese_asian"
+    assert houses["KFC"] == "fast_food"
+
+
+@pytest.mark.parametrize(
+    "category, name, house, expected",
+    [
+        # Answering "Fast food" had returned a Chinese restaurant's prawn toast.
+        ("fast_food", "Sesame Prawn Toast", "chinese_asian", "chinese_asian"),
+        ("fast_food", "Mozzarella Sticks", "middle_eastern", "middle_eastern"),
+        ("fast_food", "Chicken Wings", "afghan", "afghan"),
+        # A fast-food main stays fast food wherever it is served...
+        ("fast_food", "Afghan Single Chicken Tikka Burger", "pizza", "fast_food"),
+        ("fast_food", "Crispy Zinger Burger", "desi_traditional", "fast_food"),
+        # ...as does everything at a place that really is fast food.
+        ("fast_food", "Onion Rings", "fast_food", "fast_food"),
+        # Nothing is moved into a dish type, or out of a category it already belongs to.
+        ("fast_food", "Garlic Bread", "pizza", "fast_food"),
+        ("desi_traditional", "Chicken Karahi", "desi_traditional", "desi_traditional"),
+        ("fast_food", "Fries", None, "fast_food"),
+    ],
+)
+def test_a_starter_at_a_sit_down_restaurant_takes_its_cuisine(category, name, house, expected):
+    assert house_category(category, name, house) == expected
+
+
+def test_a_plain_portion_of_fries_is_a_side():
+    assert plain_side("Fries") and plain_side("French Fries") and plain_side("Classic Fries")
+    assert not plain_side("Loaded Fries")  # a dish in its own right
+    assert not plain_side("Korean BBQ Fries")
+    assert not plain_side("Fish & Chips")
