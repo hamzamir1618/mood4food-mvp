@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { allergenLine, matchOf, placeLine, rupees, scoreRows, serves } from '../utils.js';
-import Runners from '../components/Runners.jsx';
-import Weights from '../components/Weights.jsx';
+import { matchOf, scoreRows } from '../utils.js';
+import { Slot, layoutOf } from '../components/blocks.jsx';
 
 const SWIPE = 110;
 
@@ -22,6 +21,11 @@ function useCountUp(target, ms = 900) {
   return shown;
 }
 
+/**
+ * The pick. What the card shows is the server's decision: it sends a layout — which blocks, in
+ * which column, in what order, drawn how — and this screen draws it (docs/SERVER_DRIVEN_UI.md).
+ * Without a layout it draws the fixed one, which is the screen this always was.
+ */
 export default function Pick({
   blueprint,
   refinements,
@@ -36,11 +40,30 @@ export default function Pick({
   const dish = blueprint?.winning_dish || {};
   const match = matchOf(blueprint);
   const shown = useCountUp(match);
-  const reasons = scoreRows(blueprint);
   const [dx, setDx] = useState(0);
   const [imageFailed, setImageFailed] = useState(false);
   const drag = useRef({ on: false, x: 0, moved: false });
   const hasPhoto = Boolean(dish.image_url) && !imageFailed;
+
+  const layout = layoutOf(blueprint);
+  const ctx = {
+    blueprint,
+    dish,
+    shown,
+    reasons: scoreRows(blueprint),
+    hasPhoto,
+    onImageError: () => setImageFailed(true),
+    onScores,
+    onWeights,
+    busy,
+  };
+  // The layout's own account of itself, shown only if the reader opens it.
+  const why = (layout.why || []).filter((w) => w.text);
+  // The server decides which refinement is worth offering first.
+  const order = layout.actions?.refinements;
+  const chips = order
+    ? [...(refinements || [])].sort((a, b) => order.indexOf(a.value) - order.indexOf(b.value))
+    : refinements || [];
 
   const down = (e) => {
     if (e.target.closest('[data-nodrag]')) return;
@@ -96,102 +119,31 @@ export default function Pick({
         }}
       >
         <div className="pick-main">
-          <div className="match-row o-1">
-            <div className="match-num">{shown}</div>
-            <div style={{ paddingTop: 8 }}>
-              <div className="lab">Match</div>
-              <div className="lab lab-sm muted">Out of 100</div>
-            </div>
-            <div className="grow" />
-            <button
-              className="lab accent"
-              data-nodrag="1"
-              onClick={onScores}
-              style={{ paddingTop: 8, textAlign: 'right' }}
-            >
-              The scores
-              <br />
-              <span className="bod" style={{ fontSize: 16 }}>
-                ↓
-              </span>
-            </button>
-          </div>
-
-          <h2 className="h2 pick-name mask pt-8 o-2">{dish.name}</h2>
-          <div className="lab rise pt-12 o-3">{placeLine(dish)}</div>
-
-          <div className="o-4">
-            <div className="rule draw" style={{ marginTop: 10 }} />
-            <div className="between" style={{ padding: '8px 0' }}>
-              <div className="bod-b pick-price" style={{ fontSize: 32 }}>
-                {rupees(dish.price_pkr)}
-              </div>
-              <div className="lab lab-sm muted">{serves(dish.serves_min, dish.serves_max)}</div>
-            </div>
-            <div className="rule draw" />
-          </div>
-
-          {dish.summary && (
-            <p className="body-serif clamp3 pt-12 o-6" style={{ margin: 0 }}>
-              {dish.summary}
-            </p>
-          )}
-
-          <div className="pt-12 o-7">
-            <span className="tag-box">{allergenLine(dish.allergens)}</span>
-          </div>
-
-          {blueprint?.agent_weights && onWeights && (
-            <div className="o-9" data-nodrag="1">
-              <Weights
-                weights={blueprint.agent_weights}
-                onChange={onWeights}
-                busy={busy}
-                tasteUnset={blueprint.utility_breakdown?.u_taste == null}
-              />
-            </div>
-          )}
+          <Slot layout={layout} slot="main" ctx={ctx} />
         </div>
 
         <div className="pick-side">
-          {hasPhoto && (
-            <div className="o-5">
-              <div className="photo pick-photo wipe" style={{ marginTop: 12 }}>
-                <img src={dish.image_url} alt={dish.name} draggable="false" onError={() => setImageFailed(true)} />
-              </div>
-              {dish.is_rep_image && <div className="lab lab-sm muted pt-8">Representative image</div>}
-            </div>
-          )}
-
-          {reasons.length > 0 && (
-            <div className="pt-16 o-8">
-              {reasons.map((r, i) => (
-                <div className="reason" key={r.label}>
-                  <div className="lab lab-sm reason-label">{r.label}</div>
-                  <div className="grow">
-                    <div className="reason-score wide-only">
-                      <div className="bar is-accent">
-                        <span style={{ width: `${r.value}%`, animationDelay: `${300 + i * 120}ms` }} />
-                      </div>
-                      <span className="bod-b">{r.value}</span>
-                    </div>
-                    <div className="small">{r.text}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
+          <Slot layout={layout} slot="side" ctx={ctx} />
         </div>
 
-        <div className="pick-runners o-10" data-nodrag="1">
-          <Runners candidates={blueprint?.top_candidates} winnerId={dish.dish_id} />
+        <div className="pick-runners o-13" data-nodrag="1">
+          <Slot layout={layout} slot="band" ctx={ctx} />
+          {why.length > 0 && (
+            <details className="why" data-nodrag="1">
+              <summary className="lab lab-sm">Why the page looks like this</summary>
+              <ul className="why-lines small">
+                {why.map((w) => (
+                  <li key={w.text}>{w.text}</li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       </div>
 
       <div className="pick-actions mt-auto">
         <div className="chip-row lab" style={{ borderTop: '1px solid var(--rule)' }}>
-          {(refinements || []).map((r) => (
+          {chips.map((r) => (
             <button key={r.value} className="chip lab" onClick={() => onRefine(r.value)} disabled={busy}>
               {r.label}
             </button>

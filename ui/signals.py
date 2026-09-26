@@ -9,7 +9,7 @@ Only counts and names leave this module. It never decides anything; ui/compose.p
 
 from collections import Counter
 
-from tier_2.scoring import CHEAP_WORDS
+from tier_2.scoring import CHEAP_WORDS, GOAL_WORDS
 
 
 def _as_dict(event) -> dict:
@@ -42,11 +42,14 @@ def gather(profile, history, intent: dict, context: dict) -> dict:
         d = profile.dietary
         dietary = {"allergies": list(d.allergies), "diet": d.diet, "halal_only": d.halal_only}
 
-    said = str(intent.get("raw_input") or "")
+    said = f"{intent.get('raw_input') or ''} {intent.get('craving') or ''}"
+    # What this request asks for wins over the saved goal, as it does in the scorer: a guest
+    # who asks for "high protein" should see the protein, not nothing.
+    query_goal = next((goal for pattern, goal in GOAL_WORDS if pattern.search(said)), None)
     return {
         "signed_in": profile is not None,
         "persona": context.get("persona") or "",
-        "goal": context.get("goal"),
+        "goal": query_goal or context.get("goal"),
         "dietary": dietary,
         # The query's own rules, after any saved ones were merged in
         "allergens": sorted(intent.get("allergens_pruned") or []),

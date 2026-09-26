@@ -5,8 +5,11 @@ const SHOWN = 4;
 /**
  * The dishes that came second. The pick is one of a ranked shortlist, and showing the next
  * few — with their scores — is what makes that visible rather than asserted.
+ *
+ * `badges` comes from the layout: {dish_id: "Your usual"}, for runners this person chose before
+ * or that people with their taste chose.
  */
-export default function Runners({ candidates, winnerId }) {
+export default function Runners({ candidates, winnerId, badges }) {
   const runners = (candidates || []).filter((c) => c.dish_id !== winnerId).slice(0, SHOWN);
   if (!runners.length) return null;
 
@@ -24,6 +27,10 @@ export default function Runners({ candidates, winnerId }) {
             <div className="runner-name">{c.name}</div>
             <div className="lab lab-sm muted runner-place">{placeLine(c)}</div>
             {c.exploration && <div className="lab lab-sm accent">Something different</div>}
+            {/* "Your usual", "Liked by similar tastes": what the server knows about this one. */}
+            {badges?.[c.dish_id] && (
+              <div className="lab lab-sm accent">{badges[c.dish_id]}</div>
+            )}
           </div>
           <div className="runner-right">
             <div className="bod-b runner-match">{pct(c.u_total)}</div>

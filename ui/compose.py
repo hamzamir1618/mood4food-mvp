@@ -25,17 +25,20 @@ SLOTS = ("top", "main", "side", "band")
 PINNED = ("allergens", "notice")
 
 # Today's Pick screen, block for block: what a layout with no adaptations looks like.
+# In display order, which is also the phone's: on a narrow screen the two columns are
+# `display: contents`, so one order runs through both (the photo sits between the price and
+# the summary). On a wide screen each column keeps this order within itself.
 DEFAULT = (
     ("notice", "top"),
     ("match", "main"),
     ("name", "main"),
     ("place", "main"),
     ("price", "main"),
+    ("photo", "side"),
     ("summary", "main"),
     ("allergens", "main"),
-    ("weights", "main"),
-    ("photo", "side"),
     ("reasons", "side"),
+    ("weights", "main"),
     ("runners", "band"),
 )
 DEFAULT_REASONS = ("taste", "budget", "health", "distance")

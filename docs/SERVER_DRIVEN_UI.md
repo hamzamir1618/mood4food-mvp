@@ -20,6 +20,28 @@ only).
    a block the frontend doesn't know, it draws the fixed Pick screen. A layout is never worth
    failing a recommendation over: a composition error is logged and sends `null`.
 
+## What draws it
+
+`frontend/src/components/blocks.jsx` is the catalogue: one small component per block type, each
+drawing the markup the fixed screen always used. `frontend/src/screens/Pick.jsx` is now a thin
+renderer — it asks for the blocks of each slot and draws them in the order the layout gives.
+
+- **Order** rides on the `o-N` classes. On a phone both columns are `display: contents`, so one
+  order runs through them; on a wide screen each column keeps that order within itself. This is
+  why the server's `DEFAULT` is in display order, with the photo between the price and the summary.
+- **A block type the frontend doesn't know is skipped**, so the server can name one before the
+  frontend can draw it.
+- **No layout means the fixed one** (`layoutOf` in `blocks.jsx`), which mirrors the server's
+  `DEFAULT`. An older server, or a composer that failed, still draws the screen we had.
+- **The chips** follow `actions.refinements`, so the refinement the server puts first is first.
+- **"Why the page looks like this"** is a `<details>` at the foot of the card, closed. It lists
+  `why`, one line per adaptation. Nothing on the card is annotated: the reader opens it or not.
+
+`tests/test_frontend_e2e.py` drives a real browser against the built app and checks both: the
+fixed layout draws the screen it always did, and a request with a goal and a food rule draws the
+safety block first, the protein beside the price, "More filling" first among the chips, and an
+account of itself that stays closed until it's opened.
+
 ## Signals
 
 | Signal | From | Explicit or learned |
