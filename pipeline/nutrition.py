@@ -44,14 +44,19 @@ SERVING_G = {
     "add_ons": 100,
     "other": 250,
 }
-# The split of a serving, calibrated on 2026-09-21 against USDA SR Legacy's measured restaurant
-# dishes (scripts/calibrate_nutrition.py): 113 of our dishes matched 28 of them by name.
+# The split of a serving, calibrated against USDA SR Legacy's measured restaurant dishes
+# (scripts/calibrate_nutrition.py): 113 of our dishes matched 28 of them by name.
 # The sourcing project's 50% bulk / 15% fat put pure oil at 15% of every plate's weight,
 # 60 g in a desi serving. Measured dishes get a median 44% of their energy from fat; ours
-# got 68%, and 78% of dishes read over 50%. At 71% bulk / 7% fat / 15% veg, the median error
-# in fat share against the measured dishes fell from +20 to +2 percentage points, with
-# calories per 100 g no worse (median error 20.5% before, 19.2% after).
-SHARES = {"bulk": 0.71, "fat": 0.07, "veg": 0.15}
+# got 68%, and 78% of dishes read over 50%, which is why almost everything read as heavy.
+#
+# Refitted 2026-09-26 on the rebuilt dataset. Seven splits come first in at least 5% of the
+# bootstrap resamples the script runs, so the matched dishes cannot tell them apart; this one
+# is the least biased of those, at +2.8 points of fat share and +0.4% on calories per 100 g.
+# The 71/7 split fitted on 2026-09-21 was nearly unbiased on fat share (+0.9) but ran 5.8%
+# light on calories, and the corrections since — sides, crackers, the cooking-oil fallback —
+# moved the data under it. Bias is the criterion because it lands on every dish at once.
+SHARES = {"bulk": 0.74, "fat": 0.08, "veg": 0.15}
 NUTRIENTS = ("kcal", "protein", "fat", "carbs")
 # A prepared bread already is its flour (and its fat): counting "naan" and "wheat flour"
 # side by side weighs the flour twice, and "bread" beside "bun" is the same burger bun.
