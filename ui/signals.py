@@ -62,4 +62,6 @@ def gather(profile, history, intent: dict, context: dict) -> dict:
         "approvals": approvals,
         "peers": dict(context.get("peers") or {}),
         "queries": sum(1 for e in events if e.get("kind") == "query"),
+        # How many are eating, which decides whether a meal's total is also said per person.
+        "party_size": int(context.get("party_size") or 1),
     }

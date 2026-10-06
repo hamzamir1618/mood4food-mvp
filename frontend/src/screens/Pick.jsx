@@ -34,6 +34,7 @@ export default function Pick({
   onChoose,
   onScores,
   onWeights,
+  onDataset,
   busy,
   rank,
 }) {
@@ -55,6 +56,7 @@ export default function Pick({
     onImageError: () => setImageFailed(true),
     onScores,
     onWeights,
+    onDataset,
     busy,
   };
   // The layout's own account of itself, shown only if the reader opens it.
@@ -129,7 +131,7 @@ export default function Pick({
         <div className="pick-runners o-13" data-nodrag="1">
           <Slot layout={layout} slot="band" ctx={ctx} />
           {why.length > 0 && (
-            <details className="why" data-nodrag="1">
+            <details className="why why-layout" data-nodrag="1">
               <summary className="lab lab-sm">Why the page looks like this</summary>
               <ul className="why-lines small">
                 {why.map((w) => (

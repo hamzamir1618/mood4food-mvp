@@ -39,6 +39,8 @@ DEFAULT = (
     ("allergens", "main"),
     ("reasons", "side"),
     ("weights", "main"),
+    ("meal", "band"),
+    ("provenance", "band"),
     ("runners", "band"),
 )
 DEFAULT_REASONS = ("taste", "budget", "health", "distance")
@@ -135,6 +137,35 @@ class Layout:
 
 
 # ── Rules, in order of precedence ───────────────────────────────────────────────
+def _provenance(layout: Layout, blueprint: dict, signals: dict) -> None:
+    """How this dish came to be known. Always offered, and always closed until asked for."""
+    from ui.provenance import lines, tally
+
+    said = lines(blueprint.get("winning_dish") or {})
+    if said:
+        layout.get("provenance")["props"] = {"lines": said, "tally": tally(said)}
+    else:  # nothing recorded about it, which is itself not worth a heading
+        layout.blocks = [b for b in layout.blocks if b["id"] != "provenance"]
+
+
+def _meal(layout: Layout, blueprint: dict, signals: dict) -> None:
+    """
+    The offer to make it a meal, which only stands where there is a kitchen to order from.
+
+    What is on that menu is not fetched here — the card asks for it when the reader taps
+    (GET /meal), so no request pays for a question nobody asked. The block carries the party
+    size, because "Rs 1,240 between two" is the number a table of two is actually after.
+    """
+    dish = blueprint.get("winning_dish") or {}
+    if not dish.get("restaurant_name"):
+        layout.blocks = [b for b in layout.blocks if b["id"] != "meal"]
+        return
+    layout.get("meal")["props"] = {
+        "restaurant_name": dish["restaurant_name"],
+        "party_size": int(signals.get("party_size") or 1),
+    }
+
+
 def _notice(layout: Layout, blueprint: dict, signals: dict) -> None:
     """The notice only shows when the search widened, so it is removed when there's none."""
     notice = blueprint.get("relaxation_notice")
@@ -352,7 +383,19 @@ def _learning(layout: Layout, blueprint: dict, signals: dict) -> None:
     )
 
 
-RULES = (_notice, _safety, _habit, _goal, _budget, _explore, _reasons, _history, _learning)
+RULES = (
+    _notice,
+    _meal,
+    _provenance,
+    _safety,
+    _habit,
+    _goal,
+    _budget,
+    _explore,
+    _reasons,
+    _history,
+    _learning,
+)
 
 
 def pick(blueprint: dict, signals: dict | None) -> dict:

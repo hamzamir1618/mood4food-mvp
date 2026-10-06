@@ -316,6 +316,97 @@ a.btn-accent:hover { color: var(--on-accent); }
 .why[open] summary { color: var(--ink); }
 .why-lines { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
 .why-lines li { padding: 2px 0; }
+/*
+  The dish's own history, printed as evidence: a tally of how strong it is, then one stamped tile
+  per fact. The badge says which kind of knowing it is and the rule above the tile repeats it in
+  weight — heavy ink for what a person checked, a dashed hairline for an estimate, orange for what
+  nobody has checked. Two columns where there is room, one on a phone.
+*/
+.evidence summary { display: flex; align-items: baseline; gap: 10px; }
+.evidence-count { margin-left: auto; font-size: 11px; letter-spacing: 1.2px; }
+.evidence-lede { margin: 12px 0 0; max-width: 46ch; }
+.evidence-tally { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+.evidence-grid { display: grid; grid-template-columns: 1fr; gap: 0 22px; margin-top: 6px; }
+.evidence-tile { padding: 11px 0 12px; border-top: 1.5px solid var(--rule); }
+.evidence-tile.is-confirmed { border-top: 2px solid var(--ink); }
+.evidence-tile.is-inferred { border-top: 1.5px solid var(--rule); }
+.evidence-tile.is-estimated { border-top: 1.5px dashed var(--rule); }
+.evidence-tile.is-unchecked { border-top: 2px solid var(--accent); }
+.evidence-head { display: flex; align-items: center; gap: 9px; }
+.evidence-head .lab { flex: 1 1 auto; min-width: 0; }
+.evidence-text { margin: 5px 0 0; color: var(--muted); padding-left: 29px; }
+.glyph { flex: 0 0 auto; color: var(--ink); }
+.evidence-more { display: block; margin-top: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.is-unchecked .glyph { color: var(--accent); }
+
+/*
+  The dataset label (screens/Label.jsx): the same evidence, counted for the whole collection.
+  A sheet of its own height, big figures across the top, then one bar per group. It borrows the
+  dish panel's badges outright — a group that says "Person checked" here is the same status the
+  dish says it in.
+*/
+.sheet-tall { max-width: 720px; max-height: 92dvh; }
+.figures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 22px; }
+.figure { border-top: 2px solid var(--ink); padding-top: 8px; }
+.figure-num { font-family: var(--display); font-size: 40px; line-height: 1; }
+.changed-row { border-top: 1px solid var(--rule); padding: 10px 0; }
+.changed-pair { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
+.changed-arrow { color: var(--muted); }
+.changed-note { margin: 6px 0 0; }
+.count-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--rule-soft); }
+/* A stored value is lower case ("named + typical ingredients"); only its first letter lifts,
+   so it reads as a sentence rather than a Headline. */
+.count-label { flex: 0 0 34%; }
+.count-label::first-letter { text-transform: uppercase; }
+.count-bar { flex: 1 1 auto; height: 5px; background: var(--rule-soft); overflow: hidden; }
+.count-bar span { display: block; height: 100%; background: var(--accent-bright); }
+.count-num { flex: 0 0 56px; text-align: right; font-size: 15px; }
+.count-share { flex: 0 0 62px; text-align: right; }
+
+/*
+  Taste in fifteen seconds (screens/TasteStart.jsx): six plates, tapped. A chosen card inverts
+  to ink — at a glance the answer is what is dark, which reads at arm's length on a phone.
+*/
+.taste-offer { display: block; width: 100%; text-align: left; border: 1.5px solid var(--rule); border-left: 3px solid var(--accent); padding: 12px 14px; margin-top: 18px; background: none; }
+.taste-offer:hover { border-color: var(--ink); }
+.taste-offer .small { display: block; padding-top: 4px; color: var(--muted); }
+.taste-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.taste-card { text-align: left; background: none; border: 1.5px solid var(--rule); padding: 8px; }
+.taste-card.is-on { border-color: var(--accent); background: var(--tint); }
+.taste-photo { height: 104px; position: relative; margin-bottom: 8px; }
+.taste-photo img { width: 100%; height: 100%; object-fit: cover; filter: var(--photo-dim); }
+.taste-card.is-on .taste-photo img { filter: none; }
+.taste-tick { position: absolute; right: 6px; top: 6px; width: 22px; height: 22px; display: grid; place-items: center; }
+.taste-card.is-on .taste-tick { background: var(--accent); color: var(--on-accent); }
+/* Two lines for every name, however long, so the six cards keep their line. */
+.taste-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.2em; padding-bottom: 2px; }
+
+/* Make it a meal: the order, line by line, with the sum at the foot. */
+.meal summary { display: flex; align-items: baseline; gap: 10px; }
+.meal-where { margin-left: auto; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; }
+.meal-line { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-top: 1px solid var(--rule-soft); }
+.meal-line:first-child { border-top: none; }
+.meal-line.is-total { border-top: 1.5px solid var(--ink); margin-top: 2px; }
+.meal-price { margin-left: auto; white-space: nowrap; }
+.meal-why { display: block; }
+
+/* One badge, four weights of certainty. */
+.badge {
+  display: inline-block;
+  font-family: var(--ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  white-space: nowrap;
+  border: 1.5px solid var(--ink);
+}
+.badge b { font-weight: 700; }
+.badge.is-confirmed { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.badge.is-inferred { color: var(--ink); border-color: var(--ink); }
+.badge.is-estimated { color: var(--muted); border-color: var(--rule); border-style: dashed; }
+.badge.is-unchecked { color: var(--accent); border-color: var(--accent); }
 .weight.is-off { color: var(--muted); }
 .weight.is-off input[type="range"]:disabled { opacity: 0.3; }
 .weights-note { margin: 4px 0 0; }
@@ -365,6 +456,13 @@ a.btn-accent:hover { color: var(--on-accent); }
   .pick-photo { height: 240px; }
   .done-photo { height: 280px; }
   .sheet, .toast-wrap { max-width: 620px; }
+  /* Two facts abreast once the column is wide enough for the sentences. */
+  .evidence-grid { grid-template-columns: 1fr 1fr; }
+  .figures { grid-template-columns: repeat(3, 1fr); }
+  .taste-grid { grid-template-columns: repeat(3, 1fr); }
+  .taste-photo { height: 132px; }
+  .figure-num { font-size: 52px; }
+  .evidence-lede { max-width: 62ch; }
 }
 
 /* ── Wide: the broadsheet spread ────────────────────────────────────────── */
@@ -374,6 +472,9 @@ a.btn-accent:hover { color: var(--on-accent); }
   .screen { padding-bottom: 40px; }
   .wide-only { display: revert; }
   .touch-only { display: none; }
+
+  /* Three across the spread, so no sentence runs the width of a broadsheet. */
+  .evidence-grid { grid-template-columns: repeat(3, 1fr); }
 
   .h1 { font-size: clamp(76px, 7.2vw, 128px); line-height: 0.9; letter-spacing: -2px; }
   .h2 { font-size: clamp(48px, 4.4vw, 76px); letter-spacing: -1px; }
@@ -618,6 +719,8 @@ a.btn-accent:hover { color: var(--on-accent); }
     border-left: 3px solid var(--ink);
     animation: drawer 520ms var(--ease) both;
   }
+  /* The label is a table of counts, so its drawer is wider than a sheet of prose. */
+  .sheet-tall { width: min(860px, 96vw); }
   .toast-wrap { max-width: 680px; top: 20px; }
 }
 @keyframes drawer { from { transform: translateX(100%); } to { transform: none; } }

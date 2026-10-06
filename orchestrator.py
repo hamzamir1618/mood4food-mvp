@@ -25,12 +25,15 @@ from api.approve import router as approve_router
 from api.areas import router as areas_router
 from api.auth import router as auth_router
 from api.chat import router as chat_router
+from api.dataset import router as dataset_router
 from api.fulfillment import router as fulfillment_router
 from api.health import router as health_router
+from api.meal import router as meal_router
 from api.profile import router as profile_router
 from api.rate_limit import limiter
 from api.recalculate import router as recalculate_router
 from api.submit import router as submit_router
+from api.taste import router as taste_router
 from config import settings
 
 # ── Config ──────────────────────────────────────────────────────────────────
@@ -193,3 +196,6 @@ app.include_router(profile_router)
 app.include_router(approve_router)
 app.include_router(chat_router)
 app.include_router(areas_router)
+app.include_router(dataset_router)
+app.include_router(taste_router)
+app.include_router(meal_router)
