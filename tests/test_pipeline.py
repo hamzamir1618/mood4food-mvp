@@ -202,10 +202,14 @@ def test_no_ingredients_means_no_estimate():
 
 
 def test_estimate_splits_the_serving_by_role():
+    from pipeline.nutrition import SHARES
+
     est = estimate(["chicken", "onion", "cooking oil"], "desi_traditional", REF)
-    # 400 g serving: 284 g bulk + 28 g fat + 60 g veg, all at 100 kcal / 100 g (the split
-    # calibrated against USDA-measured restaurant dishes; scripts/calibrate_nutrition.py)
-    assert est["calories"] == pytest.approx(372.0)
+    # One ingredient in each role, a 400 g serving, everything at 100 kcal / 100 g: the plate
+    # weighs what the split says it weighs. Read from SHARES rather than written out, because
+    # the split is refitted against USDA-measured dishes whenever the dataset is rebuilt
+    # (scripts/calibrate_nutrition.py) and this rule holds whatever it is refitted to.
+    assert est["calories"] == pytest.approx(400 * sum(SHARES.values()))
     assert est["defaults_used"] == []
 
 
