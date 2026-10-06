@@ -82,6 +82,23 @@ def browser():
         browser.close()
 
 
+def pick_through(page, query: str):
+    """Ask `query` on a page that is already open, skipping the questions."""
+    page.wait_for_selector("#query", timeout=30_000)
+    page.fill("#query", query)
+    page.keyboard.press("Enter")
+    for _ in range(4):
+        page.wait_for_timeout(2_000)
+        skip = page.locator("button", has_text="Just pick for me")
+        if skip.count() and skip.first.is_visible():
+            skip.first.click()
+        if page.locator(".pick-card").count():
+            break
+    page.wait_for_selector(".pick-card", timeout=45_000)
+    page.wait_for_timeout(800)
+    return page
+
+
 def the_pick(browser, url: str, query: str):
     """A page showing the pick for `query`, questions skipped."""
     page = browser.new_page(viewport={"width": 1440, "height": 1000})
@@ -134,13 +151,36 @@ def test_a_goal_and_a_food_rule_are_drawn_where_the_server_put_them(browser, app
         assert page.locator(".chip").first.inner_text().strip().lower() == "more filling"
 
         # The page can account for itself, and only when asked.
-        why = page.locator(".why")
+        why = page.locator(".why-layout")
         assert why.count(), "the layout gives no account of itself"
         assert not page.locator(".why-lines").first.is_visible()
-        page.locator(".why summary").first.click()
+        page.locator(".why-layout summary").first.click()
         page.wait_for_timeout(200)
         lines = page.eval_on_selector_all(".why-lines li", "els => els.map(e => e.innerText)")
         assert any("protein" in line.lower() for line in lines), lines
+
+        # The dish's history is its own panel, also closed until asked for.
+        history = page.locator(".evidence")
+        assert history.count(), "how the dish came to be known isn't on the card"
+        assert not page.locator(".evidence-tile").first.is_visible()
+        history.first.locator("summary").click()
+        page.wait_for_timeout(200)
+        said = history.first.inner_text().lower()
+        assert "ocr" in said or "menu" in said, said
+        assert "estimated from those ingredients" in said
+
+        # Every fact is stamped: a mark, a badge, and a tone the badge is drawn from.
+        tiles = page.locator(".evidence-tile")
+        assert tiles.count() >= 5, tiles.count()
+        assert page.locator(".evidence-tile .glyph").count() == tiles.count()
+        assert page.locator(".evidence-tile .badge").count() == tiles.count()
+        tones = page.eval_on_selector_all(
+            ".evidence-tally .badge", "els => els.map(e => e.className)"
+        )
+        assert tones, "the evidence is not tallied"
+        assert all(
+            any(t in c for t in ("confirmed", "inferred", "estimated", "unchecked")) for c in tones
+        ), tones
     finally:
         page.close()
 
@@ -200,5 +240,102 @@ def test_the_readers_choice_beats_the_system_and_is_remembered(browser, app_url)
         page.wait_for_selector("#query", timeout=30_000)
         assert page.evaluate("() => document.documentElement.dataset.theme") == "dark"
         assert page.evaluate(CONTRAST)["ink"] >= AA
+    finally:
+        page.close()
+
+
+def test_the_dataset_label_is_counted_and_reachable_from_the_dish(browser, app_url):
+    """The dish's panel leads to the label for the collection, and it counts, never guesses."""
+    page = the_pick(browser, app_url, PLAIN)
+    try:
+        page.locator(".evidence summary").first.click()
+        page.wait_for_timeout(200)
+        page.locator(".evidence-more").first.click()
+        page.wait_for_selector(".figure-num", timeout=20_000)
+
+        figures = page.eval_on_selector_all(".figure-num", "els => els.map(e => e.innerText)")
+        assert len(figures) >= 5, figures
+        assert all(f.strip() and f.strip()[0].isdigit() for f in figures), figures
+
+        # Every before-value stands beside an after-value counted from the graph.
+        pairs = page.locator(".changed-pair")
+        assert pairs.count() >= 4
+        assert page.locator(".changed-pair .badge").count() == pairs.count() * 2
+
+        # The groups are the dish panel's own statuses, counted.
+        said = page.locator(".sheet-tall").inner_text().lower()
+        for group in ("person checked", "inferred", "never served"):
+            assert group in said, group
+        assert "estimated" in said
+    finally:
+        page.close()
+
+
+def test_six_taps_turn_the_flavour_term_on(browser, app_url):
+    """
+    The point of the taste starter: before it, the card says there is no flavour to go on and
+    the scorer leaves taste out; after it, taste is one of the reasons the dish won.
+    """
+    page = browser.new_page(viewport={"width": 1280, "height": 1000})
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector(".taste-offer", timeout=30_000)
+
+        def reasons():
+            return page.eval_on_selector_all(
+                ".reason .reason-label", "els => els.map(e => e.innerText.toLowerCase())"
+            )
+
+        pick_through(page, "chicken karahi")
+        assert "taste" not in reasons(), "taste counted before the reader said anything"
+        assert "no flavour to go on yet" in page.locator(".weights-note").first.inner_text().lower()
+
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector(".taste-offer", timeout=30_000)
+        page.locator(".taste-offer").click()
+        page.wait_for_selector(".taste-card", timeout=20_000)
+        for i in (1, 3, 5):
+            page.locator(".taste-card").nth(i).click()
+        page.locator("button", has_text="Use these").click()
+        page.wait_for_selector(".sheet-tall .body-serif", timeout=20_000)
+        said = page.locator(".sheet-tall .body-serif").first.inner_text().lower()
+        assert "noted" in said or "learn as you go" in said, said
+        page.locator("button", has_text="Good").click()
+
+        pick_through(page, "chicken karahi")
+        assert "taste" in reasons(), reasons()
+        # The offer is not made twice to someone who has answered it.
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector("#query", timeout=30_000)
+        page.wait_for_timeout(1_500)
+        assert page.locator(".taste-offer").count() == 0
+    finally:
+        page.close()
+
+
+def test_one_tap_turns_the_dish_into_a_meal_with_a_total(browser, app_url):
+    """The sides and drinks held out of being picked earn their place here, and they add up."""
+    page = the_pick(browser, app_url, "chicken karahi")
+    try:
+        meal = page.locator(".meal")
+        assert meal.count(), "the offer to make it a meal isn't on the card"
+        assert not page.locator(".meal-line").count(), "the menu was read before anyone asked"
+
+        meal.first.locator("summary").click()
+        page.wait_for_selector(".meal-line", timeout=20_000)
+        lines = page.eval_on_selector_all(
+            ".meal-line", r"els => els.map(e => e.innerText.replace(/\s+/g, ' '))"
+        )
+        assert len(lines) >= 2, lines  # the dish, and at least one thing beside it
+        assert "ALTOGETHER" in lines[-1].upper()
+
+        # The total is the parts added up, and the reader can check it.
+        money = page.eval_on_selector_all(
+            ".meal-price", "els => els.map(e => Number(e.innerText.replace(/[^0-9]/g, '')))"
+        )
+        assert money[-1] == sum(money[:-1]), money
+        # ...and it never pretends to be an order.
+        said = meal.first.inner_text().lower()
+        assert "we don't place it" in said
     finally:
         page.close()

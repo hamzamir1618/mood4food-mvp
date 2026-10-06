@@ -46,13 +46,14 @@ def load_grounded_intent() -> dict:
 
 # ── Neo4j Allergen-Prune Query ──────────────────────────────────────────────
 
-PRUNE_CYPHER = """
-MATCH (d:Dish)
-WHERE (d.price_rs IS NULL OR d.price_rs <= $budget_max)
-  AND NOT d.category IN ["add_ons", "sides", "beverages"]
+# What this person may be offered at all, as one predicate. Every query that puts a dish in
+# front of someone uses it — the pick itself, and the sides and drinks offered alongside it
+# (tier_1/meal.py). Written once because it is the safety rule: a second copy is a second
+# thing to keep in step, and the copy that falls behind is the one that serves someone nuts.
+SAFE_FOR_THE_USER = """
   // Quarantined dishes (gross price errors, names the owner discarded) stay on file
   // but are never offered.
-  AND coalesce(d.quarantined, false) = false
+  coalesce(d.quarantined, false) = false
   // Replaced NOT EXISTS { MATCH (d)-[:CONTAINS*1..5]->(i:Ingredient) ... }
   // with a direct check on the d.allergens array property.
   // The Ingredient node traversal was removed because Ingredient nodes
@@ -69,6 +70,16 @@ WHERE (d.price_rs IS NULL OR d.price_rs <= $budget_max)
   // Excluded foods that aren't allergen tags ("no meat", "no seafood"), by ingredient
   AND ($excluded_ingredients = []
        OR none(i IN coalesce(d.ingredients, []) WHERE i IN $excluded_ingredients))
+"""
+
+PRUNE_CYPHER = (
+    """
+MATCH (d:Dish)
+WHERE (d.price_rs IS NULL OR d.price_rs <= $budget_max)
+  AND NOT d.category IN ["add_ons", "sides", "beverages"]
+  AND """
+    + SAFE_FOR_THE_USER
+    + """
   // A requested category, dish or food group (see requested_match)
   AND ($preferred_category = ""
        OR toLower(d.category) CONTAINS $category_key
@@ -87,11 +98,19 @@ RETURN coalesce(d.dish_uid, elementId(d)) AS dish_id, d.name AS name,
        d.carbs_g AS carbs_g, d.fat_g AS fat_g,
        d.nutrition_confidence AS nutrition_confidence, d.nutrition_flag AS nutrition_flag,
        d.review_status AS review_status, d.taste_source AS taste_source,
+       // How the dish came to be known, for the "how we know this" panel (ui/provenance.py)
+       d.name_status AS name_status, d.price_note AS price_note,
+       d.ingredients_basis AS ingredients_basis, d.allergens_known AS allergens_known,
+       d.ingredients_named AS ingredients_named, d.ingredients_typical AS ingredients_typical,
+       d.nutrition_defaults AS nutrition_defaults, d.category_source AS category_source,
+       d.category_before AS category_before, d.halal_note AS halal_note, d.is_halal AS is_halal,
+       d.source AS source, d.source_date AS source_date,
        d.image_url AS image_url, d.human_tags AS human_tags,
        d.taste_sweet AS taste_sweet, d.taste_salty AS taste_salty,
        d.taste_sour AS taste_sour, d.taste_bitter AS taste_bitter,
        d.taste_umami AS taste_umami, d.taste_spice AS taste_spice
 """
+)
 
 # A request for a food group matches dishes containing any of its ingredients; one naming
 # an ingredient ("chicken", "paneer") or an allergen group ("dairy") matches dishes that
@@ -571,6 +590,19 @@ def query_safe_candidates(
                         "nutrition_flag": record.get("nutrition_flag"),
                         "review_status": record.get("review_status"),
                         "taste_source": record.get("taste_source"),
+                        "name_status": record.get("name_status"),
+                        "price_note": record.get("price_note"),
+                        "ingredients_basis": record.get("ingredients_basis"),
+                        "ingredients_named": record.get("ingredients_named"),
+                        "ingredients_typical": record.get("ingredients_typical"),
+                        "allergens_known": record.get("allergens_known"),
+                        "nutrition_defaults": record.get("nutrition_defaults"),
+                        "category_source": record.get("category_source"),
+                        "category_before": record.get("category_before"),
+                        "halal_note": record.get("halal_note"),
+                        "is_halal": record.get("is_halal"),
+                        "source": record.get("source"),
+                        "source_date": record.get("source_date"),
                         "allergens": record.get("allergens"),  # None: not known
                         "category": cat,
                         "image_url": img_url,

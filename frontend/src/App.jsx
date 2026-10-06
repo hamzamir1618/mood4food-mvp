@@ -13,6 +13,8 @@ import Areas from './screens/Areas.jsx';
 import Setup from './screens/Setup.jsx';
 import Profile from './screens/Profile.jsx';
 import About from './screens/About.jsx';
+import Label from './screens/Label.jsx';
+import TasteStart from './screens/TasteStart.jsx';
 
 const LOCATION_KEY = 'm4f.location';
 const SEEN_KEY = 'm4f.seen';
@@ -73,6 +75,10 @@ export default function App() {
   const [areasOpen, setAreasOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // The dataset's own label, opened from the dish's evidence panel or from the data sheet.
+  const [labelOpen, setLabelOpen] = useState(false);
+  // Six dishes, tap what you'd eat: the taste term has nothing to go on until someone does.
+  const [tasteOpen, setTasteOpen] = useState(false);
   // A first-time visitor lands on the product, not on a sign-up wall. Setup stays one tap
   // away on the home screen ("Sign in →"), which is also how the account demo is reached.
   const [setupOpen, setSetupOpen] = useState(false);
@@ -279,7 +285,13 @@ export default function App() {
       )}
 
       {phase === 'home' && (
-        <Home onStart={start} busy={busy} initialQuery={query} onAbout={() => setAboutOpen(true)} />
+        <Home
+          onStart={start}
+          busy={busy}
+          initialQuery={query}
+          onAbout={() => setAboutOpen(true)}
+          onTaste={() => setTasteOpen(true)}
+        />
       )}
 
       {phase === 'question' && question && (
@@ -304,6 +316,7 @@ export default function App() {
           onChoose={choose}
           onScores={() => setScoresOpen(true)}
           onWeights={setWeights}
+          onDataset={() => setLabelOpen(true)}
           busy={busy}
         />
       )}
@@ -321,7 +334,13 @@ export default function App() {
 
       {scoresOpen && blueprint && <Scores blueprint={blueprint} onClose={() => setScoresOpen(false)} />}
 
-      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {aboutOpen && (
+        <About onClose={() => setAboutOpen(false)} onDataset={() => setLabelOpen(true)} />
+      )}
+
+      {labelOpen && <Label onClose={() => setLabelOpen(false)} />}
+
+      {tasteOpen && <TasteStart onClose={() => setTasteOpen(false)} />}
 
       {areasOpen && (
         <Areas

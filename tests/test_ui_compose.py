@@ -15,6 +15,7 @@ from ui import compose, signals
 WINNER = {
     "dish_id": "d1",
     "name": "Chicken Tikka",
+    "restaurant_name": "Sufi Restaurant",  # every real pick has one; the meal block needs it
     "price_pkr": 1200.0,
     "serves_max": 2,
     "macros": {"calories": 650.0, "protein_g": 48.0},
@@ -281,3 +282,19 @@ def test_the_goal_the_request_asks_for_reaches_the_layout():
     assert block(layout, "nutrition")["variant"] == "protein"
     saved = signals.gather(None, [], {"raw_input": "dinner"}, {**context, "goal": "weight_loss"})
     assert saved["goal"] == "weight_loss"
+
+
+# ── Make it a meal ──────────────────────────────────────────────────────────────
+def test_the_offer_to_make_it_a_meal_names_the_kitchen_it_would_come_from():
+    layout = compose.pick(blueprint(), {"party_size": 3})
+    meal = block(layout, "meal")
+    assert meal["slot"] == "band"
+    assert meal["props"]["restaurant_name"] == "Sufi Restaurant"
+    assert meal["props"]["party_size"] == 3
+
+
+def test_a_pick_with_no_kitchen_is_not_offered_a_meal():
+    """A meal is one order at one counter, so with no restaurant there is nothing to offer."""
+    winner = {k: v for k, v in WINNER.items() if k != "restaurant_name"}
+    layout = compose.pick({"winning_dish": winner, "agent_weights": EVEN}, {})
+    assert "meal" not in ids(layout)

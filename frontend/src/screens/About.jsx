@@ -3,7 +3,7 @@
  * deployment: Open Food Facts and OpenStreetMap are ODbL, Open-Meteo is CC BY 4.0,
  * and USDA asks to be named. The wording follows that file.
  */
-export default function About({ onClose }) {
+export default function About({ onClose, onDataset }) {
   return (
     <>
       <div className="scrim" onClick={onClose} />
@@ -56,6 +56,12 @@ export default function About({ onClose }) {
           Dishes without a photo of their own show a stock photograph from Unsplash, labelled
           "Representative image". It shows the kind of dish, not the plate you'll be served.
         </p>
+
+        {onDataset && (
+          <button className="lab lab-sm accent" style={{ marginTop: 18 }} onClick={onDataset}>
+            How this dataset was built, counted →
+          </button>
+        )}
 
         <button className="btn btn-line" style={{ marginTop: 20 }} onClick={onClose}>
           <span className="lab">Done</span>

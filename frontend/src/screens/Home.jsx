@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { num } from '../utils.js';
 
 /** The moods are shorthand for a typed request; the backend reads them as text. */
@@ -39,7 +39,19 @@ function Stamp() {
   );
 }
 
-export default function Home({ onStart, busy, initialQuery, onAbout }) {
+export default function Home({ onStart, busy, initialQuery, onAbout, onTaste }) {
+  // The offer to learn a taste is only worth making to someone the app knows nothing about.
+  const [askTaste, setAskTaste] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch('/taste/start')
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((data) => live && setAskTaste(!data.known))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   const [picked, setPicked] = useState(initialQuery ? -1 : 0);
   const [query, setQuery] = useState(initialQuery || MOODS[0].text);
 
@@ -112,6 +124,16 @@ export default function Home({ onStart, busy, initialQuery, onAbout }) {
           style={{ marginTop: 6 }}
         />
       </div>
+
+      {askTaste && onTaste && (
+        <button className="taste-offer rise" onClick={onTaste} style={{ animationDelay: '480ms' }}>
+          <span className="lab lab-sm accent">Fifteen seconds →</span>
+          <span className="small">
+            Tap the dishes you'd eat, and every pick after that is weighed for your taste.
+            Until then it has to leave taste out.
+          </span>
+        </button>
+      )}
 
       <div className="home-cta mt-auto pt-24">
         <button className="btn btn-ink btn-wide rise" onClick={start} disabled={busy || !query.trim()}>

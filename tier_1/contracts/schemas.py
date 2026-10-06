@@ -50,6 +50,21 @@ class Candidate(BaseModel):
     nutrition_flag: Optional[str] = None
     review_status: Optional[str] = None
     taste_source: Optional[str] = None
+    # How the dish came to be known, for "how we know this" (ui/provenance.py). A field missing
+    # here is dropped in silence on the way through the session store, so it never arrives.
+    name_status: Optional[str] = None
+    price_note: Optional[str] = None
+    ingredients_basis: Optional[str] = None
+    ingredients_named: Optional[List[str]] = None  # the ones its name or description stated
+    ingredients_typical: Optional[List[str]] = None  # those plus what a dish like it usually has
+    allergens_known: Optional[bool] = None
+    nutrition_defaults: Optional[List[str]] = None  # assumed in the estimate, never listed
+    category_source: Optional[str] = None  # which model or rule sorted it, at build time
+    category_before: Optional[str] = None  # what it was sorted as before a rule corrected it
+    halal_note: Optional[str] = None
+    is_halal: Optional[bool] = None
+    source: Optional[str] = None
+    source_date: Optional[str] = None
     # Utilities in [0, 1]; None where the term couldn't be assessed (tier_2/scoring.py)
     u_health: Optional[float] = None
     u_budget: Optional[float] = None

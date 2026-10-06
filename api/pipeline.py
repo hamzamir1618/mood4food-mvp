@@ -117,6 +117,17 @@ def recommend(
         except Exception as exc:
             log.warning("similar tastes unavailable, so left out: %s", exc)
     context = scoring_context(DEFAULT_PERSONA, profile, history, peers)
+    # A guest who tapped through the taste starter (api/taste.py) has said what they like;
+    # their picks are kept with the session, and count exactly as a signed-in user's would.
+    if "taste" not in context:
+        try:
+            told = load_contract(session_id, "taste_start")
+        except Exception as exc:  # a starter that can't be read just leaves taste unknown
+            log.warning("the taste starter's picks could not be read: %s", exc)
+            told = None
+        if told and told.get("vector"):
+            context["taste"] = told["vector"]
+            context["importance"] = told.get("importance") or context.get("importance")
     try:
         signals = ui_signals(profile, history, intent, context)
     except Exception as exc:  # the screen falls back to its fixed layout
