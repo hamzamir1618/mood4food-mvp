@@ -55,11 +55,17 @@ python -m pipeline.build_dataset
 NEO4J_URI=neo4j+s://<your-instance>.databases.neo4j.io \
 NEO4J_USER=neo4j \
 NEO4J_PASSWORD=<password> \
-python -m pipeline.seed --reset
+python -m pipeline.seed
 ```
 
 Re-run it whenever the dataset changes. Nothing in the running service writes
-dishes or restaurants, so this is the only way data reaches the graph.
+dishes or restaurants, so this is the only way data reaches the graph. The seed
+upserts by `dish_uid`, so re-seeding overwrites every dish in place.
+
+**Never pass `--reset` to a graph that is in use.** It runs `MATCH (n) DETACH
+DELETE n`, which deletes *every* node — and accounts live in the same graph, so
+that is every user, saved dietary profile, learned taste model and interaction
+event along with the dishes. It is for a scratch graph only.
 
 ## Configuration
 
