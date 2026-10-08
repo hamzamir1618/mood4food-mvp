@@ -67,6 +67,8 @@ VOCABULARY: dict[str, Ingredient] = {
     "lamb fat": I("fat", animal="meat", aliases=("dumba",)),
     "turkey": I("bulk", animal="meat"),
     "liver": I("bulk", animal="meat", aliases=("kaleji", "kalegi")),
+    # Missing until 2026-10-09, so "Brain Masala" read as onion, tomato and spice: vegan.
+    "brain": I("bulk", animal="meat", aliases=("brains", "maghaz", "magaz", "maghz", "bheja")),
     "fish": I(
         "bulk",
         ("fish",),
@@ -359,8 +361,19 @@ VOCABULARY: dict[str, Ingredient] = {
     ),
     "bell pepper": I("veg", aliases=("bell peppers", "capsicum", "shimla mirch")),
     "spinach": I("veg", aliases=("palak", "saag")),
+    # "Egg plant" is listed so it is read whole, before "egg": it had given two eggplant dishes
+    # an egg allergen and taken them out of vegan results.
     "eggplant": I(
-        "veg", aliases=("brinjal", "baingan", "aubergine", "moutabal", "mutabal", "baba ghanoush")
+        "veg",
+        aliases=(
+            "egg plant",
+            "brinjal",
+            "baingan",
+            "aubergine",
+            "moutabal",
+            "mutabal",
+            "baba ghanoush",
+        ),
     ),
     "okra": I("veg", aliases=("bhindi", "ladyfinger")),
     "cauliflower": I("veg", aliases=("gobi", "gobhi")),

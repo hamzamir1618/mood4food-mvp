@@ -490,3 +490,16 @@ def test_a_plain_portion_of_fries_is_a_side():
     assert not plain_side("Loaded Fries")  # a dish in its own right
     assert not plain_side("Korean BBQ Fries")
     assert not plain_side("Fish & Chips")
+
+
+@pytest.mark.parametrize("name", ["Brain Masala Full", "Maghaz Fry", "Bheja Fry"])
+def test_a_brain_dish_is_meat(name):
+    """'Brain' wasn't in the vocabulary, so Brain Masala read as onion and tomato: vegan."""
+    flags = derive_diet_flags(detect_ingredients(name))
+    assert not flags["is_vegan"] and not flags["is_vegetarian"]
+
+
+def test_egg_plant_is_an_eggplant_not_an_egg():
+    found = detect_ingredients("Szechuan Egg Plant")
+    assert "eggplant" in found and "egg" not in found
+    assert "egg" in detect_ingredients("Egg Fried Rice")

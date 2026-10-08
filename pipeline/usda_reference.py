@@ -46,6 +46,10 @@ CHOICES = {
     ),
     "turkey": ("Turkey, whole, meat only, cooked, roasted", ""),
     "liver": ("Chicken, liver, all classes, cooked, simmered", ""),
+    "brain": (
+        "Lamb, variety meats and by-products, brain, cooked, braised",
+        "goat brain (maghaz) has no USDA entry; lamb stands in, as goat does for mutton",
+    ),
     "fish": ("Fish, cod, Atlantic, cooked, dry heat", "a white fish stands in for fish in general"),
     "prawns": (
         "Crustaceans, shrimp, mixed species, cooked, moist heat (may contain additives to retain moisture)",

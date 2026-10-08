@@ -518,6 +518,13 @@ def build() -> tuple[list[dict], dict]:
             # promote a dish into a diet it plainly doesn't belong to.
             if MEAT_NAME.search(name):
                 is_vegan = is_vegetarian = False
+            # ...and its allergens are the last word on what it contains. A kept source tag
+            # (legacy_allergens) can say egg where the ingredients now don't; the tag is never
+            # dropped, so the diet flags give way to it rather than contradict it on the card.
+            if set(allergens) & {"egg", "dairy", "fish", "shellfish"}:
+                is_vegan = False
+            if set(allergens) & {"fish", "shellfish"}:
+                is_vegetarian = False
         else:
             allergens, allergens_known, is_vegan, is_vegetarian, is_halal = (
                 sorted(legacy_allergens),
