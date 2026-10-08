@@ -30,6 +30,7 @@ PINNED = ("allergens", "notice")
 # the summary). On a wide screen each column keeps this order within itself.
 DEFAULT = (
     ("notice", "top"),
+    ("tradeoffs", "top"),
     ("match", "main"),
     ("name", "main"),
     ("place", "main"),
@@ -37,8 +38,10 @@ DEFAULT = (
     ("photo", "side"),
     ("summary", "main"),
     ("allergens", "main"),
+    ("ingredients", "main"),
     ("reasons", "side"),
     ("weights", "main"),
+    ("walkthrough", "band"),
     ("meal", "band"),
     ("provenance", "band"),
     ("runners", "band"),
@@ -163,6 +166,70 @@ def _meal(layout: Layout, blueprint: dict, signals: dict) -> None:
     layout.get("meal")["props"] = {
         "restaurant_name": dish["restaurant_name"],
         "party_size": int(signals.get("party_size") or 1),
+    }
+
+
+def _drop(layout: Layout, block_id: str) -> None:
+    layout.blocks = [b for b in layout.blocks if b["id"] != block_id]
+
+
+def _tradeoffs(layout: Layout, blueprint: dict, signals: dict) -> None:
+    """
+    The other ways to read a request the menus couldn't meet in full, each naming the dish it
+    would give (tier_2/trade_offs.py). Beside the notice, because they answer it.
+    """
+    winner = (blueprint.get("winning_dish") or {}).get("dish_id")
+    options = [
+        {k: o[k] for k in ("id", "label", "gives_up", "keeps", "count", "dish")}
+        for o in blueprint.get("trade_offs") or []
+        if o.get("dish", {}).get("dish_id") != winner
+    ]
+    if not options:
+        _drop(layout, "tradeoffs")
+        return
+    layout.get("tradeoffs")["props"] = {"options": options}
+    layout.explain(
+        "Other ways to read your request are offered, because the menus couldn't meet all of it.",
+        "query",
+        "tradeoffs",
+    )
+
+
+def _walkthrough(layout: Layout, blueprint: dict, signals: dict) -> None:
+    """From the words to the dish, step by step (ui/walkthrough.py). Always told when known."""
+    steps = blueprint.get("walkthrough") or []
+    if not steps:
+        _drop(layout, "walkthrough")
+        return
+    layout.get("walkthrough")["props"] = {"steps": steps}
+
+
+def _ingredients(layout: Layout, blueprint: dict, signals: dict) -> None:
+    """
+    What the dish is made of, on the card rather than in a drawer: each ingredient with the
+    allergens it carries, and whether the menu named it or it is what a dish like it usually has.
+    """
+    from pipeline.ingredients import VOCABULARY
+
+    dish = blueprint.get("winning_dish") or {}
+    names = list(dish.get("ingredients") or [])
+    if not names:
+        _drop(layout, "ingredients")
+        return
+    stated = set(dish.get("ingredients_named") or [])
+    items = [
+        {
+            "name": n,
+            "allergens": list(VOCABULARY[n].allergens) if n in VOCABULARY else [],
+            "named": n in stated,
+        }
+        for n in names
+    ]
+    items.sort(key=lambda i: (not i["named"], not i["allergens"]))
+    layout.get("ingredients")["props"] = {
+        "items": items,
+        "named": sum(i["named"] for i in items),
+        "typical": sum(not i["named"] for i in items),
     }
 
 
@@ -385,6 +452,9 @@ def _learning(layout: Layout, blueprint: dict, signals: dict) -> None:
 
 RULES = (
     _notice,
+    _tradeoffs,
+    _walkthrough,
+    _ingredients,
     _meal,
     _provenance,
     _safety,
@@ -412,7 +482,32 @@ def pick_for_session(session_id: str, blueprint: dict) -> dict | None:
     from tier_1.contracts.session_store import load_contract
 
     try:
-        return pick(blueprint, load_contract(session_id, "ui_signals") or {})
+        signals = load_contract(session_id, "ui_signals") or {}
     except Exception as exc:
         log.warning("layout not composed, the fixed one is used: %s", exc)
         return None
+    try:
+        told = {**blueprint, **story(session_id, blueprint)}
+    except Exception as exc:  # the card stands without its walkthrough
+        log.warning("the walkthrough couldn't be told: %s", exc)
+        told = blueprint
+    try:
+        return pick(told, signals)
+    except Exception as exc:
+        log.warning("layout not composed, the fixed one is used: %s", exc)
+        return None
+
+
+def story(session_id: str, blueprint: dict) -> dict:
+    """The walkthrough and the trade-offs for the session's request, as of this pick."""
+    from dialogue import state
+    from dialogue.pool import held
+    from ui.walkthrough import steps
+
+    evaluation, _ = held(session_id)
+    if not evaluation:
+        return {}
+    return {
+        "walkthrough": steps(evaluation, state.load(session_id), blueprint),
+        "trade_offs": evaluation.get("trade_offs") or [],
+    }

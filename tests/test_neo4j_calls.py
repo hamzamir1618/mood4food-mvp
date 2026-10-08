@@ -52,8 +52,12 @@ def test_neo4j_call_count_submit_vs_recalculate(mock_enrich, mock_ingest, mock_q
     res = client.post("/submit", data={"text": "I want something spicy"})
     assert res.status_code == 200
 
-    # query_safe_candidates must be called exactly once during /submit
-    assert mock_query.call_count == 1
+    # /submit reads the graph twice: Tier 1's search, and the open pool the walkthrough counts
+    # and the trade-offs are read from (tier_2/trade_offs.py) — every dish the user's rules
+    # allow, with no limit and no dish asked for.
+    assert mock_query.call_count == 2
+    open_pool = mock_query.call_args_list[1]
+    assert open_pool.args[1:3] == (999999, "")
 
     # Reset mock counter
     mock_query.reset_mock()

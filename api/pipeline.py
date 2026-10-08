@@ -33,20 +33,22 @@ def recommend(
     Runs the whole pipeline for one query and returns the enriched blueprint. A location
     ({lat, lng, label}) is kept with the session; without one, the session's last is used.
     """
-    from accounts import events, learning
-    from accounts.constraints import apply_dietary_profile
-    from accounts.deps import current_user_id
-    from accounts.store import get_profile, list_events
-    from api.location import load_location, nearby, save_location, with_distances
+    intent, location = read_request(text, audio_path, image_path, location)
+    return recommend_intent(request, intent, location)
+
+
+def read_request(
+    text: str | None = None,
+    audio_path: str | None = None,
+    image_path: str | None = None,
+    location: dict | None = None,
+) -> tuple[dict, dict | None]:
+    """
+    Stage 1: the request, read. The intent extractor (the only LLM call) and then the rules
+    that read what its fields can't carry. Returns the intent and the location to measure from.
+    """
     from tier_1 import query_words
-    from tier_1.contracts.session_store import load_contract, save_contract
     from tier_1.multi_modal_ingestion import run_ingestion_pipeline
-    from tier_1.persona_manager import DEFAULT_PERSONA
-    from tier_1.symbolic_anchoring import run_anchoring_pipeline
-    from tier_2.consensus_manager import run_debate_pipeline
-    from tier_2.context import scoring_context
-    from tier_3.fulfillment_engine import enrich_blueprint
-    from ui.signals import gather as ui_signals
 
     # Stage 1: Multimodal Intent Parsing
     try:
@@ -82,6 +84,31 @@ def recommend(
         if here:
             location = here
             log.info("measuring from %s, named in the request", here["label"])
+    return intent, location
+
+
+def recommend_intent(request: Request, intent: dict, location: dict | None = None) -> dict:
+    """
+    Everything after reading: the saved profile, the scoring context, Tier 1, Tier 2 and
+    fulfilment. Choosing a trade-off (tier_2/trade_offs.py) starts here with one thing changed,
+    so it never pays for the extractor twice.
+    """
+    from accounts import events, learning
+    from accounts.constraints import apply_dietary_profile
+    from accounts.deps import current_user_id
+    from accounts.store import get_profile, list_events
+    from api.location import load_location, nearby, save_location, with_distances
+    from tier_1 import query_words
+    from tier_1.contracts.session_store import load_contract, save_contract
+    from tier_1.persona_manager import DEFAULT_PERSONA
+    from tier_1.symbolic_anchoring import run_anchoring_pipeline
+    from tier_2 import trade_offs
+    from tier_2.consensus_manager import run_debate_pipeline
+    from tier_2.context import scoring_context
+    from tier_3.fulfillment_engine import enrich_blueprint
+    from ui.signals import gather as ui_signals
+
+    said = str(intent.get("raw_input") or "")
 
     # Stage 1b: a signed-in user's saved dietary constraints join the query. If they
     # can't be loaded, stop: recommending without a saved allergy is not a fallback.
@@ -161,6 +188,9 @@ def recommend(
             evaluation["message"] = " ".join(
                 s for s in (said_so, evaluation.get("message") or "") if s
             )
+        # The counts for the walkthrough, and, where the request couldn't be met in full,
+        # the other ways to read it with the dish each would give.
+        evaluation.update(trade_offs.examine(evaluation, context, location))
         save_contract(session_id, "candidate_evaluation", evaluation)
     except Exception as exc:
         log.error("Tier 1b failed: %s", exc)

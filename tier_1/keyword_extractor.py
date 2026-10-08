@@ -1,5 +1,6 @@
 import re
 
+from tier_1 import query_words
 from tier_1.contracts.schemas import GroundedIntent, TasteProfile
 from tier_1.intent_extractor_interface import IntentExtractor
 
@@ -162,10 +163,7 @@ class KeywordExtractorImpl(IntentExtractor):
         mood_profile = TasteProfile()
         for keyword, profile in mood_map.items():
             said = re.search(rf"\b{keyword}\b", text_lower)
-            negated = re.search(
-                rf"\b(?:not|no|non|without|less|never)\s+(?:too\s+|very\s+|so\s+)?{keyword}\b",
-                text_lower,
-            )
+            negated = re.search(rf"(?:{query_words.NEGATION}|\bless)\s+{keyword}\b", text_lower)
             if said and not negated:
                 mood_profile = profile
                 break

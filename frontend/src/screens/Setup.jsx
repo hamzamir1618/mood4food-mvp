@@ -21,6 +21,22 @@ const STEPS = ['account', 'persona', 'dietary', 'goals'];
  * starts from, the rules that are never relaxed, and what you're eating for.
  * Each step saves as you leave it, so nothing is stored without you agreeing to it.
  */
+// The server's own rules (accounts/models.py: MIN_PASSWORD_LENGTH, EMAIL_RE), checked here so
+// a mistake is caught on the screen it was made on rather than two screens later.
+const MIN_PASSWORD = 10;
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const tooShort = (password) => password.length < MIN_PASSWORD;
+
+function accountProblem({ email, password }) {
+  if (!EMAIL.test(email.trim())) {
+    return "That email address doesn't look right. It needs an @ and a domain, like name@example.com.";
+  }
+  if (tooShort(password)) {
+    return `Your password needs at least ${MIN_PASSWORD} characters. It has ${password.length}.`;
+  }
+  return '';
+}
+
 export default function Setup({ onDone, onSignedIn, toast }) {
   const [step, setStep] = useState('welcome'); // welcome · signin · account · persona · dietary · goals
   const [busy, setBusy] = useState(false);
@@ -32,6 +48,8 @@ export default function Setup({ onDone, onSignedIn, toast }) {
   const [halal, setHalal] = useState(false);
   const [goal, setGoal] = useState('balanced');
   const [spend, setSpend] = useState('');
+  // What's wrong with the account details, said on the screen they were typed on.
+  const [problem, setProblem] = useState('');
 
   useEffect(() => {
     api
@@ -52,15 +70,32 @@ export default function Setup({ onDone, onSignedIn, toast }) {
     }
   };
 
-  const createAccount = () =>
-    run(
-      () => api.register({ ...form, persona }),
-      (r) => {
-        onSignedIn(r.user);
-        toast(r.guest_events_claimed ? 'Your earlier picks moved across.' : 'Account created.');
-        setStep('dietary');
-      },
-    );
+  const createAccount = async () => {
+    setBusy(true);
+    try {
+      const r = await api.register({ ...form, persona });
+      onSignedIn(r.user);
+      toast(r.guest_events_claimed ? 'Your earlier picks moved across.' : 'Account created.');
+      setStep('dietary');
+    } catch (err) {
+      // A problem with what was typed on the account screen is fixed there, not here.
+      if (err?.status === 422 || err?.status === 409) {
+        setProblem(errorMessage(err));
+        setStep('account');
+      } else {
+        toast(errorMessage(err), 'error');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Checked before leaving the account screen, by the same rules the server applies. */
+  const checkAccount = () => {
+    const found = accountProblem(form);
+    setProblem(found);
+    if (!found) setStep('persona');
+  };
 
   const signIn = () =>
     run(
@@ -173,19 +208,35 @@ export default function Setup({ onDone, onSignedIn, toast }) {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
-              {step === 'account' && <span className="lab lab-sm muted">At least 10 characters.</span>}
+              {step === 'account' && (
+                <span className={`lab lab-sm ${tooShort(form.password) ? 'muted' : 'accent'}`}>
+                  At least {MIN_PASSWORD} characters
+                  {form.password && tooShort(form.password) ? ` · ${form.password.length} so far` : ''}
+                </span>
+              )}
             </label>
           </div>
+          {step === 'account' && problem && (
+            <p className="setup-problem small" role="alert">
+              {problem}
+            </p>
+          )}
           <div className="mt-auto pt-24" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               className="btn btn-accent"
-              onClick={step === 'signin' ? signIn : () => setStep('persona')}
+              onClick={step === 'signin' ? signIn : checkAccount}
               disabled={busy || !form.email || !form.password}
             >
               <span className="lab">{step === 'signin' ? 'Sign in' : 'Continue'}</span>
               {busy && <span className="spinner" />}
             </button>
-            <button className="btn btn-text" onClick={() => setStep(step === 'signin' ? 'account' : 'signin')}>
+            <button
+              className="btn btn-text"
+              onClick={() => {
+                setProblem('');
+                setStep(step === 'signin' ? 'account' : 'signin');
+              }}
+            >
               <span className="lab lab-sm">
                 {step === 'signin' ? 'New here? Create an account' : 'I already have an account'}
               </span>

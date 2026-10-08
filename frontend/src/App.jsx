@@ -72,6 +72,8 @@ export default function App() {
   const [location, setLocation] = useState(savedLocation);
   const [query, setQuery] = useState('');
   const [trouble, setTrouble] = useState(null); // {kind: 'offline' | 'nomatch', message}
+  // A request that wasn't about food: said on the home screen, with examples to try instead.
+  const [notFood, setNotFood] = useState(null); // {reply, examples}
   const [areasOpen, setAreasOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -101,6 +103,12 @@ export default function App() {
   /** Every reply is either a question or a recommendation; both carry a line to show. */
   const apply = useCallback(
     (reply) => {
+      if (reply.type === 'not_food') {
+        setNotFood({ reply: reply.reply, examples: reply.examples || [] });
+        setPhase('home');
+        return;
+      }
+      setNotFood(null);
       if (reply.reply) showToast(reply.reply);
       if (reply.type === 'question') {
         setQuestion(reply.question);
@@ -193,6 +201,30 @@ export default function App() {
     [run],
   );
 
+  /** One of the other ways to read the request, chosen: the request runs again with it. */
+  const tradeOff = useCallback(
+    async (id) => {
+      rejected.current = [];
+      const reply = await run(() => api.chat({ trade_off: id }));
+      if (reply) apply(reply);
+    },
+    [apply, run],
+  );
+
+  /** A runner-up chosen from the list, in place of the pick. */
+  const takeRunner = useCallback(
+    async (dishId) => {
+      const current = blueprint?.winning_dish?.dish_id;
+      if (current) rejected.current = [...rejected.current, current];
+      const next = await run(() => api.alternate(rejected.current, dishId));
+      if (next && !next.no_more_alternates) {
+        setBlueprint(withPlace(next));
+        window.scrollTo?.({ top: 0, behavior: 'smooth' });
+      }
+    },
+    [blueprint, run],
+  );
+
   const nextDish = useCallback(async () => {
     const current = blueprint?.winning_dish?.dish_id;
     if (current) rejected.current = [...rejected.current, current];
@@ -220,6 +252,7 @@ export default function App() {
     setQuestion(null);
     setAsked(0);
     setTrouble(null);
+    setNotFood(null);
     setPhase('home');
   }, []);
 
@@ -291,6 +324,8 @@ export default function App() {
           initialQuery={query}
           onAbout={() => setAboutOpen(true)}
           onTaste={() => setTasteOpen(true)}
+          notFood={notFood}
+          onExample={(text) => start(text)}
         />
       )}
 
@@ -300,7 +335,7 @@ export default function App() {
           question={question}
           step={asked}
           onAnswer={answer}
-          onSkip={skip}
+          onSkip={question.id === 'tradeoff' ? restart : skip}
           busy={busy}
         />
       )}
@@ -317,6 +352,8 @@ export default function App() {
           onScores={() => setScoresOpen(true)}
           onWeights={setWeights}
           onDataset={() => setLabelOpen(true)}
+          onTradeOff={tradeOff}
+          onRunner={takeRunner}
           busy={busy}
         />
       )}

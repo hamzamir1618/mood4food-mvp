@@ -23,6 +23,8 @@ WINNER = {
     "allergens": ["dairy"],
 }
 EVEN = {"w_h": 0.34, "w_b": 0.33, "w_t": 0.33}
+# Blocks that appear only when there is something to put in them.
+SHOWN_WITH_CONTENT = {"notice", "tradeoffs", "walkthrough", "ingredients"}
 
 
 def blueprint(weights=EVEN, **extra) -> dict:
@@ -54,7 +56,7 @@ def event(kind: str, dish_uid: str | None = None, critique: str | None = None) -
 # ── The fixed layout is the default ─────────────────────────────────────────────
 def test_with_nothing_known_the_layout_is_todays_pick_screen():
     layout = compose.pick(blueprint(), {})
-    assert ids(layout) == [b for b, _ in compose.DEFAULT if b != "notice"]
+    assert ids(layout) == [b for b, _ in compose.DEFAULT if b not in SHOWN_WITH_CONTENT]
     assert layout["actions"] == {"refinements": list(CRITIQUES), "lead": None}
     assert layout["why"] == []
 

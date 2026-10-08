@@ -39,7 +39,7 @@ function Stamp() {
   );
 }
 
-export default function Home({ onStart, busy, initialQuery, onAbout, onTaste }) {
+export default function Home({ onStart, busy, initialQuery, onAbout, onTaste, notFood, onExample }) {
   // The offer to learn a taste is only worth making to someone the app knows nothing about.
   const [askTaste, setAskTaste] = useState(false);
   useEffect(() => {
@@ -123,6 +123,31 @@ export default function Home({ onStart, busy, initialQuery, onAbout, onTaste }) 
           maxLength={500}
           style={{ marginTop: 6 }}
         />
+        {/* Not a request for food: said here, before any question is asked. */}
+        {notFood && (
+          <div className="not-food rise" role="status">
+            <p className="small" style={{ margin: 0 }}>{notFood.reply}</p>
+            {notFood.examples.length > 0 && (
+              <div className="not-food-examples">
+                <span className="lab lab-sm muted">Try</span>
+                {notFood.examples.map((ex) => (
+                  <button
+                    key={ex}
+                    className="chip lab lab-sm"
+                    onClick={() => {
+                      setQuery(ex);
+                      setPicked(-1);
+                      onExample?.(ex);
+                    }}
+                    disabled={busy}
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {askTaste && onTaste && (

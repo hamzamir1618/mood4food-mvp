@@ -21,6 +21,7 @@ KEEP_LABEL = "Keep my pick"
 # How "Everything here is ..." reads for categories whose short name isn't a food on its own.
 KIND_PHRASES = {"cafe_bakery": "café food", "sandwich": "sandwiches", "other": "one kind of food"}
 RELAX = "relax"  # the slot of the "what can I loosen?" question
+TRADE = "tradeoff"  # the slot of "nothing fits it all: which would you change?"
 
 # What a refinement that found nothing may offer to loosen, one at a time, and only when doing
 # so would actually find a dish. Allergies, diet and halal are Tier 1 rules, not adjustments:
@@ -59,7 +60,21 @@ def handle(request: Request, turn) -> dict:
             critique = critiques.parse(text)
             if critique and _current(session_id):
                 return _refine(request, conversation or Conversation(closed=True), critique)
+        # Not about food at all ("(", "capital of France"): said so, before the extractor runs.
+        from tier_1 import domain
+
+        verdict = domain.check(text)
+        if not verdict.food:
+            return {
+                "type": "not_food",
+                "kind": verdict.kind,
+                "reply": verdict.reply,
+                "examples": list(domain.EXAMPLES),
+            }
         return _new_query(request, text)
+
+    if getattr(turn, "trade_off", None) is not None:
+        return _trade_off(request, conversation, turn.trade_off)
 
     if turn.answer is not None:
         pending = conversation.pending if conversation else None
@@ -94,12 +109,75 @@ def _new_query(request: Request, text: str) -> dict:
     if party and party > 1 and blueprint.get("winning_dish"):
         conversation.adjustments = Adjustments(party_size=party)
         blueprint = pool.rerank(request.state.session_id, conversation.adjustments) or blueprint
+    question = _trade_question(request.state.session_id, blueprint)
+    if question:
+        return _ask(request, conversation, question, None, "Ask for something else", blueprint)
     return _next(request, conversation, blueprint, reply=None)
+
+
+def _trade_question(session_id: str, blueprint: dict) -> Question | None:
+    """
+    When nothing fits the whole request ("biryani under 50"), or nothing that fits is anything
+    like it, the question is which part to give up — each answer naming the dish it would give.
+    A near match ("spicy chicken under 200": a spicy chicken soup) is recommended instead, with
+    the same options beside it on the card.
+    """
+    evaluation, _ = pool.held(session_id)
+    offers = evaluation.get("trade_offs") or []
+    if not offers:
+        return None
+    unlike = any(
+        t.get("step") == "closest" and not t.get("count") for t in evaluation.get("trace") or []
+    )
+    if blueprint.get("winning_dish") and not unlike:
+        return None
+    from tier_2.scoring import _rs
+
+    chips = {
+        o["id"]: {
+            "label": f"{o['label']}: {o['dish']['name']}, {_rs(o['dish']['price_pkr'])}",
+            "adjust": {},
+        }
+        for o in offers
+    }
+    return Question(
+        slot=TRADE,
+        text="Which would you change?",
+        why=evaluation.get("message") or "Nothing fits everything you asked.",
+        chips=chips,
+    )
+
+
+def _trade_off(request: Request, conversation: Conversation | None, option_id: str) -> dict:
+    """
+    Re-runs the request with one thing given up, as the option said: a higher limit, or an ask
+    set aside. Only an option this request was offered can be taken, and an option can only ever
+    change a limit or an ask, never an allergy, a diet or halal (tier_2/trade_offs.py).
+    """
+    from api.pipeline import recommend_intent
+    from tier_2.trade_offs import applied
+
+    session_id = request.state.session_id
+    evaluation, _ = pool.held(session_id)
+    option = next((o for o in evaluation.get("trade_offs") or [] if o["id"] == option_id), None)
+    if option is None:
+        raise HTTPException(409, "That option isn't on offer any more.")
+    intent = applied(evaluation.get("source_intent") or {}, option["change"])
+    intent["chose"] = {"id": option["id"], "text": option["label"]}
+    blueprint = recommend_intent(request, intent)
+    party = conversation.adjustments.party_size if conversation else None
+    fresh = Conversation(closed=True, adjustments=Adjustments(party_size=party))
+    if party and party > 1 and blueprint.get("winning_dish"):
+        blueprint = pool.rerank(session_id, fresh.adjustments) or blueprint
+    return _recommendation(request, fresh, blueprint, option["then"])
 
 
 def _answer(request: Request, conversation: Conversation, value: str, chip: dict) -> dict:
     session_id = request.state.session_id
     slot = conversation.pending.slot
+    if slot == TRADE:
+        conversation.pending = None
+        return _trade_off(request, conversation, value)
     if slot == RELAX:
         conversation.pending = None
         loosened = Adjustments(**chip["replace"])

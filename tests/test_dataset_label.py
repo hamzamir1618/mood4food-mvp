@@ -87,13 +87,13 @@ def test_every_after_value_resolves_against_what_is_counted(label):
 
 def test_a_group_carries_the_same_badge_the_dish_panel_gives_it(label):
     rows = {s["id"]: s["rows"] for s in label["sections"]}
-    confirmed = next(r for r in rows["review_status"] if r["label"] == "human confirmed")
+    confirmed = next(r for r in rows["review_status"] if r["value"] == "human_confirmed")
     assert (confirmed["badge"], confirmed["tone"]) == ("Person checked", "confirmed")
     assert confirmed["share"] == 45
-    unchecked = next(r for r in rows["review_status"] if r["label"] == "auto imported")
+    unchecked = next(r for r in rows["review_status"] if r["value"] == "auto_imported")
     assert unchecked["tone"] == "unchecked"
     assert rows["quarantine_reason"][0]["tone"] == "unchecked"
-    assert rows["allergens"][0]["badge"] == "Inferred"  # never "tested"
+    assert rows["allergens"][0]["badge"] == "Worked out"  # never "tested"
     assert rows["located"][0]["badge"] == "Mapped to the door"
 
 
@@ -130,3 +130,34 @@ def test_the_before_values_still_match_the_build_report(what, pattern):
     number = found.group(1) if found.groups() else found.group(0).split()[0]
     written = fact["before"]
     assert number in written, f"{what}: the report says {number}, build_facts says {written}"
+
+
+def test_the_label_is_written_for_someone_who_never_built_it(label):
+    """Each group is named as a diner would say it, and the jargon stays in the code."""
+    rows = {s["id"]: s["rows"] for s in label["sections"]}
+    confirmed = next(r for r in rows["review_status"] if r["value"] == "human_confirmed")
+    assert confirmed["label"] == "Checked by a person"
+    shown = " ".join(
+        [s["title"] + " " + (s.get("note") or "") for s in label["sections"]]
+        + [r["label"] for s in label["sections"] for r in s["rows"]]
+        + [c["title"] + " " + c["note"] for c in label["changed"]]
+        + [label["typical"]["text"], label["calibration"]["plain"], label["calibration"]["result"]]
+    ).lower()
+    for jargon in (
+        "median",
+        "fat share",
+        "energy from fat",
+        "ocr",
+        "bootstrap",
+        "quarantin",
+        "prior",
+        "macronutrient",
+        "inferred",
+    ):
+        assert jargon not in shown, jargon
+
+
+def test_each_change_carries_numbers_for_its_chart(label):
+    fat = next(c for c in label["changed"] if c["icon"] == "fat")
+    assert fat["before_value"] == 0.68 and 0 < fat["after_value"] < 1
+    assert fat["reference"]["value"] == 0.44

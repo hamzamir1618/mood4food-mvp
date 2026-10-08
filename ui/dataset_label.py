@@ -52,14 +52,120 @@ RETURN count(*) AS dishes,
 
 # field -> the heading its breakdown is printed under
 BREAKDOWNS = {
-    "review_status": "How each row was read",
-    "price_status": "How each price was checked",
-    "ingredients_basis": "Where the ingredients came from",
-    "nutrition_confidence": "How far the nutrition estimate is trusted",
-    "taste_source": "Where the flavour values came from",
-    "serves_source": "How many each dish serves",
-    "quarantine_reason": "Why a row is kept on file but never served",
-    "category": "What kind of dish",
+    "review_status": "Who checked each dish",
+    "price_status": "How sure we are of each price",
+    "ingredients_basis": "Where each dish's ingredients come from",
+    "nutrition_confidence": "How good each calorie estimate is",
+    "taste_source": "Where each dish's flavour comes from",
+    "serves_source": "How many people each dish feeds",
+    "quarantine_reason": "Dishes we keep but never recommend",
+    "category": "Kinds of dish",
+}
+# What each breakdown is about, in a sentence a diner can follow, and the mark beside it.
+INTROS = {
+    "review_status": (
+        "row",
+        "A computer read every dish off a photo of the menu. Some were then checked by a person "
+        "against the photo.",
+    ),
+    "price_status": ("price", "Every price comes from a menu. Some could be double-checked."),
+    "ingredients_basis": (
+        "ingredients",
+        "Menus rarely list everything in a dish, so where they don't, we fill in what that kind "
+        "of dish usually has, and say so.",
+    ),
+    "nutrition_confidence": (
+        "nutrition",
+        "No restaurant here publishes calories, so we estimate them from the ingredients. The "
+        "more we know about a dish's ingredients, the better the estimate.",
+    ),
+    "taste_source": (
+        "taste",
+        "How spicy, sweet or sour each dish is. The less sure the source, the less flavour "
+        "counts when dishes are compared.",
+    ),
+    "serves_source": (
+        "serves",
+        "Most menus don't say how many a dish feeds, so we count it as one person unless "
+        "something says otherwise.",
+    ),
+    "quarantine_reason": (
+        "hidden",
+        "These stay in the records so nothing is quietly deleted, but the app will never "
+        "recommend them.",
+    ),
+    "category": ("kind", "Drinks and sides are kept for “make it a meal” and never picked."),
+}
+# Each value as a person would say it. A value not listed is shown as it is stored.
+PLAIN = {
+    "review_status": {
+        "human_confirmed": "Checked by a person",
+        "auto_imported": "Read by computer, not yet checked",
+        "scraped": "Taken from the restaurant's website",
+        "manual": "Typed in by hand",
+    },
+    "price_status": {
+        "trusted": "Read straight off the menu",
+        "verified": "Double-checked against the menu",
+        "unverified": "Couldn't be double-checked",
+    },
+    "ingredients_basis": {
+        "named + typical ingredients": "Some on the menu, the rest typical",
+        "named ingredients": "All named on the menu",
+        "typical ingredients": "Typical for that kind of dish",
+        "none": "Not known",
+    },
+    "nutrition_confidence": {
+        "high": "Good estimate",
+        "medium": "Fair estimate",
+        "low": "Rough estimate",
+        "none": "No estimate",
+    },
+    "taste_source": {
+        "original": "Came with the menu data",
+        "restaurant_average": "That restaurant's usual flavours",
+        "keyword": "Worked out from its name",
+        "name_rule": "Worked out from its name",
+        "category_prior": "Usual for that kind of dish",
+        "global_prior": "Average of all dishes",
+        "neutral": "Not known",
+    },
+    "serves_source": {
+        "default": "Not stated, so counted as one",
+        "price_estimate": "Worked out from its price",
+        "menu": "Stated on the menu",
+        "double": "Confirmed by the owner",
+    },
+    "quarantine_reason": {
+        "owner discarded the name as OCR damage": "Name garbled when the photo was read",
+        "owner removed the dish (platter worksheet)": "Taken off by the restaurant's owner",
+        "name truncated by OCR": "Name cut off when the photo was read",
+        "withheld rather than guessed": "Too uncertain to show",
+        "price: price under Rs 20": "Price under Rs 20, a misreading",
+        "price: over 8x the restaurant's median price, with no size or serving word": (
+            "Price far too high for that restaurant"
+        ),
+        "price: no price": "No price on the menu",
+    },
+    "category": {
+        "desi_traditional": "Desi",
+        "chinese_asian": "Chinese and Asian",
+        "middle_eastern": "Middle Eastern",
+        "continental_upscale": "Continental",
+        "fast_food": "Fast food",
+        "cafe_bakery": "Café and desserts",
+        "afghan": "Afghan",
+        "pizza": "Pizza",
+        "sandwich": "Sandwiches and wraps",
+        "beverages": "Drinks (never picked)",
+        "add_ons": "Sides (never picked)",
+        "other": "Couldn't tell",
+    },
+    "located": {
+        "place": "Mapped to its own door",
+        "area": "Mapped to the middle of its area",
+        "unknown": "Couldn't be mapped",
+    },
 }
 BREAKDOWN = """
 MATCH (d:Dish) WHERE d.{field} IS NOT NULL
@@ -164,6 +270,11 @@ def _figure(value) -> str:
     return f"{round(value):,}"
 
 
+def _plain(field: str, value: str) -> str:
+    said = PLAIN.get(field, {})
+    return said.get(value) or said.get(value.replace(" ", "_")) or value.replace("_", " ")
+
+
 def _row(field: str, value: str, count: int, total: int) -> dict:
     """One line of a breakdown: what it is, how many, and how strong that evidence is."""
     known = VOCABULARIES.get(field, {}).get(value)
@@ -176,7 +287,8 @@ def _row(field: str, value: str, count: int, total: int) -> dict:
     else:
         badge, tone = "", ""
     return {
-        "label": value.replace("_", " "),
+        "label": _plain(field, value),
+        "value": value,
         "count": count,
         "share": round(100 * count / total) if total else 0,
         "badge": badge,
@@ -194,27 +306,41 @@ def label() -> dict | None:
     by_review = facts["breakdowns"]["review_status"]
     checked = next((r["count"] for r in by_review if r["value"] == "human_confirmed"), 0)
     headline = [
-        {"figure": _figure(dishes), "of": "dishes", "note": "every one read off a real menu"},
-        {"figure": _figure(facts["restaurants"]), "of": "restaurants", "note": "in Islamabad"},
+        {
+            "figure": _figure(dishes),
+            "of": "dishes",
+            "icon": "dish",
+            "note": "every one read off a photo of a real menu",
+        },
+        {
+            "figure": _figure(facts["restaurants"]),
+            "of": "restaurants",
+            "icon": "store",
+            "note": "all in Islamabad",
+        },
         {
             "figure": _figure(checked),
             "of": "confirmed by a person",
-            "note": f"{round(100 * checked / dishes)}% of the rows, name and price",
+            "icon": "checked",
+            "note": f"{round(100 * checked / dishes)}% of dishes: name and price checked by hand",
         },
         {
             "figure": _figure(facts["recommendable"]),
             "of": "the app will pick from",
-            "note": "drinks, sides and quarantined rows are held back",
+            "icon": "target",
+            "note": "drinks and sides are kept for meals, never picked on their own",
         },
         {
             "figure": _figure(facts["quarantined"]),
             "of": "kept on file, never served",
-            "note": "a damaged name or an impossible price",
+            "icon": "hidden",
+            "note": "a garbled name or an impossible price",
         },
         {
             "figure": _figure(facts["allergens_unknown_recommendable"]),
             "of": "with allergens still unknown",
-            "note": "never offered to anyone who excludes one",
+            "icon": "allergens",
+            "note": "never shown to anyone avoiding an allergen",
         },
     ]
 
@@ -231,14 +357,35 @@ def label() -> dict | None:
             "count": lambda v: f"{v:,}",
             "percent_of_dishes": lambda v: f"{100 * v / dishes:.1f}%",
         }[fact["as"]](found)
+        # The pair as numbers too, on one scale, for the before-and-after chart.
+        after_value = {
+            "kcal": lambda v: float(v),
+            "share": lambda v: float(v),
+            "count": lambda v: float(v),
+            "percent_of_dishes": lambda v: 100 * v / dishes,
+        }[fact["as"]](found)
         changed.append(
-            {"what": fact["what"], "before": fact["before"], "after": shown, "note": fact["note"]}
+            {
+                "what": fact["what"],
+                "title": fact.get("title") or fact["what"],
+                "icon": fact.get("icon"),
+                "kind": fact["as"],
+                "before": fact["before"],
+                "after": shown,
+                "before_value": fact.get("before_value"),
+                "after_value": after_value,
+                "better": fact.get("better"),
+                "reference": fact.get("reference"),
+                "note": fact["note"],
+            }
         )
 
     sections = [
         {
             "id": field,
             "title": title,
+            "icon": INTROS.get(field, (None, None))[0],
+            "note": INTROS.get(field, (None, None))[1],
             "rows": [
                 _row(field, r["value"], r["count"], dishes) for r in facts["breakdowns"][field]
             ],
@@ -248,15 +395,17 @@ def label() -> dict | None:
     sections.append(
         {
             "id": "allergens",
-            "title": "Allergen tags, inferred from ingredients",
-            "note": f"{facts['allergens_unknown']} dishes have ingredients too uncertain to tag, "
-            "and are withheld from anyone excluding an allergen rather than guessed at.",
+            "title": "Allergens we marked",
+            "icon": "allergens",
+            "note": "Worked out from each dish's ingredients, not tested in a laboratory. "
+            f"{facts['allergens_unknown']} dishes have ingredients too unclear to work it out, "
+            "so they are never shown to anyone avoiding an allergen.",
             "rows": [
                 {
                     "label": r["value"],
                     "count": r["count"],
                     "share": round(100 * r["count"] / dishes),
-                    "badge": "Inferred",
+                    "badge": "Worked out",
                     "tone": "inferred",
                 }
                 for r in facts["allergen_tags"]
@@ -266,11 +415,15 @@ def label() -> dict | None:
     sections.append(
         {
             "id": "located",
-            "title": "How the restaurants are placed on the map",
-            "note": "Areas: " + ", ".join(f"{r['value']} {r['count']}" for r in facts["areas"]),
+            "title": "Where the restaurants are on the map",
+            "icon": "where",
+            "note": "Some restaurants are mapped to their own door; for others we only know the "
+            "area, so their distances are approximate. Areas: "
+            + ", ".join(f"{r['value']} {r['count']}" for r in facts["areas"]),
             "rows": [
                 {
-                    "label": r["value"],
+                    "label": _plain("located", r["value"]),
+                    "value": r["value"],
                     "count": r["count"],
                     "share": round(100 * r["count"] / facts["restaurants"]),
                     "badge": (provenance.WHERE.get(r["value"]) or ("", "", ""))[0],
@@ -281,10 +434,45 @@ def label() -> dict | None:
         }
     )
 
+    nutrition = facts["nutrition"]
+    typical = {
+        "dishes": nutrition["dishes"],
+        "calories": round(nutrition["median_calories"]),
+        "fat_share": nutrition["median_fat_share"],
+        "over_three_quarters_fat": nutrition["over_three_quarters_fat"],
+        "text": f"Take the dish in the middle of all {nutrition['dishes']:,} the app can pick, "
+        f"half above it and half below. It has about {round(nutrition['median_calories']):,} "
+        f"calories, and about {round(100 * nutrition['median_fat_share'])}% of them come from "
+        f"fat. {nutrition['over_three_quarters_fat']} dishes are estimated at more than three "
+        "quarters fat, and their cards say how far their estimate can be trusted.",
+    }
     return {
         "headline": headline,
         "changed": changed,
         "sections": [s for s in sections if s["rows"]],
-        "nutrition": facts["nutrition"],
+        "nutrition": nutrition,
+        "typical": typical,
         "calibration": build_facts.CALIBRATION,
+        "legend": [
+            {
+                "tone": "confirmed",
+                "badge": "Checked",
+                "text": "Seen on the menu, or checked by a person.",
+            },
+            {
+                "tone": "inferred",
+                "badge": "Worked out",
+                "text": "Worked out by a rule from what we do know.",
+            },
+            {
+                "tone": "estimated",
+                "badge": "Estimated",
+                "text": "Our best estimate, and it may be off.",
+            },
+            {
+                "tone": "unchecked",
+                "badge": "Unchecked",
+                "text": "Not checked yet, or not known, so it counts for less.",
+            },
+        ],
     }

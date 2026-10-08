@@ -20,7 +20,11 @@ export default function Question({ question, step, onAnswer, onSkip, busy }) {
         <div className="between pt-16">
           {/* Two is the limit the backend enforces (dialogue/questions.py MAX_QUESTIONS). */}
           <div className="lab accent">
-            {question.id === 'relax' ? 'One thing to loosen' : `Question ${num(step)} of 02`}
+            {question.id === 'relax'
+              ? 'One thing to loosen'
+              : question.id === 'tradeoff'
+                ? "Can't have it all"
+                : `Question ${num(step)} of 02`}
           </div>
         </div>
         <div className="rule-ink draw" style={{ marginTop: 10 }} />
@@ -33,7 +37,7 @@ export default function Question({ question, step, onAnswer, onSkip, busy }) {
             {question.why}
           </div>
         )}
-        {question.id !== 'relax' && (
+        {question.id !== 'relax' && question.id !== 'tradeoff' && (
           <div className="q-numeral wide-only" aria-hidden="true">
             {num(step)}
           </div>

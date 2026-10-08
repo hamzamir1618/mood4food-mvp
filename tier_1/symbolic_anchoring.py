@@ -238,11 +238,9 @@ DISH_NAMES = {
     "cheesecake": ("cheesecake", "cheese cake"),
     "brownie": ("brownie",),
 }
-# "anything but pizza", "no more burgers", "don't want biryani": the dish is not wanted.
-_NEGATED = (
-    r"(?:\bno|\bnot|\bwithout|\bexcept|\bbut|\bavoid|\bskip|\bdon'?t\s+want|\binstead\s+of)"
-    r"\s+(?:(?:a|an|the|any|some|more)\s+)?"
-)
+# "anything but pizza", "no more burgers", "don't want biryani": the dish is not wanted. The
+# negations are the shared list (tier_1/query_words.py), plus a bare "but".
+_NEGATED = rf"(?:\bbut|{query_words.NEGATION})\s+"
 
 
 def named_dishes(intent: dict) -> list[str]:
@@ -250,8 +248,11 @@ def named_dishes(intent: dict) -> list[str]:
     text = " ".join(
         str(intent.get(k) or "") for k in ("raw_input", "craving", "preferred_category")
     ).lower()
+    aside = set(intent.get("set_aside") or [])
     found = []
     for dish, spellings in DISH_NAMES.items():
+        if f"dish:{dish}" in aside:
+            continue
         for s in spellings:
             word = re.escape(s)
             if re.search(rf"\b{word}s?\b", text) and not re.search(rf"{_NEGATED}{word}s?\b", text):
@@ -298,9 +299,10 @@ def asked_proteins(intent: dict) -> set[str]:
     from pipeline.ingredients import detect_ingredients
 
     text = " ".join(str(intent.get(k) or "") for k in ("raw_input", "craving")).lower()
+    aside = set(intent.get("set_aside") or [])
     found = set()
     for name in detect_ingredients(text):
-        if VOCABULARY[name].animal not in PROTEIN_ANIMALS:
+        if VOCABULARY[name].animal not in PROTEIN_ANIMALS or f"food:{name}" in aside:
             continue
         spellings = [name, *VOCABULARY[name].aliases]
         said = [s for s in spellings if re.search(rf"\b{re.escape(s)}\b", text)]
@@ -357,6 +359,12 @@ def relaxation_sentence(relaxations: list[dict], said: str = "") -> str:
     saying so is the difference between a helpful substitute and a confidently wrong answer.
     """
     cannot = cannot_sentence(said)
+    clashes = [
+        f"{r['reason'][0].upper()}{r['reason'][1:]}, and your rules come first, "
+        f"so I've left {r['old_value']} out."
+        for r in relaxations
+        if r.get("constraint") == "conflict" and r.get("reason")
+    ]
     asked = next(
         (
             str(r.get("old_value") or "").strip()
@@ -382,7 +390,7 @@ def relaxation_sentence(relaxations: list[dict], said: str = "") -> str:
         gave_up = f"Nothing here is properly {word}, so this is the closest I have."
     else:
         gave_up = ""
-    return " ".join(s for s in (cannot, gave_up) if s)
+    return " ".join(s for s in (*clashes, cannot, gave_up) if s)
 
 
 def requested_match(term: str | None) -> dict:
@@ -497,8 +505,12 @@ def query_safe_candidates(
     is_vegan: bool = False,
     is_vegetarian: bool = False,
     is_halal: bool = False,
+    driver=None,
 ) -> list[dict]:
     """
+    `driver`, when given, is an open driver to use and leave open (the app's shared one);
+    without it the query opens its own, with retries, and closes it.
+
     Connects to local Neo4j and executes a deterministic Cypher query that:
       - Filters dishes with synthesized_calories <= 1000
       - Prunes any dish linked (up to 5 hops) to a banned ingredient
@@ -516,8 +528,8 @@ def query_safe_candidates(
     )
 
     candidates: list[dict] = []
-    driver = None
-    max_attempts = 3
+    shared = driver is not None
+    max_attempts = 0 if shared else 3
 
     for attempt in range(1, max_attempts + 1):
         try:
@@ -623,7 +635,7 @@ def query_safe_candidates(
     except Exception as exc:
         log.error("neo4j query failed: %s", exc)
     finally:
-        if driver:
+        if driver and not shared:
             driver.close()
 
     # --- HACK: Semantic Keyword Safety Net ---
@@ -836,11 +848,35 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
         log.info("using passed intent_dict instead of reading from file")
     else:
         intent = load_grounded_intent()
+    from tier_1 import asks as asking
+
+    # A food the request's own rules forbid ("vegan chicken karahi") is set aside before the
+    # search, and said: the rule wins, and pretending to look for it would only fail later.
+    clashes = asking.conflicts(intent)
+    if clashes:
+        aside = {*(intent.get("set_aside") or []), *(c["id"] for c in clashes)}
+        intent = {**intent, "set_aside": sorted(aside)}
+    aside = set(intent.get("set_aside") or [])
+    if any(a.startswith("taste:") for a in aside):
+        intent = {
+            **intent,
+            "mood_vector": {
+                k: (0.0 if f"taste:{k}" in aside else v)
+                for k, v in (intent.get("mood_vector") or {}).items()
+            },
+        }
     allergens = intent.get("allergens_pruned", [])
 
     preferred_category = intent.get("preferred_category") or ""
     if preferred_category.lower() == "dessert":
         preferred_category = "cafe_bakery"
+    if (
+        preferred_category
+        and {a.id for a in asking.asks_of({"preferred_category": preferred_category})} & aside
+    ):
+        preferred_category = ""
+    # Each step and what it left, for the walkthrough from the words to the dish.
+    trace = [{"step": "query", "count": None}]
     # We never drop allergens because it's a safety constraint!
 
     budget = intent.get("budget_max_pkr")
@@ -854,7 +890,17 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
     candidates = query_safe_candidates(
         allergens, budget, preferred_category, is_vegan, is_vegetarian, is_halal=is_halal
     )
-    relaxations = []
+    trace[0]["count"] = len(candidates)
+    trace[0]["asked"] = preferred_category
+    relaxations = [
+        {
+            "constraint": "conflict",
+            "old_value": c["words"],
+            "new_value": None,
+            "reason": c["reason"],
+        }
+        for c in clashes
+    ]
 
     # First attempt: With preferred category
     if preferred_category and len(candidates) < 3:
@@ -872,9 +918,13 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
             }
         )
         # drop category requirement
+        asked_for = preferred_category
         preferred_category = ""
         candidates = query_safe_candidates(
             allergens, budget, preferred_category, is_vegan, is_vegetarian, is_halal=is_halal
+        )
+        trace.append(
+            {"step": "category", "asked": asked_for, "relaxed": True, "count": len(candidates)}
         )
 
     # A dish the query names ("karahi", "biryani") narrows the pool to dishes with that name
@@ -888,8 +938,23 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
             "no dish named %s fits, so the name isn't required", named_relaxation["old_value"]
         )
         relaxations.append(named_relaxation)
+        trace.append(
+            {
+                "step": "named_dish",
+                "asked": named_relaxation["old_value"],
+                "relaxed": True,
+                "count": len(candidates),
+            }
+        )
     elif len(candidates) < before:
         log.info("the named dish narrowed the candidates from %d to %d", before, len(candidates))
+        trace.append(
+            {
+                "step": "named_dish",
+                "asked": ", ".join(named_dishes(intent)),
+                "count": len(candidates),
+            }
+        )
     # ...and then an ingredient it names: "chicken karahi" is a karahi that says chicken, not a
     # seekh kebab karahi.
     narrowed = len(candidates)
@@ -900,6 +965,7 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
             narrowed,
             len(candidates),
         )
+        trace.append({"step": "named_ingredient", "count": len(candidates)})
 
     # Second constraint: Minimum Relevance Filter for Dominant Moods
     mood_vector = intent.get("mood_vector", {})
@@ -940,6 +1006,14 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
                     "reason": "few_candidates_found",
                 }
             )
+            trace.append(
+                {
+                    "step": "taste",
+                    "asked": dominant_mood,
+                    "relaxed": True,
+                    "count": len(filtered_candidates),
+                }
+            )
             # We relax by simply not applying the filter, leaving `candidates` as it was.
         else:
             log.info(
@@ -951,6 +1025,28 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
                 len(filtered_candidates),
             )
             candidates = filtered_candidates
+            trace.append({"step": "taste", "asked": dominant_mood, "count": len(candidates)})
+
+    # A flavour the request doesn't want ("not sweet", "not too spicy"): the dishes that have it
+    # are left out, when enough are left without them. Before, "not sweet" only failed to crave
+    # sweetness, and a dessert could still win.
+    for dim, limit in query_words.avoided_tastes(said_in(intent)).items():
+        if not candidates:
+            break
+        kept = [c for c in candidates if c["taste_profile"].get(dim, 0.0) < limit]
+        too_few = len(kept) < NAMED_INGREDIENT_MIN
+        if not too_few:
+            log.info("not %s: the candidates went from %d to %d", dim, len(candidates), len(kept))
+            candidates = kept
+        trace.append(
+            {
+                "step": "avoid_taste",
+                "asked": dim,
+                "limit": limit,
+                "relaxed": too_few,
+                "count": len(kept),
+            }
+        )
 
     # A cooking method the request asks for: keep the dishes whose names are cooked that way,
     # and drop the fried ones when the request says "not fried". Only when enough are left.
@@ -970,6 +1066,23 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
                 len(kept),
             )
             candidates = kept
+            trace.append({"step": "cooking", "asked": cooking, "count": len(candidates)})
+
+    # Where the search had to widen, what is left is no longer all a match, so each dish
+    # carries how much of the request it meets, and Tier 2 ranks the closest first.
+    widened = [
+        r
+        for r in relaxations
+        if r.get("constraint") == "named_dish"
+        or str(r.get("constraint", "")).startswith("minimum_relevance_")
+        or (r.get("constraint") == "preferred_category" and not named_hit)
+    ]
+    if widened and candidates:
+        wanted = asking.asks_of(intent)
+        for c in candidates:
+            c["closeness"] = asking.closeness(wanted, c)
+            c["meets"] = asking.meets(wanted, c)
+        trace.append({"step": "closest", "count": sum(1 for c in candidates if c["closeness"] > 0)})
 
     if not candidates:
         msg = "No matches even after maximum relaxation attempts."
@@ -989,6 +1102,7 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
 
     # Step 3 — persist contract
     write_candidate_evaluation(intent, candidates, relaxations, msg)
+    trace.append({"step": "left", "count": len(candidates)})
 
     log.info("─── Tier 1b: Graph Constraint Pipeline DONE ────")
 
@@ -1004,6 +1118,7 @@ def run_anchoring_pipeline(intent_dict: dict = None) -> dict:
         "candidate_count": len(candidates),
         "relaxations": relaxations,
         "message": msg,
+        "trace": trace,
     }
 
 

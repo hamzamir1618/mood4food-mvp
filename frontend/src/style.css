@@ -413,12 +413,24 @@ a.btn-accent:hover { color: var(--on-accent); }
 
 /* The dishes that came second, so the shortlist is visible rather than asserted. */
 .runners { padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--rule); }
-.runner { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: baseline;
-  padding: 10px 0; border-bottom: 1px solid var(--rule-soft); }
+.runner { border-bottom: 1px solid var(--rule-soft); }
+.runner-head { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: baseline;
+  width: 100%; padding: 10px 0; text-align: left; background: none; border: 0; cursor: pointer; color: inherit; }
+.runner-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.runner.is-open .runner-head { padding-bottom: 6px; }
+.runner-body, .runner-right { display: flex; flex-direction: column; }
+.runner-tags { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 7px; }
+.runner-compare { margin: 0 0 12px 42px; padding: 10px 12px; background: var(--tint); border-left: 3px solid var(--accent); }
+.runner-take { display: inline-block; margin-top: 8px; }
+/* A term's score on a runner-up: the label small, the number bold. */
+.score-badge { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 7px;
+  border: 1.5px solid var(--ink); font-family: var(--ui); font-size: 11px; font-variant-numeric: tabular-nums; }
+.score-badge-label { font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+.score-badge.is-off { border-style: dashed; border-color: var(--rule); color: var(--muted); }
 .runner-num { font-size: 16px; color: var(--accent); }
 .runner-name { font-family: var(--display); font-size: 21px; line-height: 1.1; }
 .runner-place { padding-top: 3px; }
-.runner-right { text-align: right; }
+.runner-right { text-align: right; align-items: flex-end; }
 .runner-match { font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* The widened-search notice: plain, accented, never mistaken for the dish's own copy. */
@@ -728,4 +740,84 @@ a.btn-accent:hover { color: var(--on-accent); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Other ways to read a request the menus couldn't meet: change one thing, get this dish. */
+.tradeoffs { margin-top: 10px; border: 1.5px solid var(--ink); padding: 10px 12px 4px; }
+.tradeoff { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; text-align: left;
+  padding: 9px 0; background: none; border: 0; border-top: 1px solid var(--rule-soft); color: inherit; cursor: pointer; }
+.tradeoff:first-of-type { border-top: 0; }
+.tradeoff:disabled { cursor: default; opacity: 0.6; }
+.tradeoff-label { color: var(--accent); grid-column: 1; }
+.tradeoff-dish { grid-column: 1; font-family: var(--display); font-size: 18px; line-height: 1.15; }
+.tradeoff-price { grid-column: 2; grid-row: 1 / span 2; align-self: center; white-space: nowrap; }
+@media (hover: hover) { .tradeoff:not(:disabled):hover .tradeoff-dish { color: var(--accent); } }
+
+/* From the words to the dish, numbered: each step what the pipeline actually did. */
+.walk-steps { margin: 10px 0 0; padding-left: 22px; }
+.walk-step { padding: 3px 0; }
+.walk-step::marker { color: var(--accent); font-weight: 700; }
+.walk-step.is-said { font-style: italic; }
+.walk-step.is-conflict, .walk-step.is-chose { color: var(--accent); }
+.walk-step.is-pick { font-weight: 600; }
+
+/* What's in it: named on the menu solid, typical-for-the-kind dashed, allergens called out. */
+.ingredient-list { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+.ingredient { font-size: 13px; padding: 4px 9px; border: 1.5px dashed var(--rule); color: var(--muted); }
+.ingredient.is-named { border-style: solid; border-color: var(--ink); color: var(--ink); }
+.ingredient.has-allergen { border-color: var(--accent); }
+.ingredient-allergen { color: var(--accent); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+
+/* Not a request for food: said under the field, with something to try instead. */
+.not-food { margin-top: 12px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--tint); }
+.not-food-examples { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; padding-top: 8px; }
+
+/* What's wrong with the account details, on the screen they were typed on. */
+.setup-problem { margin: 12px 0 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--tint); }
+
+/* The dataset label, drawn: icons beside every figure, before-and-after bars, a typical plate. */
+.figure-head { display: flex; align-items: center; gap: 10px; }
+.figure-head .glyph { color: var(--accent); }
+.legend-grid { display: grid; grid-template-columns: 1fr; gap: 6px 18px; padding-top: 8px; }
+.legend-item { display: flex; align-items: baseline; gap: 10px; }
+.legend-item .badge { flex: 0 0 auto; min-width: 92px; text-align: center; }
+.section-head, .changed-head { display: flex; align-items: center; gap: 10px; }
+.section-head .glyph, .changed-head .glyph { color: var(--accent); }
+.changed-card { border-top: 1px solid var(--rule); padding: 14px 0 12px; }
+.changed-what { flex: 1 1 auto; }
+.changed-better { flex: 0 0 auto; }
+.share-chart, .pair-chart { padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.share-row, .pair-row { display: grid; grid-template-columns: 56px 1fr; align-items: center; gap: 10px; }
+.pair-row { grid-template-columns: 56px 1fr 92px; }
+.error-row { display: grid; grid-template-columns: 1fr; gap: 3px; padding-top: 4px; }
+.error-row .pair-track { height: 14px; }
+.share-name { color: var(--muted); }
+.share-bar { position: relative; height: 26px; background: var(--rule-soft); }
+.share-fill { display: flex; align-items: center; height: 100%; }
+.share-fill.is-before { background: var(--rule); }
+.share-fill.is-after { background: var(--accent); }
+.share-in { padding-left: 8px; font-size: 12px; font-weight: 700; white-space: nowrap; color: var(--ink); }
+.share-fill.is-after .share-in { color: var(--paper); }
+.share-ref { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--ink); }
+.share-key { display: flex; align-items: center; gap: 8px; padding: 2px 0 0 66px; }
+.share-key-line { display: inline-block; width: 0; height: 14px; border-left: 2px dashed var(--ink); }
+.pair-track { height: 18px; background: var(--rule-soft); }
+.pair-fill { display: block; height: 100%; }
+.pair-fill.is-before { background: var(--rule); }
+.pair-fill.is-after { background: var(--accent); }
+.pair-num { text-align: right; font-size: 15px; white-space: nowrap; }
+.pair-num.is-before { color: var(--muted); }
+.plate { display: grid; grid-template-columns: 132px 1fr; gap: 16px; align-items: center; padding-top: 10px; }
+.plate-svg { width: 132px; height: 132px; }
+.plate-rest { fill: none; stroke: var(--rule); stroke-width: 14; }
+.plate-fat { fill: none; stroke: var(--accent); stroke-width: 14; }
+.plate-num { font-family: var(--display); font-size: 22px; fill: var(--ink); }
+.plate-unit { font-family: var(--ui); font-size: 8px; letter-spacing: 1px; text-transform: uppercase; fill: var(--muted); }
+.plate-key { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.key-swatch { display: inline-block; width: 12px; height: 12px; }
+.key-swatch.is-fat { background: var(--accent); }
+.key-swatch.is-rest { background: var(--rule); }
+@media (min-width: 640px) {
+  .legend-grid { grid-template-columns: 1fr 1fr; }
+  .error-row { grid-template-columns: 210px 1fr 110px; align-items: center; }
 }

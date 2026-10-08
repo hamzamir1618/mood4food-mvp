@@ -77,7 +77,17 @@ def candidate_questions(
         and not adj.craved
         and not any(float(v or 0) > 0 for v in mood.values())
     ):
-        out.append(Question(slot="taste", text="What are you in the mood for?", chips=TASTE_CHIPS))
+        # Never offer a flavour the request ruled out: "not sweet" isn't asked "Something sweet?"
+        from tier_1 import query_words
+
+        said = " ".join(str(intent.get(k) or "") for k in ("raw_input", "craving"))
+        avoided = query_words.avoided_tastes(said)
+        chips = {
+            value: chip
+            for value, chip in TASTE_CHIPS.items()
+            if not any(dim in avoided for dim in chip["adjust"]["craved"])
+        }
+        out.append(Question(slot="taste", text="What are you in the mood for?", chips=chips))
     if "cuisine" not in asked and not adj.category and not intent.get("preferred_category"):
         cats = list(
             dict.fromkeys(c.get("category") for c in short if c.get("category") in CATEGORY_LABELS)
