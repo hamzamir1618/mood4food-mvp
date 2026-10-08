@@ -257,16 +257,21 @@ def test_the_dataset_label_is_counted_and_reachable_from_the_dish(browser, app_u
         assert len(figures) >= 5, figures
         assert all(f.strip() and f.strip()[0].isdigit() for f in figures), figures
 
-        # Every before-value stands beside an after-value counted from the graph.
-        pairs = page.locator(".changed-pair")
-        assert pairs.count() >= 4
-        assert page.locator(".changed-pair .badge").count() == pairs.count() * 2
+        # Every before-value stands beside an after-value counted from the graph, drawn.
+        cards = page.locator(".changed-card")
+        assert cards.count() >= 4
+        for i in range(cards.count()):
+            card = cards.nth(i)
+            assert card.locator(".share-row, .pair-row").count() == 2  # before, and now
+            assert card.locator(".glyph").count() >= 1
 
-        # The groups are the dish panel's own statuses, counted.
+        # The groups are the dish panel's own statuses, counted, in words anyone can read.
         said = page.locator(".sheet-tall").inner_text().lower()
-        for group in ("person checked", "inferred", "never served"):
+        for group in ("person checked", "checked by a person", "never served", "worked out"):
             assert group in said, group
-        assert "estimated" in said
+        for jargon in ("median", "fat share", "ocr", "bootstrap", "quarantin"):
+            assert jargon not in said.split("for the technically minded")[0], jargon
+        assert page.locator(".plate-svg").count() == 1  # the typical dish, drawn
     finally:
         page.close()
 
@@ -297,7 +302,8 @@ def test_six_taps_turn_the_flavour_term_on(browser, app_url):
         for i in (1, 3, 5):
             page.locator(".taste-card").nth(i).click()
         page.locator("button", has_text="Use these").click()
-        page.wait_for_selector(".sheet-tall .body-serif", timeout=20_000)
+        # The intro paragraph is already there; the answer is the one beside "Good".
+        page.locator("button", has_text="Good").wait_for(timeout=20_000)
         said = page.locator(".sheet-tall .body-serif").first.inner_text().lower()
         assert "noted" in said or "learn as you go" in said, said
         page.locator("button", has_text="Good").click()
@@ -337,5 +343,102 @@ def test_one_tap_turns_the_dish_into_a_meal_with_a_total(browser, app_url):
         # ...and it never pretends to be an order.
         said = meal.first.inner_text().lower()
         assert "we don't place it" in said
+    finally:
+        page.close()
+
+
+def test_the_card_shows_what_is_in_it_and_how_it_was_reached(browser, app_url):
+    """Ingredients on the card rather than in a drawer, and the walkthrough open beside it."""
+    page = the_pick(browser, app_url, "chicken karahi")
+    try:
+        assert page.locator(".ingredient").count() >= 2, "the ingredients aren't on the card"
+        steps = page.locator(".walk-step").all_inner_texts()
+        assert steps and steps[0] == "You said “chicken karahi”."
+        assert any("came out on top" in s for s in steps)
+        # The next dish is a button, and the card no longer drags
+        assert page.get_by_text("Swipe").count() == 0
+        assert page.locator("button", has_text="Next dish").count() == 1
+    finally:
+        page.close()
+
+
+def test_tapping_a_runner_up_says_how_it_differs_and_can_take_its_place(browser, app_url):
+    page = the_pick(browser, app_url, "chicken karahi")
+    try:
+        first = page.locator(".runner").first
+        assert first.locator(".score-badge").count() == 3  # price, taste, health
+        name = first.locator(".runner-name").inner_text()
+        first.locator(".runner-head").click()
+        said = page.locator(".runner-compare").inner_text()
+        assert said.startswith("Against ") and (
+            "cheaper" in said or "dearer" in said or "same price" in said
+        )
+        page.get_by_text("Show me this one instead").click()
+        page.wait_for_timeout(2_500)
+        assert page.locator(".pick-name").inner_text() == name
+    finally:
+        page.close()
+
+
+def test_a_request_the_menus_cant_meet_offers_a_way_round_it(browser, app_url):
+    page = the_pick(browser, app_url, "spicy chicken under 200")
+    try:
+        assert "Nothing at Rs 200 or less" in page.locator(".pick-notice").inner_text()
+        option = page.locator(".tradeoff").first
+        dish = option.locator(".tradeoff-dish").inner_text().split(" · ")[0]
+        option.click()
+        page.wait_for_timeout(5_000)
+        assert page.locator(".pick-name").inner_text() == dish
+    finally:
+        page.close()
+
+
+def test_a_request_that_isnt_about_food_is_answered_on_the_home_screen(browser, app_url):
+    page = browser.new_page(viewport={"width": 1440, "height": 1000})
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector("#query", timeout=30_000)
+        page.fill("#query", "(")
+        page.keyboard.press("Enter")
+        page.wait_for_selector(".not-food", timeout=15_000)
+        assert page.locator(".q-bar").count() == 0  # no question was asked
+        assert page.locator(".not-food .chip").count() >= 2
+    finally:
+        page.close()
+
+
+def test_the_order_screen_has_no_foodpanda(browser, app_url):
+    page = the_pick(browser, app_url, "chicken karahi")
+    try:
+        page.locator("button", has_text="I'll have this").click()
+        page.wait_for_selector(".done", timeout=15_000)
+        assert page.get_by_text("foodpanda").count() == 0
+    finally:
+        page.close()
+
+
+def test_sign_up_says_what_is_wrong_on_the_screen_it_was_typed(browser, app_url):
+    """
+    The reported failure: a password under ten characters was only refused two screens later,
+    after picking a profile, as "I couldn't read that request".
+    """
+    page = browser.new_page(viewport={"width": 390, "height": 900})
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.get_by_text("Sign in →").click()
+        page.locator("button", has_text="Create an account").click()
+        fields = page.locator(".field-box")
+        fields.nth(1).fill("someone@example.com")
+        fields.nth(2).fill("short")
+        page.locator("button", has_text="Continue").click()
+        said = page.locator(".setup-problem").inner_text()
+        assert said == "Your password needs at least 10 characters. It has 5."
+        assert page.locator("button", has_text="Create account").count() == 0  # not moved on
+
+        fields.nth(1).fill("someone@example")
+        fields.nth(2).fill("long enough now")
+        page.locator("button", has_text="Continue").click()
+        assert "email address doesn't look right" in page.locator(".setup-problem").inner_text()
+        assert "couldn't read" not in page.content()
     finally:
         page.close()

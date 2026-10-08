@@ -61,6 +61,8 @@ WINNER_FIELDS = (
     "summary",
     "confidence",
     "coverage",
+    "closeness",
+    "meets",
 )
 # How a category reads in "Something different: an Afghan dish."
 CATEGORY_NAMES = {

@@ -25,15 +25,34 @@ const BY_STATUS = {
   504: 'That took too long. Try again in a moment.',
 };
 
+/*
+  A validation error names the field it is about; say which, and what it needs, rather than a
+  sentence that could mean anything. Sign-up used to answer a short password with "I couldn't
+  read that request".
+*/
+const FIELD_NAMES = { email: 'email address', password: 'password', display_name: 'name', text: 'request' };
+
+function invalid(error) {
+  const field = (error.loc || []).filter((part) => part !== 'body').pop();
+  const msg = String(error.msg || '');
+  const least = error.ctx?.min_length ?? Number((msg.match(/at least (\d+)/) || [])[1]);
+  const most = error.ctx?.max_length ?? Number((msg.match(/at most (\d+)/) || [])[1]);
+  if (field === 'text') {
+    if (least === 1) return "Tell me what you'd like to eat.";
+    if (most) return `That request is too long. Keep it under ${most} characters.`;
+  }
+  if (field === 'email') return "That email address doesn't look right. It needs an @ and a domain, like name@example.com.";
+  const name = FIELD_NAMES[field] || 'details';
+  if (least > 1) return `Your ${name} needs at least ${least} characters.`;
+  if (least === 1) return `Please fill in your ${name}.`;
+  if (most) return `Your ${name} can be at most ${most} characters.`;
+  return `Something in your ${name} isn't right: ${msg.replace(/^Value error, /, '')}.`;
+}
+
 function readable(status, details) {
   const detail = details?.detail;
   if (typeof detail === 'string') return detail; // written for a person already
-  if (Array.isArray(detail) && detail[0]?.msg) {
-    const msg = String(detail[0].msg);
-    if (/at most \d+ characters/.test(msg)) return 'That request is too long. Keep it under 500 characters.';
-    if (/at least 1 character/.test(msg)) return "Tell me what you'd like to eat.";
-    return "I couldn't read that request.";
-  }
+  if (Array.isArray(detail) && detail.length) return invalid(detail[0]);
   return BY_STATUS[status] || 'Something went wrong. Try that again.';
 }
 
@@ -64,12 +83,14 @@ function send(path, body, method = 'POST') {
 }
 
 // ── The conversation ────────────────────────────────────────────────────────
-/** One turn: exactly one of text, answer, critique or skip, plus an optional location. */
+/** One turn: exactly one of text, answer, critique, skip or trade_off, plus an optional location. */
 export const chat = (turn) => send('/chat', turn);
 /** Re-ranks the dishes the query already found under new weights. No new search, no LLM. */
 export const recalculate = (weights) => send('/recalculate', weights);
 export const approve = (dishId) => send('/approve', { dish_id: dishId });
-export const alternate = (rejected) => send('/alternate', { already_rejected: rejected });
+/** The next dish down, or with `dishId` a runner-up chosen from the list. */
+export const alternate = (rejected, dishId) =>
+  send('/alternate', dishId ? { already_rejected: rejected, dish_id: dishId } : { already_rejected: rejected });
 
 // ── Places ──────────────────────────────────────────────────────────────────
 export const areas = () => get('/areas');

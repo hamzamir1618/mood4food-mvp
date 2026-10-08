@@ -743,6 +743,9 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "peers": peers,
         "reasons": reasons,
         "summary": summary(terms, weights),
+        # How much of the request it meets, when the search had to widen (tier_1/asks.py)
+        "closeness": dish.get("closeness") or 0.0,
+        "meets": dish.get("meets") or [],
     }
 
 
@@ -754,7 +757,16 @@ def _tie_break(s: dict) -> tuple:
     a run repeatable.
     """
     others = [s.get(f"u_{t}") or 0.0 for t in AGENTS]
-    return (-s["u_total"], -sum(others), -max(others, default=0.0), s["name"])
+    # Where the menus couldn't meet the whole request, the dishes nearest to it come first:
+    # a spicy chicken soup before a kulfi for "spicy chicken under 200", whatever they score.
+    # Zero for every dish otherwise, so an ordinary ranking is unchanged.
+    return (
+        -(s.get("closeness") or 0.0),
+        -s["u_total"],
+        -sum(others),
+        -max(others, default=0.0),
+        s["name"],
+    )
 
 
 def rank(candidates: list[dict], prefs: Preferences) -> list[dict]:

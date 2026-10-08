@@ -23,6 +23,10 @@ class GroundedIntent(BaseModel):
     is_halal: bool = False
     preferred_category: Optional[str] = None
     preferred_category_raw_phrase: Optional[str] = None
+    # Asks the user has given up ("food:chicken", "taste:spice"; tier_1/asks.py), and the
+    # trade-off that set them aside, for the walkthrough to say so.
+    set_aside: List[str] = Field(default_factory=list)
+    chose: Optional[Dict[str, Any]] = None
 
 
 class Candidate(BaseModel):
@@ -77,6 +81,9 @@ class Candidate(BaseModel):
     novelty: float = 1.0
     peers: int = 0  # users with a similar taste who approved this recently
     exploration: bool = False  # the shortlist's deliberate "something different"
+    # How much of the request it meets, where the search had to widen (tier_1/asks.py)
+    closeness: float = 0.0
+    meets: List[Dict[str, Any]] = Field(default_factory=list)
     reasons: Dict[str, str] = Field(default_factory=dict)
     summary: str = ""  # the reasons in one short paragraph (tier_2/scoring.py summary)
     macros: Dict[str, Any] = Field(default_factory=dict)
@@ -90,6 +97,11 @@ class CandidateEvaluation(BaseModel):
     soft_constraints: Dict[str, Any] = Field(default_factory=dict)
     relaxations: List[Dict[str, Any]] = Field(default_factory=list)
     message: str = ""
+    # The walkthrough's raw material: each Tier 1 step and what it left, the counts at the
+    # rules and the limit, and the other ways to read the request (tier_2/trade_offs.py)
+    trace: List[Dict[str, Any]] = Field(default_factory=list)
+    counts: Dict[str, Any] = Field(default_factory=dict)
+    trade_offs: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SourceContext(BaseModel):

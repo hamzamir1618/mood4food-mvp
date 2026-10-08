@@ -27,7 +27,7 @@ function Match({ ctx }) {
       <div className="grow" />
       <button
         className="lab accent"
-        data-nodrag="1"
+       
         onClick={ctx.onScores}
         style={{ paddingTop: 8, textAlign: 'right' }}
       >
@@ -213,7 +213,7 @@ function Provenance({ block, ctx }) {
   const tally = block.props?.tally || [];
   if (!lines.length) return null;
   return (
-    <details className="why evidence" data-nodrag="1">
+    <details className="why evidence">
       <summary className="lab lab-sm">
         How we know this dish
         <span className="evidence-count muted">{lines.length} records</span>
@@ -284,7 +284,7 @@ function Meal({ block, ctx }) {
   };
 
   return (
-    <details className="why meal" data-nodrag="1" onToggle={(e) => e.target.open && open()}>
+    <details className="why meal" onToggle={(e) => e.target.open && open()}>
       <summary className="lab lab-sm">
         Make it a meal
         <span className="muted meal-where">{kitchen}</span>
@@ -328,10 +328,91 @@ function Meal({ block, ctx }) {
   );
 }
 
+/**
+ * The other ways to read a request the menus couldn't meet in full: give up one thing, and this
+ * is the dish you'd get (tier_2/trade_offs.py). Each names the dish, so the choice is concrete.
+ */
+function TradeOffs({ block, ctx }) {
+  const options = block.props?.options || [];
+  if (!options.length) return null;
+  return (
+    <section className="tradeoffs rise" aria-label="Other ways to read your request">
+      <div className="lab lab-sm accent">Can't have it all? Change one thing</div>
+      {options.map((o) => (
+        <button
+          className="tradeoff"
+          key={o.id}
+          onClick={() => ctx.onTradeOff?.(o.id)}
+          disabled={ctx.busy || !ctx.onTradeOff}
+        >
+          <span className="tradeoff-label lab">{o.label}</span>
+          <span className="tradeoff-dish">
+            {o.dish.name}
+            <span className="muted"> · {o.dish.restaurant_name}</span>
+          </span>
+          <span className="tradeoff-price bod-b">{rupees(o.dish.price_pkr)}</span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+/** From the words to the dish: every step the request took, with the counts it saw. */
+function Walkthrough({ block }) {
+  const steps = block.props?.steps || [];
+  if (!steps.length) return null;
+  return (
+    <details className="why walkthrough" open>
+      <summary className="lab lab-sm">From your words to this dish</summary>
+      <ol className="walk-steps small">
+        {steps.map((s, i) => (
+          <li className={`walk-step is-${s.kind}`} key={`${i}-${s.text}`}>
+            {s.text}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+/**
+ * What the dish is made of, on the card. Each ingredient says whether the menu named it or it is
+ * what a dish like this usually has, and carries the allergens it brings.
+ */
+function Ingredients({ block }) {
+  const { items = [], named = 0, typical = 0 } = block.props || {};
+  if (!items.length) return null;
+  return (
+    <div className="ingredients pt-12">
+      <div className="between">
+        <div className="lab lab-sm">What's in it</div>
+        <div className="lab lab-sm muted">
+          {named} on the menu · {typical} typical
+        </div>
+      </div>
+      <div className="ingredient-list">
+        {items.map((i) => (
+          <span
+            className={`ingredient${i.named ? ' is-named' : ''}${i.allergens.length ? ' has-allergen' : ''}`}
+            key={i.name}
+            title={i.named ? 'Named on the menu' : 'Typical for a dish like this; not on the menu'}
+          >
+            {i.name}
+            {i.allergens.length > 0 && <span className="ingredient-allergen"> · {i.allergens.join(', ')}</span>}
+          </span>
+        ))}
+      </div>
+      <p className="small muted" style={{ margin: '6px 0 0' }}>
+        Solid: named on the menu. Dashed: what a dish like this usually has.
+      </p>
+    </div>
+  );
+}
+
 function WeightsBlock({ ctx }) {
   if (!ctx.blueprint?.agent_weights || !ctx.onWeights) return null;
   return (
-    <div data-nodrag="1">
+    <div>
       <Weights
         weights={ctx.blueprint.agent_weights}
         onChange={ctx.onWeights}
@@ -343,14 +424,16 @@ function WeightsBlock({ ctx }) {
 }
 
 function RunnersBlock({ ctx, block }) {
+  // The pick's own scores sit in the breakdown, not on the dish, so the comparison needs both.
+  const winner = { ...ctx.dish, ...(ctx.blueprint?.utility_breakdown || {}) };
   return (
-    <div data-nodrag="1">
-      <Runners
-        candidates={ctx.blueprint?.top_candidates}
-        winnerId={ctx.dish.dish_id}
-        badges={block.props?.badges}
-      />
-    </div>
+    <Runners
+      candidates={ctx.blueprint?.top_candidates}
+      winner={winner}
+      badges={block.props?.badges}
+      onRunner={ctx.onRunner}
+      busy={ctx.busy}
+    />
   );
 }
 
@@ -362,6 +445,9 @@ export const BLOCKS = {
   photo: Photo,
   summary: Summary,
   allergens: Allergens,
+  ingredients: Ingredients,
+  tradeoffs: TradeOffs,
+  walkthrough: Walkthrough,
   safety: Safety,
   nutrition: Nutrition,
   reasons: Reasons,
@@ -379,6 +465,7 @@ export const BLOCKS = {
  * still draws the screen we had.
  */
 const FIXED = [
+  ['tradeoffs', 'top'],
   ['match', 'main'],
   ['name', 'main'],
   ['place', 'main'],
@@ -386,8 +473,10 @@ const FIXED = [
   ['photo', 'side'],
   ['summary', 'main'],
   ['allergens', 'main'],
+  ['ingredients', 'main'],
   ['reasons', 'side'],
   ['weights', 'main'],
+  ['walkthrough', 'band'],
   ['meal', 'band'],
   ['provenance', 'band'],
   ['runners', 'band'],

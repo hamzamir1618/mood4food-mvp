@@ -8,10 +8,7 @@ function mapsUrl(dish) {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(target)}`;
 }
 
-const pandaUrl = (dish) =>
-  `https://www.foodpanda.pk/search?q=${encodeURIComponent(dish.restaurant_name || dish.name || '')}`;
-
-/** Settled: what was chosen, where it is, and the two ways to go and get it. */
+/** Settled: what was chosen, where it is, and how to get there. */
 export default function Done({ dish, onRestart }) {
   const km = distance(dish?.distance_km);
 
@@ -46,12 +43,6 @@ export default function Done({ dish, onRestart }) {
       <div className="done-actions mt-auto pt-24" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <a className="btn btn-accent btn-wide" href={mapsUrl(dish || {})} target="_blank" rel="noreferrer">
           <span className="lab">Get directions</span>
-          <span className="bod" style={{ fontSize: 20 }}>
-            →
-          </span>
-        </a>
-        <a className="btn btn-line btn-wide" href={pandaUrl(dish || {})} target="_blank" rel="noreferrer">
-          <span className="lab">Find it on foodpanda</span>
           <span className="bod" style={{ fontSize: 20 }}>
             →
           </span>

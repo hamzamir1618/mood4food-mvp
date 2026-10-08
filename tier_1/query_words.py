@@ -23,11 +23,53 @@ import re
 
 from pipeline.ingredients import SPELLING_TO_NAMES, VOCABULARY
 
-# "No onion", "without garlic", "hold the mayo", "no onion or garlic": the words right after
+# The ways a request says it doesn't want something. One list, shared by everything that reads
+# a negation — the foods left out here, the dishes not wanted (tier_1/symbolic_anchoring.py) and
+# the flavours not wanted (tier_1/keyword_extractor.py). Each kept its own short list before,
+# and a phrase one of them missed didn't just go unread: "doesn't have onions", "nothing with
+# onions" and "I hate onions" were read as asking FOR onions, and every dish shown had them.
+# The longer phrases come first, so "not a fan of" is read whole. Filler words after the
+# negation ("no ANY onions", "not TOO spicy", "skip THE mayo") belong to it.
+_NOT = r"n['’]?t"
+NEGATION = (
+    r"\b(?:"
+    r"not\s+a\s+(?:big\s+)?fan\s+of|can" + _NOT + r"\s+stand|cannot\s+stand|"
+    r"(?:i'?d\s+)?rather\s+not(?:\s+have)?|anything\s+(?:but|except)|nothing\s+with|"
+    r"free\s+of|leave\s+out|hold\s+the|instead\s+of|no\s+more|allergic\s+to|but\s+not|"
+    r"(?:do" + _NOT + r"|does" + _NOT + r"|did" + _NOT + r"|wo" + _NOT + r"|can" + _NOT + r"|"
+    r"do\s+not|does\s+not|did\s+not|cannot|dont|doesnt|cant)\s+"
+    r"(?:want|have|contain|include|like|eat|need|take)|"
+    r"no|not|non|never|without|minus|nothing|skip|avoid|hate|dislike|except"
+    r")"
+    r"(?:\s+(?:any|anything|the|a|an|some|too|very|so|much|more|that|of|with|in|it))*"
+)
+_NEGATION = NEGATION  # read by wanted_food below
+# "No onion", "doesn't have onions", "hold the mayo", "no onion or garlic": the words right after
 # the negation, up to a stop word. The scope is deliberately short — the exclusion in
 # tier_1/symbolic_anchoring.py runs on through lists, and a long scope excluded whole meals.
-_NEGATION = r"(?:no|without|hold the|skip|minus|avoid|don'?t want|can'?t eat|allergic to)"
-_DISLIKE = re.compile(rf"\b{_NEGATION}\s+((?:[\w'-]+(?:\s+(?:or|and|,)\s*)?){{1,4}})", re.I)
+# The scope is read ahead rather than consumed, so a second negation inside it is still found:
+# "not sweet and doesn't have onions" had stopped at "sweet" and never reached "onions".
+# A comma carries the list on only when it ends the way a list does ("no onion, garlic or
+# chilli"); otherwise it ends the scope ("no onions, chicken please" still wants the chicken).
+_ITEM = r"[\w'-]+"
+_DISLIKE = re.compile(
+    rf"{NEGATION}\s+(?=((?:{_ITEM}\s*,\s*)+{_ITEM}(?:\s+(?:or|and)\s+{_ITEM})+"
+    rf"|{_ITEM}(?:\s+(?:or|and)\s+{_ITEM}){{0,3}}))",
+    re.I,
+)
+# "Onion-free", "dairy free": the same, said the other way round.
+_FREE = re.compile(r"\b([a-z]+)[- ]free\b", re.I)
+# Flavours a request doesn't want. "Not spicy" rules out what is properly spicy; "not too
+# spicy" and "less spicy" only what is very spicy.
+_FLAVOURS = {
+    "spicy": "spice", "spice": "spice", "chilli": "spice", "chili": "spice", "sweet": "sweet",
+    "sugary": "sweet", "sour": "sour", "tangy": "sour", "salty": "salty", "bitter": "bitter",
+}  # fmt: skip
+_AVOID = re.compile(rf"({NEGATION})\s+({'|'.join(_FLAVOURS)})\b", re.I)
+_LESS = re.compile(rf"\b(?:less|milder|not\s+(?:too|very|so))\s+({'|'.join(_FLAVOURS)})\b", re.I)
+_MILD = re.compile(r"\bmild\b", re.I)
+AVOID_STRONG = 0.4  # a dish this strong in a flavour has it (Tier 1's mood filter uses the same)
+AVOID_VERY = 0.7  # ...and this strong is very much of it
 _STOP = {
     "too", "much", "very", "more", "less", "a", "an", "the", "any", "some", "please",
     "i", "it", "that", "this", "with", "but", "and", "or", "spicy", "sweet", "sour",
@@ -113,6 +155,10 @@ UNSUPPORTED = (
 def dislikes(text: str) -> list[str]:
     """Vocabulary ingredients the words ask to leave out ("no onion" -> ["onion"])."""
     found: list[str] = []
+    for match in _FREE.finditer(text or ""):
+        for name in SPELLING_TO_NAMES.get(match.group(1).lower(), ()):
+            if name not in found and VOCABULARY[name].role != "trace":
+                found.append(name)
     for match in _DISLIKE.finditer(text or ""):
         for word in re.split(r"[\s,]+(?:or|and)?\s*", match.group(1)):
             word = word.strip(".,!?;:'\" ").lower()
@@ -125,8 +171,27 @@ def dislikes(text: str) -> list[str]:
 
 
 def excluded_foods(text: str) -> list[str]:
-    """Everything the words exclude: dislikes, and land meat for a pescatarian."""
+    """
+    Everything the words exclude: dislikes, allergen groups ("doesn't have nuts", "dairy free"),
+    and land meat for a pescatarian.
+    """
+    from pipeline.ingredients import ALLERGEN_TAGS
+
     out = list(dislikes(text))
+    said = text or ""
+    groups = [m.group(1).lower() for m in _FREE.finditer(said)]
+    for match in _DISLIKE.finditer(said):
+        groups += [w.strip(".,!?;:'\" ").lower() for w in re.split(r"[\s,]+", match.group(1))]
+    for word in groups:
+        tag = (
+            word
+            if word in ALLERGEN_TAGS
+            else word.rstrip("s")
+            if word.rstrip("s") in ALLERGEN_TAGS
+            else None
+        )
+        if tag and tag not in out:
+            out.append(tag)
     if PESCATARIAN.search(text or "") and PESCATARIAN_EXCLUDES not in out:
         out.append(PESCATARIAN_EXCLUDES)
     return out
@@ -177,7 +242,7 @@ def wanted_food(text: str, allergen_tags: tuple, food_groups: tuple) -> str | No
     said = (text or "").lower()
     if not said:
         return None
-    excluded = set(dislikes(said))
+    excluded = set(excluded_foods(said))  # "dairy free" and "no nuts" too, not only dislikes
     named = sorted(
         (
             spelling
@@ -190,10 +255,28 @@ def wanted_food(text: str, allergen_tags: tuple, food_groups: tuple) -> str | No
     for spelling in named:
         if re.search(rf"{_NEGATION}\s+(?:\w+\s+){{0,2}}{re.escape(spelling)}\b", said):
             continue  # "no cheese" asks for the opposite
-        if set(SPELLING_TO_NAMES.get(spelling, ())) & excluded:
+        if spelling in excluded or set(SPELLING_TO_NAMES.get(spelling, ())) & excluded:
             continue
         return spelling
     return None
+
+
+def avoided_tastes(text: str) -> dict[str, float]:
+    """
+    Flavours the words don't want, each with the strength a dish must stay under:
+    "not sweet" -> {"sweet": 0.4}; "not too spicy", "less spicy", "mild" -> {"spice": 0.7}.
+    """
+    said = text or ""
+    out: dict[str, float] = {}
+    for match in _LESS.finditer(said):
+        out[_FLAVOURS[match.group(1).lower()]] = AVOID_VERY
+    if _MILD.search(said):
+        out.setdefault("spice", AVOID_VERY)
+    for match in _AVOID.finditer(said):
+        dim = _FLAVOURS[match.group(2).lower()]
+        very = re.search(r"\b(?:too|very|so|much)\b", match.group(1), re.I)
+        out[dim] = min(out.get(dim, 1.0), AVOID_VERY if very else AVOID_STRONG)
+    return out
 
 
 def unsupported(text: str) -> list[str]:

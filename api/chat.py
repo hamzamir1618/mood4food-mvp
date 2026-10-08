@@ -20,12 +20,15 @@ class Answer(BaseModel):
 
 
 class ChatTurn(BaseModel):
-    """One turn: exactly one of text, answer, critique or skip, and optionally a location."""
+    """One turn: exactly one of text, answer, critique, skip or trade_off, and optionally a
+    location."""
 
     text: Optional[str] = Field(default=None, min_length=1, max_length=500)
     answer: Optional[Answer] = None
     critique: Optional[str] = None
     skip: bool = False
+    # One of the "other ways to read your request" offered with the pick (tier_2/trade_offs.py)
+    trade_off: Optional[str] = Field(default=None, max_length=60)
     # Kept with the session; distances are measured from it from the next new request.
     location: Optional[Location] = None
 
@@ -36,9 +39,10 @@ class ChatTurn(BaseModel):
             self.answer is not None,
             self.critique is not None,
             self.skip,
+            self.trade_off is not None,
         ]
         if sum(given) != 1:
-            raise ValueError("send exactly one of: text, answer, critique, skip")
+            raise ValueError("send exactly one of: text, answer, critique, skip, trade_off")
         if self.critique is not None and self.critique not in CRITIQUES:
             raise ValueError(f"critique must be one of {list(CRITIQUES)}")
         return self
