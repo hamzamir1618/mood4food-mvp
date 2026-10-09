@@ -27,6 +27,10 @@ class ChatTurn(BaseModel):
     answer: Optional[Answer] = None
     critique: Optional[str] = None
     skip: bool = False
+    # Text typed into the request box is a new request, whatever the server still has open.
+    # Without it, text is first tried as an answer to the open question or as a refinement,
+    # which after a reload took "something spicy" as the answer "Spicy" to an old question.
+    new: bool = False
     # One of the "other ways to read your request" offered with the pick (tier_2/trade_offs.py)
     trade_off: Optional[str] = Field(default=None, max_length=60)
     # Kept with the session; distances are measured from it from the next new request.

@@ -262,3 +262,34 @@ def test_onions_left_out_are_left_out_and_not_sweet_means_not_sweet(chat):
         assert menu["taste_profile"]["sweet"] < 0.4, c["name"]
     steps = [s["text"] for s in block(reply, "walkthrough")["props"]["steps"]]
     assert "I read that as: not sweet and no onion." in steps
+
+
+# ── A new request is a new request ───────────────────────────────────────────
+def test_a_request_typed_after_a_reload_is_not_taken_as_the_old_questions_answer(chat):
+    """
+    The known bug: with a question still open on the server (a reload, or Back from the
+    question), "spicy chicken under 200" was read as the answer "Spicy" to it, and ignored.
+    """
+    first = say(chat, text="something to eat")
+    assert first["type"] == "question"
+    reply = say(chat, text="spicy chicken under 200", new=True)
+    assert chat.calls["extract"] == 2  # read as a request of its own
+    while reply["type"] == "question":
+        reply = say(chat, skip=True)
+    assert reply["recommendation"]["winning_dish"]["name"] == "Hot & Sour Soup"
+
+
+def test_a_typed_answer_still_answers_when_it_isnt_marked_new(chat):
+    """The contract for other callers is unchanged: free text tries the open question first."""
+    first = say(chat, text="something to eat")
+    assert first["type"] == "question"
+    label = first["question"]["chips"][0]["label"]
+    reply = say(chat, text=label.lower())
+    assert chat.calls["extract"] == 1  # taken as the answer, not as a new request
+    assert reply.get("reply") == f"{label}, got it."
+
+
+def test_a_refinement_word_in_a_new_request_doesnt_refine_the_old_pick(chat):
+    until_pick(chat, "chicken karahi")
+    say(chat, text="something cheaper", new=True)
+    assert chat.calls["extract"] == 2

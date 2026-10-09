@@ -112,7 +112,7 @@ Each suggestion carries the exact profile update to send, and the client sends i
 
 ## Limits
 
-- **Only four questions exist,** and their answers are fixed lists plus typed budgets and head counts. Anything else typed while a question is open starts a new request.
+- **Only four questions exist,** and their answers are fixed lists plus typed budgets and head counts. Anything else typed while a question is open starts a new request. A turn sent with `"new": true` is always a new request, never an answer or a refinement: the app's request box sends it, so a question left open by a reload or by going Back can't capture the next request.
 - **Refinements only narrow.** "I could spend more" or "show me more options" needs a new request, because the candidates were found under the original budget.
 - **The party size only changes price per person** (see `DECISION_CORE.md`). It doesn't yet favour dishes meant for sharing.
 - **Screens come with Phase 6.** Until then the endpoint can be used from FastAPI's `/docs` page.
