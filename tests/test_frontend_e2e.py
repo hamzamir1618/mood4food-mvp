@@ -442,3 +442,24 @@ def test_sign_up_says_what_is_wrong_on_the_screen_it_was_typed(browser, app_url)
         assert "couldn't read" not in page.content()
     finally:
         page.close()
+
+
+def test_going_back_from_a_question_never_captures_the_next_request(browser, app_url):
+    """
+    The known bug: Back (or a reload) from an open question, then a new request with a word
+    that answers it, and the new request was taken as the old question's answer.
+    """
+    page = browser.new_page(viewport={"width": 1280, "height": 1000})
+    try:
+        page.goto(app_url, wait_until="domcontentloaded")
+        page.wait_for_selector("#query", timeout=30_000)
+        page.fill("#query", "something to eat")
+        page.keyboard.press("Enter")
+        page.wait_for_selector(".q-bar", timeout=30_000)
+        page.reload(wait_until="domcontentloaded")  # the question is still open on the server
+        pick_through(page, "spicy chicken under 200")
+        assert "spicy chicken" in page.locator(".pick-notice").inner_text().lower()
+        steps = page.locator(".walk-step").all_inner_texts()
+        assert steps[0] == "You said “spicy chicken under 200”."
+    finally:
+        page.close()

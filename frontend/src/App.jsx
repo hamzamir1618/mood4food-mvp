@@ -163,7 +163,10 @@ export default function App() {
         place = await api.locate(6000);
         if (place) keepLocation(place);
       }
-      const reply = await run(() => api.chat(place ? { text, location: place } : { text }));
+      // `new`: whatever question the server still has open (a reload, or Back from a question)
+      // is left behind, rather than this request being read as its answer.
+      const turn = { text, new: true, ...(place ? { location: place } : {}) };
+      const reply = await run(() => api.chat(turn));
       if (reply) apply(reply);
     },
     [apply, keepLocation, location, run],

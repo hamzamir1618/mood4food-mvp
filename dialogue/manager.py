@@ -52,7 +52,9 @@ def handle(request: Request, turn) -> dict:
         text = turn.text.strip()
         if not text:
             raise HTTPException(400, "Tell me what you'd like to eat.")
-        if conversation and conversation.pending:
+        if getattr(turn, "new", False):
+            pass  # from the request box: never an answer to an old question, nor a refinement
+        elif conversation and conversation.pending:
             parsed = questions.parse_answer(text, conversation.pending)
             if parsed:
                 return _answer(request, conversation, *parsed)
