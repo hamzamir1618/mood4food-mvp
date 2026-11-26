@@ -77,6 +77,17 @@ export default function Pick({
           <div className="lab accent">The pick · {rank}</div>
         </div>
         <div className="rule-thick draw" style={{ marginTop: 8 }} />
+        {blueprint?.candidate_count > 0 && (
+          <div className="funnel-strip lab lab-sm muted" aria-label="Decision pipeline funnel">
+            <span>2,545 dishes</span>
+            <span className="funnel-arrow">→</span>
+            <span>1,840 menu</span>
+            <span className="funnel-arrow">→</span>
+            <span className="funnel-live">{blueprint.candidate_count.toLocaleString('en-PK')} safe</span>
+            <span className="funnel-arrow">→</span>
+            <span>Top {(blueprint.top_candidates || []).length || 1} ranked</span>
+          </div>
+        )}
         {/* Said out loud when the search had to widen, so a substitute never reads as a match. */}
         {blueprint?.relaxation_notice && (
           <p className="pick-notice small rise" role="status">

@@ -821,3 +821,31 @@ a.btn-accent:hover { color: var(--on-accent); }
   .legend-grid { grid-template-columns: 1fr 1fr; }
   .error-row { grid-template-columns: 210px 1fr 110px; align-items: center; }
 }
+
+/* Decision pipeline funnel strip on Pick screen and MCDA confidence bar on Scores sheet. */
+.funnel-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 7px;
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.funnel-arrow { color: var(--rule); }
+.funnel-live { color: var(--ink); font-weight: 700; }
+.score-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 3px;
+}
+.bar-mcda { position: relative; overflow: visible; height: 6px; }
+.bar-neutral-tick {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  border-left: 1.5px dashed var(--muted);
+  pointer-events: none;
+}

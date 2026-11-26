@@ -1,0 +1,60 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: "Backend API base URL for the mobile build"
+        required: false
+        default: "https://mood4food-mvp.onrender.com"
+  push:
+    branches:
+      - final-eval
+    paths:
+      - "frontend/**"
+      - ".github/workflows/android-apk.yml"
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build mobile web bundle & sync Capacitor Android
+        working-directory: frontend
+        env:
+          VITE_API_BASE: ${{ github.event.inputs.api_base || 'https://mood4food-mvp.onrender.com' }}
+        run: |
+          npm run build:mobile
+          npx cap sync android
+
+      - name: Assemble debug APK
+        working-directory: frontend/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload Mood4Food-debug.apk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mood4Food-debug-apk
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

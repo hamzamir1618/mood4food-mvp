@@ -46,15 +46,38 @@ export function joinList(items) {
 /** The scored terms, in the order the screens show them. Distance needs a location. */
 export function scoreRows(blueprint) {
   const u = blueprint?.utility_breakdown || {};
-  const reasons = blueprint?.winning_dish?.reasons || {};
+  const dish = blueprint?.winning_dish || {};
+  const reasons = dish.reasons || {};
+  const conf = dish.confidence || {};
+  const w = blueprint?.agent_weights || {};
+  const weights = {
+    taste: w.w_t,
+    budget: w.w_b,
+    health: w.w_h,
+    semantic: 0.25,
+    distance: 0.15,
+  };
   return [
-    ['Taste', u.u_taste, reasons.taste],
-    ['Budget', u.u_budget, reasons.budget],
-    ['Health', u.u_health, reasons.health],
-    ['Distance', u.u_distance, reasons.distance],
+    ['taste', 'Taste', u.u_taste, reasons.taste],
+    ['budget', 'Budget', u.u_budget, reasons.budget],
+    ['health', 'Health', u.u_health, reasons.health],
+    ['semantic', 'Context', u.u_semantic, reasons.semantic],
+    ['distance', 'Distance', u.u_distance, reasons.distance],
   ]
-    .filter(([, value]) => value !== null && value !== undefined)
-    .map(([label, value, text]) => ({ label, value: pct(value), text: text || '' }));
+    .filter(([, , value]) => value !== null && value !== undefined)
+    .map(([key, label, value, text]) => {
+      const c = conf[key] ?? 1;
+      const effective = c * value + (1 - c) * 0.5;
+      return {
+        key,
+        label,
+        value: pct(value),
+        confidence: pct(c),
+        effective: pct(effective),
+        weight: weights[key] != null ? Number(weights[key]).toFixed(2) : null,
+        text: text || '',
+      };
+    });
 }
 
 export function matchOf(blueprint) {

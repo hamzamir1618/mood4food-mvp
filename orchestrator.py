@@ -139,6 +139,9 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 frontend_origins = [
     origin.strip() for origin in settings.FRONTEND_ORIGIN.split(",") if origin.strip()
 ]
+for _mobile_origin in ("https://localhost", "http://localhost", "capacitor://localhost"):
+    if _mobile_origin not in frontend_origins:
+        frontend_origins.append(_mobile_origin)
 
 app.add_middleware(
     CORSMiddleware,

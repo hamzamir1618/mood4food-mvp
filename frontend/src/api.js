@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = '';
+const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '');
 
 /*
   What a failure says out loud. The backend speaks three dialects: a plain `detail` sentence
@@ -95,9 +95,22 @@ export const alternate = (rejected, dishId) =>
 // ── Places ──────────────────────────────────────────────────────────────────
 export const areas = () => get('/areas');
 
-/** The browser's location, or null if the user says no or it takes too long. */
-export function locate(timeout = 8000) {
-  if (!navigator.geolocation) return Promise.resolve(null);
+/** The device's location (native GPS in Capacitor, browser geolocation on web), or null. */
+export async function locate(timeout = 8000) {
+  if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+    try {
+      const { Geolocation } = await import('@capacitor/geolocation');
+      const perm = await Geolocation.requestPermissions();
+      if (perm.location === 'granted' || perm.coarseLocation === 'granted') {
+        const pos = await Geolocation.getCurrentPosition({ timeout, enableHighAccuracy: false });
+        return { lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Where you are' };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  if (!navigator.geolocation) return null;
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, label: 'Where you are' }),

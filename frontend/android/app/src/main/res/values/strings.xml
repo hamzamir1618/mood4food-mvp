@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mood4Food</string>
+    <string name="title_activity_main">Mood4Food</string>
+    <string name="package_name">pk.mood4food.app</string>
+    <string name="custom_url_scheme">pk.mood4food.app</string>
+</resources>

@@ -14,7 +14,13 @@ import { allergenLine, placeLine, rupees, serves } from '../utils.js';
  * server add one before the frontend can draw it.
  */
 
-const REASON_KEYS = { Taste: 'taste', Budget: 'budget', Health: 'health', Distance: 'distance' };
+const REASON_KEYS = {
+  Taste: 'taste',
+  Budget: 'budget',
+  Health: 'health',
+  Context: 'semantic',
+  Distance: 'distance',
+};
 
 function Match({ ctx }) {
   return (
