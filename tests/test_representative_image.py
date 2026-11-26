@@ -16,6 +16,16 @@ BREAD = _photo_for("paratha")
 COFFEE = _photo_for("coffee")
 KEBAB = _photo_for("kebab")
 DONUT = _photo_for("donut")
+BIRYANI = _photo_for("biryani")
+FRIED_RICE = _photo_for("fried rice")
+DUMPLINGS = _photo_for("dumpling")
+WINGS = _photo_for("wing")
+FISH = _photo_for("fish")
+SANDWICH = _photo_for("sandwich")
+SAMOSA = _photo_for("samosa")
+SUSHI = _photo_for("sushi")
+STIR_FRY = _photo_for("manchurian")
+STEAK = _photo_for("steak")
 
 
 @pytest.mark.parametrize(
@@ -26,6 +36,15 @@ DONUT = _photo_for("donut")
         ("Seekh Kababs", "desi_traditional", KEBAB),  # plurals still match
         ("Iced Coffee", "beverages", COFFEE),
         ("Chocolate Donut", "cafe_bakery", DONUT),
+        ("Chicken Biryani", "desi_traditional", BIRYANI),
+        ("Steamed White Rice", "chinese_asian", FRIED_RICE),
+        ("Korean Dumpling", "chinese_asian", DUMPLINGS),
+        ("Honey Glazed Wings", "chinese_asian", WINGS),
+        ("Grilled Fish", "continental_upscale", FISH),
+        ("Club Sandwich", "fast_food", SANDWICH),
+        ("Spring Rolls", "chinese_asian", SAMOSA),  # not shawarma wrap
+        ("Sushi Roll", "chinese_asian", SUSHI),  # not shawarma wrap
+        ("Chicken Manchurian with Rice", "chinese_asian", STIR_FRY),  # main before side
     ],
 )
 def test_a_dish_is_shown_as_what_its_name_says(name, category, expected):
@@ -33,16 +52,20 @@ def test_a_dish_is_shown_as_what_its_name_says(name, category, expected):
 
 
 @pytest.mark.parametrize(
-    "name, category",
+    "name, category, expected",
     [
-        ("Dawat Platter", "desi_traditional"),  # "platter" contains "latte"
-        ("Chicken Steak", "continental_upscale"),  # "steak" contains "tea"
-        ("Steamed White Rice", "chinese_asian"),  # "steamed" contains "tea"
+        (
+            "Dawat Platter",
+            "desi_traditional",
+            CATEGORY_PHOTOS["desi_traditional"],
+        ),  # "platter" contains "latte"
+        ("Chicken Steak", "continental_upscale", STEAK),  # "steak" contains "tea"
+        ("Steamed White Rice", "chinese_asian", FRIED_RICE),  # "steamed" contains "tea"
     ],
 )
-def test_a_word_inside_another_word_is_not_a_match(name, category):
+def test_a_word_inside_another_word_is_not_a_match(name, category, expected):
     assert representative_image(name, category) != COFFEE
-    assert representative_image(name, category) == CATEGORY_PHOTOS[category]
+    assert representative_image(name, category) == expected
 
 
 def test_a_mixed_category_gets_no_photo_rather_than_a_wrong_one():

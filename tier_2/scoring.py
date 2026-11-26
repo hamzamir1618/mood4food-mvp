@@ -138,6 +138,8 @@ AMDR = {"protein": (0.10, 0.35), "carbs": (0.45, 0.65), "fat": (0.20, 0.35)}
 
 CONTEXT_WEIGHT = 0.1  # the clock, the weather, the usual expectation of a meal
 CONTEXT_WEIGHT_EXPLICIT = 0.3  # the query itself names the meal: "lunch", "dinner"...
+SEMANTIC_WEIGHT = 0.25  # dense contextual similarity (MiniLM-L6-v2) between query and dish
+SEMANTIC_CONFIDENCE = 0.85  # automated semantic match, honest uncertainty (< 1.0)
 DISTANCE_WEIGHT = 0.15  # alongside health, budget and taste, which sum to 1. Kept small
 # deliberately: api/location.py already drops restaurants over 10 km when closer ones match,
 # so this only separates the ones that survived, and a bigger share would mute the sliders.
@@ -204,6 +206,8 @@ class Preferences:
     importance: dict[str, float] = field(default_factory=lambda: {d: 1.0 for d in TASTE_DIMS})
     learned_from: int = 0  # approvals the taste and importance were learned from
     peers: dict[str, int] = field(default_factory=dict)  # dish_uid -> similar users approving
+    query_text: str = ""  # original user request, for contextual semantic matching
+    semantic_scores: dict[str, float] = field(default_factory=dict)  # dish_uid -> raw cosine
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -585,6 +589,40 @@ def distance_term(dish: dict) -> Term:
     )
 
 
+def semantic_term(dish: dict, prefs: Preferences) -> Term:
+    """
+    Contextual semantic fit between the user's request and the dish's full culinary
+    context (cuisine, ingredients, flavour, nutrition band, occasion), using ONNX
+    MiniLM-L6-v2 embeddings. Sits out when no semantic scores were computed.
+    """
+    uid = str(dish.get("dish_id") or "")
+    raw_sim = prefs.semantic_scores.get(uid)
+    if raw_sim is None:
+        return Term(0.0, 0.0, "", False)
+    from tier_2.semantic_index import calibrate_similarity
+
+    utility = calibrate_similarity(float(raw_sim))
+    pct = int(round(utility * 100))
+    if utility >= SUMMARY_GOOD:
+        return Term(
+            utility,
+            SEMANTIC_CONFIDENCE,
+            f"Closely matches the context of your request ({pct}% semantic fit).",
+            phrase="matches what you asked for closely",
+        )
+    if utility >= 0.4:
+        return Term(
+            utility,
+            SEMANTIC_CONFIDENCE,
+            f"Fits the general context of your request ({pct}% semantic fit).",
+        )
+    return Term(
+        utility,
+        SEMANTIC_CONFIDENCE,
+        f"Only loosely matched to the wording of your request ({pct}% semantic fit).",
+    )
+
+
 def novelty(dish: dict, prefs: Preferences) -> tuple[float, str]:
     uid = dish.get("dish_id")
     recent = [e for e in prefs.history if e.get("dish_uid") == uid and e.get("days_ago", 99) <= 7]
@@ -647,6 +685,7 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "budget": budget_term(dish, prefs),
         "taste": taste_term(dish, prefs),
         "context": context_term(dish, prefs),
+        "semantic": semantic_term(dish, prefs),
         "distance": distance_term(dish),
     }
     weights = {
@@ -656,6 +695,7 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "context": (
             CONTEXT_WEIGHT_EXPLICIT if prefs.meal or prefs.wants_filling else CONTEXT_WEIGHT
         ),
+        "semantic": SEMANTIC_WEIGHT,
         "distance": DISTANCE_WEIGHT,
     }
     # Each term counts in proportion to its confidence; the rest of its weight counts
@@ -735,6 +775,7 @@ def score_dish(dish: dict, prefs: Preferences) -> dict:
         "u_budget": _utility(terms["budget"]),
         "u_taste": _utility(terms["taste"]),
         "u_context": _utility(terms["context"]),
+        "u_semantic": _utility(terms["semantic"]),
         "u_distance": _utility(terms["distance"]),
         "u_total": round(total, 6),
         "confidence": {k: round(t.confidence, 3) for k, t in live.items()},
@@ -771,7 +812,16 @@ def _tie_break(s: dict) -> tuple:
 
 def rank(candidates: list[dict], prefs: Preferences) -> list[dict]:
     """Scores every candidate; best first, ties broken by the other terms then by name."""
-    prefs = replace(prefs, price_pool=sorted(_cost(c, prefs.party_size)[1] for c in candidates))
+    semantic_scores = prefs.semantic_scores
+    if prefs.query_text and not semantic_scores and candidates:
+        from tier_2.semantic_index import score_query_candidates
+
+        semantic_scores = score_query_candidates(prefs.query_text, candidates)
+    prefs = replace(
+        prefs,
+        price_pool=sorted(_cost(c, prefs.party_size)[1] for c in candidates),
+        semantic_scores=semantic_scores,
+    )
     scored = [score_dish(c, prefs) for c in candidates]
     return sorted(scored, key=_tie_break)
 
@@ -797,7 +847,7 @@ def traces(ranked: list[dict], prefs: Preferences, top: int = 5) -> list[str]:
                 f"    - {agent.capitalize()} Agent: {reason} "
                 f"(raw: {raw}, confidence: {confidence:.2f})"
             )
-        for extra in ("context", "distance", "coverage", "novelty", "peers"):
+        for extra in ("context", "semantic", "distance", "coverage", "novelty", "peers"):
             if s["reasons"].get(extra):
                 lines.append(f"    - {extra.capitalize()}: {s['reasons'][extra]}")
         lines.append(f"    => Final U_total: {s['u_total']:.4f}")
@@ -885,4 +935,5 @@ def build_preferences(
         hour=context.get("hour"),
         temperature_c=context.get("temperature_c"),
         persona=persona,
+        query_text=str(intent.get("raw_input") or "").strip(),
     )

@@ -437,50 +437,181 @@ def _photo(unsplash_id: str) -> str:
 
 
 # Stock photographs, shown labelled "Representative image": what kind of dish it is, never
-# the plate you'll be served. Every one was checked by eye against its label (2026-09-21):
-# the bread photo used to be samosas, the soup photo a grain bowl, and the café fallback a
-# stack of sprinkled donuts that ended up on aloo paratha and halwa puri.
+# the plate you'll be served. Every URL is verified HTTP 200 and matched on whole words
+# (with optional plural) in specificity order so compound names map to the actual dish
+# rather than a broad cuisine fallback.
+_PHOTO_NOODLES = _photo("1585032226651-759b368d7246")
+_PHOTO_STIR_FRY = _photo("1605704931020-ba62cdb2ba9b")
+_PHOTO_CURRY = _photo("1585937421612-70a008356fbe")
+_PHOTO_BIRYANI = _photo("1563379091339-03b21ab4a4f8")
+_PHOTO_FRIED_RICE = _photo("1603133872878-684f208fb84b")
+_PHOTO_STEAK = _photo("1600891964092-4316c288032e")
+_PHOTO_FISH = _photo("1519708227418-c8fd9a32b7a2")
+_PHOTO_SHAWARMA = _photo("1529006557810-274b9b2fc783")
+_PHOTO_HUMMUS = _photo("1637949385162-e416fb15b2ce")
+_PHOTO_BURGER = _photo("1568901346375-23c9450c58cd")
+_PHOTO_SANDWICH = _photo("1528735602780-2552fd46c7af")
+_PHOTO_WINGS = _photo("1527477396000-e27163b481c2")
+_PHOTO_FRIES = _photo("1615485290836-4ebcebf44aaf")
+_PHOTO_PIZZA = _photo("1513104890138-7c749659a591")
+_PHOTO_BEVERAGE = _photo("1536935338788-846bb9981813")
+_PHOTO_DUMPLINGS = _photo("1541696432-82c6da8ce7bf")
+_PHOTO_SUSHI = _photo("1579871494447-9811cf80d66c")
+_PHOTO_TACOS = _photo("1565299585323-38d6b0865b47")
+_PHOTO_ROAST_CHICKEN = _photo("1598103442097-8b74394b95c6")
+_PHOTO_SAMOSA = _photo("1601050690597-df0568f70950")
+_PHOTO_OMELETTE = _photo("1510693206972-df098062cb71")
+
 CATEGORY_PHOTOS = {
-    "chinese_asian": _photo("1585032226651-759b368d7246"),  # noodles
-    "desi_traditional": _photo("1585937421612-70a008356fbe"),  # curries with rice
-    "afghan": _photo("1585937421612-70a008356fbe"),
-    "continental_upscale": _photo("1600891964092-4316c288032e"),  # steak and fries
-    "middle_eastern": _photo("1529006557810-274b9b2fc783"),  # shawarma
-    "fast_food": _photo("1568901346375-23c9450c58cd"),  # burger
-    "pizza": _photo("1513104890138-7c749659a591"),
-    "beverages": _photo("1536935338788-846bb9981813"),
+    "chinese_asian": _PHOTO_STIR_FRY,  # Asian stir-fry (most unmatched Asian mains are stir-fries)
+    "desi_traditional": _PHOTO_CURRY,  # curries with rice
+    "afghan": _PHOTO_CURRY,
+    "continental_upscale": _PHOTO_STEAK,  # steak and fries
+    "middle_eastern": _PHOTO_SHAWARMA,  # shawarma
+    "fast_food": _PHOTO_BURGER,  # burger
+    "pizza": _PHOTO_PIZZA,
+    "beverages": _PHOTO_BEVERAGE,
     # "cafe_bakery" and "other" are deliberately absent. They hold cakes, parathas, salads and
     # full breakfasts alike, so no single photograph is honest for them; no photo is better
     # than a wrong one.
 }
 KEYWORD_PHOTOS = (
+    # Compound / specific dishes first so generic words ("roll", "cake", "rice") don't misfire.
+    (("spring roll", "egg roll", "samosa", "pakora", "chaat", "kachori"), _PHOTO_SAMOSA),
+    (("sushi", "maki", "sashimi", "tempura", "california roll"), _PHOTO_SUSHI),
+    (("dumpling", "momo", "gyoza", "wonton", "dim sum"), _PHOTO_DUMPLINGS),
+    (("fish cake", "crab cake"), _PHOTO_FISH),
     (
-        ("cake", "cheesecake", "brownie", "lava cake", "pastry", "molten"),
-        _photo("1578985545062-69928b1d9587"),
+        ("paratha roll", "tikka roll", "kebab roll", "kabab roll"),
+        _photo("1626700051175-6818013e1d4f"),
+    ),
+    (("omelette", "omellete", "shakshuka", "pancake", "waffle", "scrambled"), _PHOTO_OMELETTE),
+    (("biryani", "pulao", "pilaf", "mandi", "kabsa", "bukhari"), _PHOTO_BIRYANI),
+    (
+        ("noodle", "chowmein", "chow mein", "ramen", "pad thai", "phad thai", "lo mein", "udon"),
+        _PHOTO_NOODLES,
     ),
     (
-        ("naan", "nan", "roti", "chapati", "paratha", "puri", "kulcha"),
-        _photo("1708783741187-ff1d081d87da"),
+        (
+            "manchurian",
+            "mongolian",
+            "kung pao",
+            "szechuan",
+            "schezuan",
+            "stir fry",
+            "cashew",
+            "sweet and sour",
+            "sweet & sour",
+            "chilli dry",
+            "chili dry",
+            "dynamite",
+        ),
+        _PHOTO_STIR_FRY,
     ),
-    (("shake", "malt", "smoothie", "lassi", "frappe"), _photo("1572490122747-3968b75cc699")),
+    (("burger", "cheeseburger", "hamburger", "zinger"), _PHOTO_BURGER),
+    (("pizza", "pide", "calzone", "margherita", "pepperoni"), _PHOTO_PIZZA),
+    (("sandwich", "panini", "club", "sub", "toastie"), _PHOTO_SANDWICH),
+    (("wing", "nugget", "tender", "strip", "broast", "drumstick", "popcorn chicken"), _PHOTO_WINGS),
+    (("fries", "wedge"), _PHOTO_FRIES),
+    (("taco", "burrito", "quesadilla", "nacho", "enchilada"), _PHOTO_TACOS),
+    (
+        ("pasta", "spaghetti", "macaroni", "fettuccine", "alfredo", "penne", "lasagna", "lasagne"),
+        _photo("1473093295043-cdd812d0e601"),
+    ),
+    (
+        ("steak", "t-bone", "ribeye", "sirloin", "tenderloin", "lamb chop", "mutton chop"),
+        _PHOTO_STEAK,
+    ),
+    (
+        (
+            "fish",
+            "salmon",
+            "prawn",
+            "shrimp",
+            "lobster",
+            "squid",
+            "calamari",
+            "seafood",
+            "pomfret",
+            "snapper",
+        ),
+        _PHOTO_FISH,
+    ),
+    (("sajji", "roast chicken", "chicken roast", "chargha", "rotisserie"), _PHOTO_ROAST_CHICKEN),
+    (
+        ("hummus", "meze", "mezze", "falafel", "mutabbal", "haydari", "ezme", "fattoush"),
+        _PHOTO_HUMMUS,
+    ),
+    (
+        ("soup", "yakhni", "tom yum", "hot and sour", "hot & sour"),
+        _photo("1665594051407-7385d281ad76"),
+    ),
+    (("salad", "caesar", "tabbouleh"), _photo("1512621776951-a57141f2eefd")),
     (("wrap", "roll", "shawarma", "gyro"), _photo("1626700051175-6818013e1d4f")),
     (
-        ("coffee", "tea", "chai", "espresso", "latte", "cappuccino"),
-        _photo("1541167760496-1628856ab772"),
+        (
+            "karahi",
+            "masala",
+            "handi",
+            "makhni",
+            "makhani",
+            "qorma",
+            "korma",
+            "nihari",
+            "haleem",
+            "qeema",
+            "keema",
+            "jalfrezi",
+            "daal",
+            "dal",
+            "curry",
+            "butter chicken",
+            "palak",
+            "paneer",
+            "rosh",
+            "kofta",
+        ),
+        _PHOTO_CURRY,
     ),
-    (("ice cream", "sundae", "gelato"), _photo("1497034825429-c343d7c6a68f")),
-    (("burger", "cheeseburger", "hamburger"), CATEGORY_PHOTOS["fast_food"]),
-    (("pizza",), CATEGORY_PHOTOS["pizza"]),
-    (("karahi", "masala", "handi", "makhni"), CATEGORY_PHOTOS["desi_traditional"]),
-    (("kebab", "kabab", "seekh", "tikka", "boti", "skewer"), _photo("1603360946369-dc9bb6258143")),
     (
-        ("juice", "lemonade", "drink", "soda", "cola", "sprite", "fanta", "coke", "pepsi"),
-        CATEGORY_PHOTOS["beverages"],
+        ("kebab", "kabab", "seekh", "tikka", "boti", "skewer", "shashlik"),
+        _photo("1603360946369-dc9bb6258143"),
+    ),
+    (
+        ("naan", "nan", "roti", "chapati", "paratha", "puri", "kulcha", "lavash"),
+        _photo("1708783741187-ff1d081d87da"),
+    ),
+    (("ice cream", "sundae", "gelato", "kulfi"), _photo("1497034825429-c343d7c6a68f")),
+    (
+        (
+            "cake",
+            "cheesecake",
+            "brownie",
+            "lava cake",
+            "pastry",
+            "molten",
+            "tiramisu",
+            "mousse",
+            "tart",
+            "kunafa",
+            "baklava",
+            "pudding",
+            "kheer",
+            "gulab jamun",
+        ),
+        _photo("1578985545062-69928b1d9587"),
     ),
     (("donut", "doughnut"), _photo("1551024601-bec78aea704b")),
-    (("salad",), _photo("1512621776951-a57141f2eefd")),
-    (("soup",), _photo("1665594051407-7385d281ad76")),  # corn and vegetable soup
-    (("pasta", "spaghetti", "macaroni"), _photo("1473093295043-cdd812d0e601")),
+    (("shake", "malt", "smoothie", "lassi", "frappe"), _photo("1572490122747-3968b75cc699")),
+    (
+        ("coffee", "tea", "chai", "espresso", "latte", "cappuccino", "americano", "mocha", "kahwa"),
+        _photo("1541167760496-1628856ab772"),
+    ),
+    (
+        ("juice", "lemonade", "drink", "soda", "cola", "sprite", "fanta", "coke", "pepsi"),
+        _PHOTO_BEVERAGE,
+    ),
+    (("fried rice", "rice"), _PHOTO_FRIED_RICE),
 )
 # Whole words, optional plural. Substring matching put a coffee cup on 61 dishes, because
 # "platter" contains "latte" and "steak" contains "tea".

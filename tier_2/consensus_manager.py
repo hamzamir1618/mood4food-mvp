@@ -76,7 +76,7 @@ CATEGORY_NAMES = {
     "sandwich": "sandwich",
     "cafe_bakery": "café",
 }
-UTILITIES = ("u_health", "u_budget", "u_taste", "u_context", "u_distance", "u_total")
+UTILITIES = ("u_health", "u_budget", "u_taste", "u_context", "u_semantic", "u_distance", "u_total")
 
 
 def run_debate(candidates: list[dict], prefs: Preferences) -> dict:
